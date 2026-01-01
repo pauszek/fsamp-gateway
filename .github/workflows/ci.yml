@@ -8,5 +8,5 @@ on:
 
 jobs:
   call-java:
-    uses: pauszek/fsamp-code-ci/.github/workflows/build-java.yml@v0.0.19
+    uses: pauszek/fsamp-code-ci/.github/workflows/build-java.yml@v0.0.21
     secrets: inherit
