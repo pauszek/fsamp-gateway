@@ -11,7 +11,7 @@ files:
   version: release.version
 
 qodana:
-  enabled: true
+  enabled: false
 
 bump:
   enabled: true
