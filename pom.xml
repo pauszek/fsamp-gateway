@@ -10,11 +10,12 @@
     </parent>
     <groupId>io.github.pauszek</groupId>
     <artifactId>fsamp-gateway</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>${revision}</version>
     <name>fsamp-gateway</name>
     <description>FSAMP Gateway - Enterprise-grade secure file upload microservice with FIPS 140-3 compliance</description>
 
     <properties>
+        <revision>0.0.1-SNAPSHOT</revision>
         <java.version>21</java.version>
         <aws.sdk.version>2.29.51</aws.sdk.version>
         <bouncycastle.version>2.0.0</bouncycastle.version>
@@ -275,6 +276,32 @@
                 <configuration>
                     <argLine>-Dorg.bouncycastle.fips.approved_only=true</argLine>
                 </configuration>
+            </plugin>
+            <!-- CI-Friendly Versions Support -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>1.6.0</version>
+                <configuration>
+                    <updatePomFile>true</updatePomFile>
+                    <flattenMode>resolveCiFriendliesOnly</flattenMode>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>flatten</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>flatten</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>flatten.clean</id>
+                        <phase>clean</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
