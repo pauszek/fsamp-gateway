@@ -33,9 +33,23 @@ management:
   endpoint:
     health:
       show-details: when_authorized
+      probes:
+        enabled: true
+  health:
+    circuitbreakers:
+      enabled: true
+    ratelimiters:
+      enabled: true
   metrics:
     tags:
       application: ${spring.application.name}
+      environment: ${spring.profiles.active:local}
+      fips_enabled: "true"
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      slo:
+        http.server.requests: 100ms,200ms,500ms,1s,2s
     export:
       cloudwatch:
         enabled: false
@@ -112,6 +126,16 @@ resilience4j:
       fileUpload:
         max-concurrent-calls: 25
         max-wait-duration: 0ms
+
+# =============================================================================
+# Security Configuration
+# =============================================================================
+security:
+  fips:
+    # FIPS 140-3 approved-only mode (enforces NIST-validated algorithms)
+    approved-only: ${FIPS_APPROVED_ONLY:true}
+    # Position of FIPS provider in security provider list (1 = highest priority)
+    provider-position: 1
 
 # OpenAPI / Swagger
 springdoc:
