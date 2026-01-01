@@ -26,3 +26,8 @@ docker:
   enabled: true
   image-name: fsamp-gateway
   registry: ghcr.io
+
+sonar:
+  enabled: true
+  organization: pauszek
+  project-key: pauszek_fsamp-gateway
