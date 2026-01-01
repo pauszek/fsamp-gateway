@@ -34,3 +34,6 @@ build/
 
 # Maven flatten plugin
 .flattened-pom.xml
+
+# Downloaded schema (fetched from fsamp-event-schema)
+schema/
