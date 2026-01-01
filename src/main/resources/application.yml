@@ -9,6 +9,16 @@ spring:
       max-request-size: 100MB
       enabled: true
 
+# AWS Cognito Configuration
+cognito:
+  region: ${COGNITO_REGION:us-west-2}
+  user-pool-id: ${COGNITO_USER_POOL_ID:}
+  client-id: ${COGNITO_CLIENT_ID:}
+  client-secret: ${COGNITO_CLIENT_SECRET:}
+  # For LocalStack: override these with custom endpoints
+  jwks-endpoint: ${COGNITO_JWKS_ENDPOINT:}
+  issuer-uri: ${COGNITO_ISSUER_URI:}
+
 server:
   port: 8080
   error:
@@ -107,6 +117,16 @@ spring:
     activate:
       on-profile: local
 
+# LocalStack Cognito Mock (for local development without real Cognito)
+# In local mode, we'll use a mock JWT issuer
+cognito:
+  region: us-west-2
+  user-pool-id: local_test_pool
+  client-id: local_test_client
+  # LocalStack doesn't fully support Cognito JWKS, use mock endpoint
+  jwks-endpoint: http://localhost:4566/.well-known/jwks.json
+  issuer-uri: http://localhost:4566
+
 aws:
   region: us-west-2
   endpoint: http://localhost:4566
@@ -142,6 +162,11 @@ spring:
   config:
     activate:
       on-profile: dev
+
+cognito:
+  region: ${AWS_REGION:us-west-2}
+  user-pool-id: ${COGNITO_USER_POOL_ID}
+  client-id: ${COGNITO_CLIENT_ID}
 
 aws:
   region: ${AWS_REGION:us-west-2}
@@ -180,6 +205,11 @@ spring:
   config:
     activate:
       on-profile: prod
+
+cognito:
+  region: ${AWS_REGION:us-west-2}
+  user-pool-id: ${COGNITO_USER_POOL_ID}
+  client-id: ${COGNITO_CLIENT_ID}
 
 aws:
   region: ${AWS_REGION:us-west-2}

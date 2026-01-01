@@ -5,9 +5,14 @@ spring:
       on-profile: test
   main:
     lazy-initialization: true
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+
+# Test Cognito configuration (for mock JwtDecoder)
+cognito:
+  region: us-west-2
+  user-pool-id: test-pool-id
+  client-id: test-client-id
+  jwks-endpoint: http://localhost:9999/.well-known/jwks.json
+  issuer-uri: https://cognito-idp.us-west-2.amazonaws.com/test-pool
 
 # Disable AWS connections for unit tests
 storage:
@@ -24,6 +29,29 @@ events:
 # Mock AWS endpoints
 aws:
   region: eu-central-1
+  endpoint: http://localhost:4566
+  credentials:
+    access-key: test
+    secret-key: test
+  s3:
+    bucket-name: test-bucket
+  sns:
+    file-events-topic-arn: arn:aws:sns:us-west-2:000000000000:test-topic
+  kms:
+    key-id: alias/test-key
+  dynamodb:
+    table-name: test-metadata
+
+fsamp:
+  security:
+    fips-mode: false  # Disable FIPS for tests
+    allowed-content-types:
+      - application/pdf
+      - image/png
+      - image/jpeg
+      - application/json
+      - text/plain
+    max-file-size-bytes: 10485760  # 10MB for tests
 
 logging:
   level:

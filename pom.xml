@@ -61,6 +61,19 @@
             <artifactId>spring-boot-starter-aop</artifactId>
         </dependency>
 
+        <!-- OAuth2 Resource Server (Cognito JWT validation) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+        
+        <!-- nimbus-jose-jwt for JWT processing -->
+        <dependency>
+            <groupId>com.nimbusds</groupId>
+            <artifactId>nimbus-jose-jwt</artifactId>
+            <version>9.47</version>
+        </dependency>
+
         <!-- Resilience4j - Circuit Breaker, Retry, Rate Limiter -->
         <dependency>
             <groupId>io.github.resilience4j</groupId>

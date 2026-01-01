@@ -85,7 +85,18 @@ public class OpenApiConfig {
                         .type(SecurityScheme.Type.HTTP)
                         .scheme("bearer")
                         .bearerFormat("JWT")
-                        .description("JWT authentication (future implementation)"));
+                        .description("""
+                                AWS Cognito JWT authentication.
+                                
+                                Obtain a token via:
+                                1. Cognito Hosted UI OAuth2 flow
+                                2. Cognito API (InitiateAuth)
+                                
+                                Token contains:
+                                - `cognito:groups` - User groups (admins, users)
+                                - `scope` - OAuth2 scopes (files.read, files.write)
+                                - `sub` - Unique user identifier
+                                """));
     }
 
     private SecurityRequirement securityRequirement() {

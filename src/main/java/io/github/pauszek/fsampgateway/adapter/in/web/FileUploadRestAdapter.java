@@ -6,7 +6,9 @@ import io.github.pauszek.fsampgateway.application.dto.FileUploadResponseDto;
 import io.github.pauszek.fsampgateway.application.mapper.FileMapper;
 import io.github.pauszek.fsampgateway.domain.command.UploadFileCommand;
 import io.github.pauszek.fsampgateway.domain.model.SecureFile;
+import io.github.pauszek.fsampgateway.domain.model.UserPrincipal;
 import io.github.pauszek.fsampgateway.domain.port.in.UploadFileUseCase;
+import io.github.pauszek.fsampgateway.infrastructure.security.cognito.CurrentUserService;
 import io.micrometer.core.annotation.Timed;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -14,12 +16,14 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -31,11 +35,18 @@ import java.io.IOException;
  * 
  * Primary adapter that exposes the file upload use case via REST API.
  * 
+ * Security:
+ * - All endpoints require OAuth2 Bearer token (Cognito JWT)
+ * - Upload requires files.write scope or ROLE_USERS/ROLE_ADMINS
+ * - Download requires files.read scope or ROLE_USERS/ROLE_ADMINS
+ * - Delete requires ROLE_ADMINS only
+ * 
  * API versioning: URL path versioning (v1)
  */
 @RestController
 @RequestMapping("/api/v1/files")
 @Tag(name = "Files", description = "File upload and management operations")
+@SecurityRequirement(name = "bearerAuth")
 @Validated
 @Slf4j
 @RequiredArgsConstructor
@@ -43,6 +54,7 @@ public class FileUploadRestAdapter {
 
     private final UploadFileUseCase uploadFileUseCase;
     private final FileMapper fileMapper;
+    private final CurrentUserService currentUserService;
 
     @Operation(
             summary = "Upload a file",
@@ -56,6 +68,8 @@ public class FileUploadRestAdapter {
                     
                     **Allowed file types:** PDF, PNG, JPEG, JSON, XML, TXT, CSV
                     **Max file size:** 100MB
+                    
+                    **Required permissions:** `files.write` scope OR `users`/`admins` group membership
                     """
     )
     @ApiResponses({
@@ -67,6 +81,16 @@ public class FileUploadRestAdapter {
             @ApiResponse(
                     responseCode = "400",
                     description = "Invalid request (validation error)",
+                    content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Authentication required",
+                    content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Insufficient permissions",
                     content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
             ),
             @ApiResponse(
@@ -90,6 +114,7 @@ public class FileUploadRestAdapter {
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE
     )
+    @PreAuthorize("hasAnyAuthority('SCOPE_files.write', 'ROLE_USERS', 'ROLE_ADMINS')")
     @Timed(value = "file.upload", description = "Time taken to upload a file")
     public ResponseEntity<FileUploadResponseDto> uploadFile(
             @Parameter(description = "File to upload", required = true)
@@ -98,8 +123,12 @@ public class FileUploadRestAdapter {
             @Parameter(description = "Optional upload metadata")
             @ModelAttribute FileUploadRequestDto request
     ) throws IOException {
-        log.info("Received upload request: filename={}, size={}, contentType={}",
-                file.getOriginalFilename(), file.getSize(), file.getContentType());
+        // Get authenticated user from security context
+        UserPrincipal currentUser = currentUserService.getCurrentUser()
+                .orElseThrow(() -> new IllegalStateException("User not found in security context"));
+        
+        log.info("Received upload request: filename={}, size={}, contentType={}, userId={}",
+                file.getOriginalFilename(), file.getSize(), file.getContentType(), currentUser.userId());
 
         UploadFileCommand command = UploadFileCommand.builder()
                 .fileName(file.getOriginalFilename())
@@ -107,21 +136,25 @@ public class FileUploadRestAdapter {
                 .size(file.getSize())
                 .content(file.getInputStream())
                 .correlationId(request != null ? request.correlationId() : null)
-                .uploadedBy("ANONYMOUS") // TODO: Get from security context
+                .uploadedBy(currentUser.userId())
                 .build();
 
         SecureFile uploadedFile = uploadFileUseCase.execute(command);
         FileUploadResponseDto response = fileMapper.toResponseDto(uploadedFile);
 
-        log.info("Upload successful: fileId={}, status={}", 
-                uploadedFile.getId(), uploadedFile.getStatus());
+        log.info("Upload successful: fileId={}, status={}, userId={}", 
+                uploadedFile.getId(), uploadedFile.getStatus(), currentUser.userId());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @Operation(
             summary = "Get file metadata",
-            description = "Retrieve metadata for a previously uploaded file"
+            description = """
+                    Retrieve metadata for a previously uploaded file.
+                    
+                    **Required permissions:** `files.read` scope OR `users`/`admins` group membership
+                    """
     )
     @ApiResponses({
             @ApiResponse(
@@ -130,19 +163,73 @@ public class FileUploadRestAdapter {
                     content = @Content(schema = @Schema(implementation = FileUploadResponseDto.class))
             ),
             @ApiResponse(
+                    responseCode = "401",
+                    description = "Authentication required",
+                    content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Insufficient permissions",
+                    content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
+            ),
+            @ApiResponse(
                     responseCode = "404",
                     description = "File not found",
                     content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
             )
     })
     @GetMapping("/{fileId}")
+    @PreAuthorize("hasAnyAuthority('SCOPE_files.read', 'ROLE_USERS', 'ROLE_ADMINS')")
     @Timed(value = "file.get", description = "Time taken to get file metadata")
     public ResponseEntity<FileUploadResponseDto> getFile(
             @Parameter(description = "File ID", required = true)
             @PathVariable String fileId
     ) {
-        log.info("Get file request: fileId={}", fileId);
+        String userId = currentUserService.getCurrentUserId().orElse("unknown");
+        log.info("Get file request: fileId={}, userId={}", fileId, userId);
         // TODO: Implement GetFileUseCase
+        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+    }
+
+    @Operation(
+            summary = "Delete a file",
+            description = """
+                    Delete a file from the platform.
+                    
+                    **Required permissions:** `admins` group membership only
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "204",
+                    description = "File deleted successfully"
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Authentication required",
+                    content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Admin role required",
+                    content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "File not found",
+                    content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
+            )
+    })
+    @DeleteMapping("/{fileId}")
+    @PreAuthorize("hasRole('ADMINS')")
+    @Timed(value = "file.delete", description = "Time taken to delete a file")
+    public ResponseEntity<Void> deleteFile(
+            @Parameter(description = "File ID", required = true)
+            @PathVariable String fileId
+    ) {
+        String userId = currentUserService.getCurrentUserId().orElse("unknown");
+        log.info("Delete file request: fileId={}, userId={}", fileId, userId);
+        // TODO: Implement DeleteFileUseCase
         return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
     }
 }

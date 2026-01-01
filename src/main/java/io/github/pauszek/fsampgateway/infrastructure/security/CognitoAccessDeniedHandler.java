@@ -1,0 +1,59 @@
+package io.github.pauszek.fsampgateway.infrastructure.security;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.web.access.AccessDeniedHandler;
+
+import java.io.IOException;
+import java.time.Instant;
+import java.util.Map;
+
+/**
+ * Custom access denied handler for OAuth2 resource server.
+ * 
+ * Returns standardized JSON error responses when authenticated user
+ * lacks required authorities (roles/scopes) to access a resource.
+ * 
+ * Response format follows RFC 7807 Problem Details.
+ */
+@Slf4j
+public class CognitoAccessDeniedHandler implements AccessDeniedHandler {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+    @Override
+    public void handle(HttpServletRequest request,
+                       HttpServletResponse response,
+                       AccessDeniedException accessDeniedException) throws IOException {
+        
+        log.warn("Access denied for request to {}: {}", 
+                request.getRequestURI(), 
+                accessDeniedException.getMessage());
+
+        response.setStatus(HttpStatus.FORBIDDEN.value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        
+        // Build RFC 7807 compliant error response
+        Map<String, Object> errorResponse = Map.of(
+                "type", "https://datatracker.ietf.org/doc/html/rfc7231#section-6.5.3",
+                "title", "Forbidden",
+                "status", HttpStatus.FORBIDDEN.value(),
+                "detail", "You don't have permission to access this resource",
+                "instance", request.getRequestURI(),
+                "error", "insufficient_scope",
+                "timestamp", Instant.now().toString()
+        );
+        
+        // Add WWW-Authenticate header with insufficient_scope error
+        response.setHeader("WWW-Authenticate", 
+                "Bearer error=\"insufficient_scope\", " +
+                "error_description=\"The access token lacks required scope\"");
+        
+        OBJECT_MAPPER.writeValue(response.getOutputStream(), errorResponse);
+    }
+}
