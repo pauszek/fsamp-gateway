@@ -1,0 +1,157 @@
+package io.github.pauszek.fsampgateway.infrastructure.config;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.kms.KmsClient;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.sns.SnsClient;
+import software.amazon.awssdk.services.sts.StsClient;
+
+import java.net.URI;
+
+/**
+ * AWS SDK Configuration.
+ * 
+ * Configures AWS clients for S3, SNS, KMS, STS.
+ * Supports LocalStack for local development.
+ */
+@Configuration
+public class AwsConfig {
+
+    private static final Logger log = LoggerFactory.getLogger(AwsConfig.class);
+
+    @Value("${aws.region:eu-central-1}")
+    private String region;
+
+    /**
+     * Production AWS configuration using default credentials chain.
+     */
+    @Configuration
+    @Profile("!local")
+    static class ProductionAwsConfig {
+
+        private final String region;
+
+        ProductionAwsConfig(@Value("${aws.region:eu-central-1}") String region) {
+            this.region = region;
+        }
+
+        @Bean
+        public AwsCredentialsProvider awsCredentialsProvider() {
+            log.info("Using AWS default credentials provider chain");
+            return DefaultCredentialsProvider.create();
+        }
+
+        @Bean
+        public S3Client s3Client(AwsCredentialsProvider credentialsProvider) {
+            log.info("Creating S3 client for region: {}", region);
+            return S3Client.builder()
+                    .region(Region.of(region))
+                    .credentialsProvider(credentialsProvider)
+                    .build();
+        }
+
+        @Bean
+        public SnsClient snsClient(AwsCredentialsProvider credentialsProvider) {
+            log.info("Creating SNS client for region: {}", region);
+            return SnsClient.builder()
+                    .region(Region.of(region))
+                    .credentialsProvider(credentialsProvider)
+                    .build();
+        }
+
+        @Bean
+        public KmsClient kmsClient(AwsCredentialsProvider credentialsProvider) {
+            log.info("Creating KMS client for region: {}", region);
+            return KmsClient.builder()
+                    .region(Region.of(region))
+                    .credentialsProvider(credentialsProvider)
+                    .build();
+        }
+
+        @Bean
+        public StsClient stsClient(AwsCredentialsProvider credentialsProvider) {
+            log.info("Creating STS client for region: {}", region);
+            return StsClient.builder()
+                    .region(Region.of(region))
+                    .credentialsProvider(credentialsProvider)
+                    .build();
+        }
+    }
+
+    /**
+     * LocalStack configuration for local development.
+     */
+    @Configuration
+    @Profile("local")
+    static class LocalStackAwsConfig {
+
+        private final String localstackUrl;
+        private final String region;
+
+        LocalStackAwsConfig(
+                @Value("${localstack.url:http://localhost:4566}") String localstackUrl,
+                @Value("${aws.region:eu-central-1}") String region) {
+            this.localstackUrl = localstackUrl;
+            this.region = region;
+        }
+
+        @Bean
+        public AwsCredentialsProvider awsCredentialsProvider() {
+            log.info("Using LocalStack static credentials");
+            return StaticCredentialsProvider.create(
+                    AwsBasicCredentials.create("test", "test")
+            );
+        }
+
+        @Bean
+        public S3Client s3Client(AwsCredentialsProvider credentialsProvider) {
+            log.info("Creating S3 client for LocalStack: {}", localstackUrl);
+            return S3Client.builder()
+                    .region(Region.of(region))
+                    .endpointOverride(URI.create(localstackUrl))
+                    .credentialsProvider(credentialsProvider)
+                    .forcePathStyle(true) // Required for LocalStack
+                    .build();
+        }
+
+        @Bean
+        public SnsClient snsClient(AwsCredentialsProvider credentialsProvider) {
+            log.info("Creating SNS client for LocalStack: {}", localstackUrl);
+            return SnsClient.builder()
+                    .region(Region.of(region))
+                    .endpointOverride(URI.create(localstackUrl))
+                    .credentialsProvider(credentialsProvider)
+                    .build();
+        }
+
+        @Bean
+        public KmsClient kmsClient(AwsCredentialsProvider credentialsProvider) {
+            log.info("Creating KMS client for LocalStack: {}", localstackUrl);
+            return KmsClient.builder()
+                    .region(Region.of(region))
+                    .endpointOverride(URI.create(localstackUrl))
+                    .credentialsProvider(credentialsProvider)
+                    .build();
+        }
+
+        @Bean
+        public StsClient stsClient(AwsCredentialsProvider credentialsProvider) {
+            log.info("Creating STS client for LocalStack: {}", localstackUrl);
+            return StsClient.builder()
+                    .region(Region.of(region))
+                    .endpointOverride(URI.create(localstackUrl))
+                    .credentialsProvider(credentialsProvider)
+                    .build();
+        }
+    }
+}

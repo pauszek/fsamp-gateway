@@ -1,0 +1,215 @@
+spring:
+  application:
+    name: fsamp-gateway
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+      enabled: true
+
+server:
+  port: 8080
+  error:
+    include-message: always
+    include-binding-errors: always
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    export:
+      cloudwatch:
+        enabled: false
+
+logging:
+  level:
+    root: INFO
+    io.github.pauszek: DEBUG
+    software.amazon.awssdk: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{correlationId}] %-5level %logger{36} - %msg%n"
+
+# Resilience4j Configuration
+resilience4j:
+  circuitbreaker:
+    instances:
+      s3Storage:
+        register-health-indicator: true
+        sliding-window-type: count_based
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        slow-call-rate-threshold: 80
+        slow-call-duration-threshold: 10s
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        minimum-number-of-calls: 5
+      snsPublisher:
+        register-health-indicator: true
+        sliding-window-type: count_based
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        slow-call-rate-threshold: 80
+        slow-call-duration-threshold: 5s
+        wait-duration-in-open-state: 20s
+        permitted-number-of-calls-in-half-open-state: 3
+        minimum-number-of-calls: 5
+  retry:
+    instances:
+      s3Storage:
+        max-attempts: 3
+        wait-duration: 1s
+        exponential-backoff-multiplier: 2
+      snsPublisher:
+        max-attempts: 5
+        wait-duration: 200ms
+        exponential-backoff-multiplier: 2
+
+# OpenAPI / Swagger
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operations-sorter: method
+    tags-sorter: alpha
+    display-request-duration: true
+  show-actuator: false
+
+# Storage configuration
+storage:
+  s3:
+    bucket: ${S3_BUCKET_NAME:fsamp-files-local}
+    kms-key-id: ${KMS_KEY_ID:alias/fsamp-files-key}
+    prefix: uploads/
+    presigned-url-expiration: 3600
+
+# Event publishing configuration
+events:
+  sns:
+    topic-arn: ${SNS_TOPIC_ARN:arn:aws:sns:eu-central-1:000000000000:fsamp-file-events}
+    source: fsamp-gateway
+
+---
+# Local profile (LocalStack)
+spring:
+  config:
+    activate:
+      on-profile: local
+
+aws:
+  region: us-west-2
+  endpoint: http://localhost:4566
+  credentials:
+    access-key: test
+    secret-key: test
+  s3:
+    bucket-name: fsamp-local-files
+  sns:
+    file-events-topic-arn: arn:aws:sns:us-west-2:000000000000:fsamp-local-file-events
+  kms:
+    key-id: alias/fsamp-local-master-key
+  dynamodb:
+    table-name: fsamp-local-file-metadata
+
+fsamp:
+  security:
+    fips-mode: true
+    allowed-content-types:
+      - application/pdf
+      - image/png
+      - image/jpeg
+      - application/json
+      - text/plain
+      - application/xml
+    max-file-size-bytes: 104857600  # 100MB
+  upload:
+    temp-dir: /tmp/fsamp-uploads
+
+---
+# Development profile (AWS)
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+aws:
+  region: ${AWS_REGION:us-west-2}
+  s3:
+    bucket-name: fsamp-dev-files
+  sns:
+    file-events-topic-arn: ${SNS_FILE_EVENTS_TOPIC_ARN}
+  kms:
+    key-id: ${KMS_KEY_ID}
+  dynamodb:
+    table-name: fsamp-dev-file-metadata
+
+fsamp:
+  security:
+    fips-mode: true
+    allowed-content-types:
+      - application/pdf
+      - image/png
+      - image/jpeg
+      - application/json
+      - text/plain
+      - application/xml
+    max-file-size-bytes: 104857600
+
+management:
+  metrics:
+    export:
+      cloudwatch:
+        enabled: true
+        namespace: FSAMP/Gateway
+        step: 1m
+
+---
+# Production profile
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+aws:
+  region: ${AWS_REGION:us-west-2}
+  s3:
+    bucket-name: fsamp-prod-files
+  sns:
+    file-events-topic-arn: ${SNS_FILE_EVENTS_TOPIC_ARN}
+  kms:
+    key-id: ${KMS_KEY_ID}
+  dynamodb:
+    table-name: fsamp-prod-file-metadata
+
+fsamp:
+  security:
+    fips-mode: true
+    allowed-content-types:
+      - application/pdf
+      - image/png
+      - image/jpeg
+    max-file-size-bytes: 52428800  # 50MB in prod
+
+logging:
+  level:
+    root: WARN
+    io.github.pauszek: INFO
+
+management:
+  metrics:
+    export:
+      cloudwatch:
+        enabled: true
+        namespace: FSAMP/Gateway
+        step: 1m

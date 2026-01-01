@@ -1,0 +1,31 @@
+# Test profile configuration
+spring:
+  config:
+    activate:
+      on-profile: test
+  main:
+    lazy-initialization: true
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+
+# Disable AWS connections for unit tests
+storage:
+  s3:
+    bucket: test-bucket
+    kms-key-id: alias/test-key
+    prefix: test/
+
+events:
+  sns:
+    topic-arn: arn:aws:sns:eu-central-1:000000000000:test-topic
+    source: test
+
+# Mock AWS endpoints
+aws:
+  region: eu-central-1
+
+logging:
+  level:
+    root: WARN
+    io.github.pauszek: DEBUG
