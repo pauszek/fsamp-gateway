@@ -8,7 +8,10 @@ import io.github.pauszek.fsampgateway.domain.command.UploadFileCommand;
 import io.github.pauszek.fsampgateway.domain.model.SecureFile;
 import io.github.pauszek.fsampgateway.domain.model.UserPrincipal;
 import io.github.pauszek.fsampgateway.domain.port.in.UploadFileUseCase;
+import io.github.pauszek.fsampgateway.infrastructure.idempotency.Idempotent;
 import io.github.pauszek.fsampgateway.infrastructure.security.cognito.CurrentUserService;
+import io.github.resilience4j.bulkhead.annotation.Bulkhead;
+import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import io.micrometer.core.annotation.Timed;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -70,6 +73,8 @@ public class FileUploadRestAdapter {
                     **Max file size:** 100MB
                     
                     **Required permissions:** `files.write` scope OR `users`/`admins` group membership
+                    
+                    **Idempotency:** Send `X-Idempotency-Key` header for safe retries
                     """
     )
     @ApiResponses({
@@ -94,6 +99,11 @@ public class FileUploadRestAdapter {
                     content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
             ),
             @ApiResponse(
+                    responseCode = "409",
+                    description = "Idempotency key conflict - request already in progress",
+                    content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
+            ),
+            @ApiResponse(
                     responseCode = "413",
                     description = "File too large",
                     content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
@@ -101,6 +111,11 @@ public class FileUploadRestAdapter {
             @ApiResponse(
                     responseCode = "415",
                     description = "Unsupported media type",
+                    content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
+            ),
+            @ApiResponse(
+                    responseCode = "429",
+                    description = "Rate limit exceeded",
                     content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
             ),
             @ApiResponse(
@@ -116,6 +131,9 @@ public class FileUploadRestAdapter {
     )
     @PreAuthorize("hasAnyAuthority('SCOPE_files.write', 'ROLE_USERS', 'ROLE_ADMINS')")
     @Timed(value = "file.upload", description = "Time taken to upload a file")
+    @RateLimiter(name = "fileUpload", fallbackMethod = "uploadFileFallback")
+    @Bulkhead(name = "fileUpload", fallbackMethod = "uploadFileFallback")
+    @Idempotent(responseType = FileUploadResponseDto.class)
     public ResponseEntity<FileUploadResponseDto> uploadFile(
             @Parameter(description = "File to upload", required = true)
             @RequestParam("file") MultipartFile file,
@@ -146,6 +164,26 @@ public class FileUploadRestAdapter {
                 uploadedFile.getId(), uploadedFile.getStatus(), currentUser.userId());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * Fallback method for rate limiting and bulkhead.
+     * Returns 429 Too Many Requests or 503 Service Unavailable.
+     */
+    @SuppressWarnings("unused")
+    private ResponseEntity<FileUploadResponseDto> uploadFileFallback(
+            MultipartFile file,
+            FileUploadRequestDto request,
+            Exception ex) {
+        log.warn("Upload fallback triggered: {}", ex.getMessage());
+        
+        if (ex instanceof io.github.resilience4j.ratelimiter.RequestNotPermitted) {
+            throw new RateLimitExceededException("Upload rate limit exceeded. Please try again later.");
+        }
+        if (ex instanceof io.github.resilience4j.bulkhead.BulkheadFullException) {
+            throw new ServiceUnavailableException("Service is currently overloaded. Please try again later.");
+        }
+        throw new RuntimeException("Upload failed", ex);
     }
 
     @Operation(
@@ -181,6 +219,7 @@ public class FileUploadRestAdapter {
     @GetMapping("/{fileId}")
     @PreAuthorize("hasAnyAuthority('SCOPE_files.read', 'ROLE_USERS', 'ROLE_ADMINS')")
     @Timed(value = "file.get", description = "Time taken to get file metadata")
+    @RateLimiter(name = "fileDownload")
     public ResponseEntity<FileUploadResponseDto> getFile(
             @Parameter(description = "File ID", required = true)
             @PathVariable String fileId

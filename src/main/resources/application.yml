@@ -82,6 +82,36 @@ resilience4j:
         max-attempts: 5
         wait-duration: 200ms
         exponential-backoff-multiplier: 2
+  ratelimiter:
+    instances:
+      fileUpload:
+        limit-for-period: 10
+        limit-refresh-period: 1s
+        timeout-duration: 500ms
+        register-health-indicator: true
+        event-consumer-buffer-size: 100
+      fileDownload:
+        limit-for-period: 50
+        limit-refresh-period: 1s
+        timeout-duration: 100ms
+        register-health-indicator: true
+      default:
+        limit-for-period: 100
+        limit-refresh-period: 1s
+        timeout-duration: 0s
+  timelimiter:
+    instances:
+      s3Storage:
+        timeout-duration: 30s
+        cancel-running-future: true
+      snsPublisher:
+        timeout-duration: 10s
+        cancel-running-future: true
+  bulkhead:
+    instances:
+      fileUpload:
+        max-concurrent-calls: 25
+        max-wait-duration: 0ms
 
 # OpenAPI / Swagger
 springdoc:

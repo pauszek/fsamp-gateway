@@ -2,9 +2,14 @@ package io.github.pauszek.fsampgateway.adapter.in.web;
 
 import io.github.pauszek.fsampgateway.application.dto.ApiErrorDto;
 import io.github.pauszek.fsampgateway.domain.exception.*;
+import io.github.pauszek.fsampgateway.infrastructure.idempotency.IdempotencyConflictException;
+import io.github.resilience4j.bulkhead.BulkheadFullException;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.ratelimiter.RequestNotPermitted;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -143,6 +148,101 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
                 buildError(HttpStatus.SERVICE_UNAVAILABLE, "AWS_SNS_ERROR",
                         "Messaging service error", request)
+        );
+    }
+
+    // ========================================================================
+    // Resilience4j Exception Handlers
+    // ========================================================================
+
+    @ExceptionHandler(RequestNotPermitted.class)
+    public ResponseEntity<ApiErrorDto> handleRateLimitExceeded(
+            RequestNotPermitted ex, WebRequest request) {
+        
+        log.warn("Rate limit exceeded: {}", ex.getMessage());
+        
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Retry-After", "1");  // Suggest retry after 1 second
+        
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .headers(headers)
+                .body(buildError(HttpStatus.TOO_MANY_REQUESTS, "RATE_LIMIT_EXCEEDED",
+                        "Too many requests. Please try again later.", request));
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ApiErrorDto> handleCustomRateLimitExceeded(
+            RateLimitExceededException ex, WebRequest request) {
+        
+        log.warn("Rate limit exceeded: {}", ex.getMessage());
+        
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Retry-After", "1");
+        
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .headers(headers)
+                .body(buildError(HttpStatus.TOO_MANY_REQUESTS, "RATE_LIMIT_EXCEEDED",
+                        ex.getMessage(), request));
+    }
+
+    @ExceptionHandler(BulkheadFullException.class)
+    public ResponseEntity<ApiErrorDto> handleBulkheadFull(
+            BulkheadFullException ex, WebRequest request) {
+        
+        log.warn("Bulkhead full (service overloaded): {}", ex.getMessage());
+        
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Retry-After", "5");  // Suggest retry after 5 seconds
+        
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .headers(headers)
+                .body(buildError(HttpStatus.SERVICE_UNAVAILABLE, "SERVICE_OVERLOADED",
+                        "Service is temporarily overloaded. Please try again later.", request));
+    }
+
+    @ExceptionHandler(CallNotPermittedException.class)
+    public ResponseEntity<ApiErrorDto> handleCircuitBreakerOpen(
+            CallNotPermittedException ex, WebRequest request) {
+        
+        log.warn("Circuit breaker open: {}", ex.getMessage());
+        
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Retry-After", "30");  // Circuit breaker wait duration
+        
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .headers(headers)
+                .body(buildError(HttpStatus.SERVICE_UNAVAILABLE, "SERVICE_UNAVAILABLE",
+                        "Service temporarily unavailable. Please try again later.", request));
+    }
+
+    @ExceptionHandler(ServiceUnavailableException.class)
+    public ResponseEntity<ApiErrorDto> handleServiceUnavailable(
+            ServiceUnavailableException ex, WebRequest request) {
+        
+        log.warn("Service unavailable: {}", ex.getMessage());
+        
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Retry-After", "5");
+        
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .headers(headers)
+                .body(buildError(HttpStatus.SERVICE_UNAVAILABLE, "SERVICE_UNAVAILABLE",
+                        ex.getMessage(), request));
+    }
+
+    // ========================================================================
+    // Idempotency Exception Handlers
+    // ========================================================================
+
+    @ExceptionHandler(IdempotencyConflictException.class)
+    public ResponseEntity<ApiErrorDto> handleIdempotencyConflict(
+            IdempotencyConflictException ex, WebRequest request) {
+        
+        log.warn("Idempotency conflict: {}", ex.getMessage());
+        
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(
+                buildError(HttpStatus.CONFLICT, "IDEMPOTENCY_CONFLICT",
+                        ex.getMessage(), request)
         );
     }
 

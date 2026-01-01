@@ -1,9 +1,15 @@
 package io.github.pauszek.fsampgateway.infrastructure.config;
 
+import io.github.resilience4j.bulkhead.BulkheadConfig;
+import io.github.resilience4j.bulkhead.BulkheadRegistry;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.ratelimiter.RateLimiterConfig;
+import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
 import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
+import io.github.resilience4j.timelimiter.TimeLimiterConfig;
+import io.github.resilience4j.timelimiter.TimeLimiterRegistry;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import software.amazon.awssdk.services.s3.model.S3Exception;
@@ -89,6 +95,99 @@ public class ResilienceConfig {
         RetryRegistry registry = RetryRegistry.of(defaultConfig);
         registry.addConfiguration("s3", s3Config);
         registry.addConfiguration("sns", snsConfig);
+        return registry;
+    }
+
+    /**
+     * Rate Limiter Registry.
+     * 
+     * Protects against:
+     * - DoS attacks
+     * - Excessive API usage
+     * - Cost overruns from high AWS API calls
+     */
+    @Bean
+    public RateLimiterRegistry rateLimiterRegistry() {
+        // File upload - stricter limits (resource intensive)
+        RateLimiterConfig uploadConfig = RateLimiterConfig.custom()
+                .limitForPeriod(10)                          // 10 requests
+                .limitRefreshPeriod(Duration.ofSeconds(1))   // per second
+                .timeoutDuration(Duration.ofMillis(500))     // wait max 500ms if limit exceeded
+                .build();
+
+        // File download - higher limits
+        RateLimiterConfig downloadConfig = RateLimiterConfig.custom()
+                .limitForPeriod(50)
+                .limitRefreshPeriod(Duration.ofSeconds(1))
+                .timeoutDuration(Duration.ofMillis(100))
+                .build();
+
+        // Default - general API limits
+        RateLimiterConfig defaultConfig = RateLimiterConfig.custom()
+                .limitForPeriod(100)
+                .limitRefreshPeriod(Duration.ofSeconds(1))
+                .timeoutDuration(Duration.ZERO)              // fail immediately
+                .build();
+
+        RateLimiterRegistry registry = RateLimiterRegistry.of(defaultConfig);
+        registry.addConfiguration("upload", uploadConfig);
+        registry.addConfiguration("download", downloadConfig);
+        return registry;
+    }
+
+    /**
+     * Time Limiter Registry.
+     * 
+     * Prevents long-running operations from blocking threads indefinitely.
+     * Critical for async operations and CompletableFuture handling.
+     */
+    @Bean
+    public TimeLimiterRegistry timeLimiterRegistry() {
+        // S3 operations - longer timeout for large files
+        TimeLimiterConfig s3Config = TimeLimiterConfig.custom()
+                .timeoutDuration(Duration.ofSeconds(30))
+                .cancelRunningFuture(true)
+                .build();
+
+        // SNS operations - shorter timeout
+        TimeLimiterConfig snsConfig = TimeLimiterConfig.custom()
+                .timeoutDuration(Duration.ofSeconds(10))
+                .cancelRunningFuture(true)
+                .build();
+
+        TimeLimiterConfig defaultConfig = TimeLimiterConfig.custom()
+                .timeoutDuration(Duration.ofSeconds(15))
+                .cancelRunningFuture(true)
+                .build();
+
+        TimeLimiterRegistry registry = TimeLimiterRegistry.of(defaultConfig);
+        registry.addConfiguration("s3", s3Config);
+        registry.addConfiguration("sns", snsConfig);
+        return registry;
+    }
+
+    /**
+     * Bulkhead Registry.
+     * 
+     * Limits concurrent calls to prevent resource exhaustion.
+     * Implements the Bulkhead pattern for fault isolation.
+     */
+    @Bean
+    public BulkheadRegistry bulkheadRegistry() {
+        // File upload - limited concurrent uploads
+        BulkheadConfig uploadConfig = BulkheadConfig.custom()
+                .maxConcurrentCalls(25)
+                .maxWaitDuration(Duration.ZERO)  // fail immediately if bulkhead full
+                .build();
+
+        // Default
+        BulkheadConfig defaultConfig = BulkheadConfig.custom()
+                .maxConcurrentCalls(50)
+                .maxWaitDuration(Duration.ofMillis(100))
+                .build();
+
+        BulkheadRegistry registry = BulkheadRegistry.of(defaultConfig);
+        registry.addConfiguration("upload", uploadConfig);
         return registry;
     }
 }
