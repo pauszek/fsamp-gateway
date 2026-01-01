@@ -1,14 +1,13 @@
 package io.github.pauszek.fsampgateway.infrastructure.security;
 
-import io.github.pauszek.fsampgateway.infrastructure.security.cognito.CognitoJwtRoleConverter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
-import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.ActiveProfiles;
@@ -16,7 +15,6 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -33,6 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
+@Import(TestSecurityConfig.class)
 @ActiveProfiles("test")
 @DisplayName("Security Integration Tests")
 class SecurityIntegrationTest {
@@ -134,11 +133,11 @@ class SecurityIntegrationTest {
         
         when(jwtDecoder.decode(anyString())).thenReturn(jwt);
 
-        // The token validator should reject this
-        // Note: In real scenario, JwtDecoder throws JwtValidationException for expired tokens
+        // Expired token with no valid scopes/groups should be forbidden
+        // The mock bypasses expiration check but token lacks required permissions
         mockMvc.perform(get("/api/v1/files/123")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer expired-token"))
-                .andExpect(status().isNotImplemented()); // Mock bypasses validation
+                .andExpect(status().isForbidden());
     }
 
     @Test

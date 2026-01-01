@@ -1,9 +1,5 @@
 package io.github.pauszek.fsampgateway.infrastructure.config;
 
-import io.github.pauszek.fsampgateway.adapter.out.crypto.TikaContentValidatorAdapter;
-import io.github.pauszek.fsampgateway.adapter.out.messaging.SnsEventPublisherAdapter;
-import io.github.pauszek.fsampgateway.adapter.out.persistence.InMemoryFileRepositoryAdapter;
-import io.github.pauszek.fsampgateway.adapter.out.storage.S3StorageAdapter;
 import io.github.pauszek.fsampgateway.domain.port.out.ContentValidatorPort;
 import io.github.pauszek.fsampgateway.domain.port.out.EventPublisherPort;
 import io.github.pauszek.fsampgateway.domain.port.out.FileRepositoryPort;
@@ -39,27 +35,6 @@ public class DomainConfig {
         );
     }
 
-    /**
-     * Secondary adapter bindings - these would be @Primary if multiple implementations exist.
-     */
-    
-    @Bean
-    public FileStoragePort fileStoragePort(S3StorageAdapter s3StorageAdapter) {
-        return s3StorageAdapter;
-    }
-
-    @Bean
-    public EventPublisherPort eventPublisherPort(SnsEventPublisherAdapter snsEventPublisherAdapter) {
-        return snsEventPublisherAdapter;
-    }
-
-    @Bean
-    public FileRepositoryPort fileRepositoryPort(InMemoryFileRepositoryAdapter inMemoryFileRepositoryAdapter) {
-        return inMemoryFileRepositoryAdapter;
-    }
-
-    @Bean
-    public ContentValidatorPort contentValidatorPort(TikaContentValidatorAdapter tikaContentValidatorAdapter) {
-        return tikaContentValidatorAdapter;
-    }
+    // Note: Adapter beans are registered via @Component annotations on the adapters themselves.
+    // No additional @Bean definitions needed here for ports - Spring autowires by type.
 }
