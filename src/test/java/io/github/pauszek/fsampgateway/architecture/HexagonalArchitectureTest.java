@@ -132,7 +132,6 @@ class HexagonalArchitectureTest {
         void portsShouldBeInterfaces() {
             classes()
                     .that().resideInAPackage("..domain.port..")
-                    .and().areTopLevelClasses()
                     .should().beInterfaces()
                     .because("Ports define contracts and should be interfaces")
                     .check(classes);
@@ -189,7 +188,6 @@ class HexagonalArchitectureTest {
         void useCasesShouldFollowNamingConvention() {
             classes()
                     .that().resideInAPackage("..port.in..")
-                    .and().areTopLevelClasses()
                     .should().haveSimpleNameEndingWith("UseCase")
                     .because("Use cases should follow naming convention")
                     .check(classes);
@@ -211,7 +209,8 @@ class HexagonalArchitectureTest {
             classes()
                     .that().resideInAPackage("..domain.event..")
                     .and().areNotInterfaces()
-                    .and().areTopLevelClasses()
+                    .and().haveSimpleNameNotContaining("$") // Exclude generated classes
+                    .and().haveSimpleNameNotEndingWith("Payload") // Payload classes are event components
                     .should().haveSimpleNameEndingWith("Event")
                     .because("Domain events should follow naming convention")
                     .check(classes);
@@ -222,7 +221,7 @@ class HexagonalArchitectureTest {
         void dtosShouldFollowNamingConvention() {
             classes()
                     .that().resideInAPackage("..application.dto..")
-                    .and().areTopLevelClasses()
+                    .and().areNotMemberClasses() // Exclude Builder inner classes
                     .should().haveSimpleNameEndingWith("Dto")
                     .because("DTOs should follow naming convention")
                     .check(classes);

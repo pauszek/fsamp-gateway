@@ -4,6 +4,7 @@ import io.github.pauszek.fsampgateway.application.dto.ApiErrorDto;
 import io.github.pauszek.fsampgateway.application.dto.FileUploadRequestDto;
 import io.github.pauszek.fsampgateway.application.dto.FileUploadResponseDto;
 import io.github.pauszek.fsampgateway.application.mapper.FileMapper;
+import io.github.pauszek.fsampgateway.domain.command.UploadFileCommand;
 import io.github.pauszek.fsampgateway.domain.model.SecureFile;
 import io.github.pauszek.fsampgateway.domain.port.in.UploadFileUseCase;
 import io.micrometer.core.annotation.Timed;
@@ -14,8 +15,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -36,17 +37,12 @@ import java.io.IOException;
 @RequestMapping("/api/v1/files")
 @Tag(name = "Files", description = "File upload and management operations")
 @Validated
+@Slf4j
+@RequiredArgsConstructor
 public class FileUploadRestAdapter {
-
-    private static final Logger log = LoggerFactory.getLogger(FileUploadRestAdapter.class);
 
     private final UploadFileUseCase uploadFileUseCase;
     private final FileMapper fileMapper;
-
-    public FileUploadRestAdapter(UploadFileUseCase uploadFileUseCase, FileMapper fileMapper) {
-        this.uploadFileUseCase = uploadFileUseCase;
-        this.fileMapper = fileMapper;
-    }
 
     @Operation(
             summary = "Upload a file",
@@ -105,14 +101,14 @@ public class FileUploadRestAdapter {
         log.info("Received upload request: filename={}, size={}, contentType={}",
                 file.getOriginalFilename(), file.getSize(), file.getContentType());
 
-        UploadFileUseCase.UploadFileCommand command = new UploadFileUseCase.UploadFileCommand(
-                file.getOriginalFilename(),
-                file.getContentType(),
-                file.getSize(),
-                file.getInputStream(),
-                request != null ? request.correlationId() : null,
-                "ANONYMOUS" // TODO: Get from security context
-        );
+        UploadFileCommand command = UploadFileCommand.builder()
+                .fileName(file.getOriginalFilename())
+                .contentType(file.getContentType())
+                .size(file.getSize())
+                .content(file.getInputStream())
+                .correlationId(request != null ? request.correlationId() : null)
+                .uploadedBy("ANONYMOUS") // TODO: Get from security context
+                .build();
 
         SecureFile uploadedFile = uploadFileUseCase.execute(command);
         FileUploadResponseDto response = fileMapper.toResponseDto(uploadedFile);

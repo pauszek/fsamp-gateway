@@ -2,6 +2,7 @@ package io.github.pauszek.fsampgateway.domain.port.out;
 
 import io.github.pauszek.fsampgateway.domain.model.Checksum;
 import io.github.pauszek.fsampgateway.domain.model.MimeType;
+import io.github.pauszek.fsampgateway.domain.model.ValidationResult;
 
 import java.io.InputStream;
 
@@ -39,21 +40,4 @@ public interface ContentValidatorPort {
      * @return SHA-256 checksum
      */
     Checksum computeChecksum(byte[] content);
-
-    /**
-     * Result of content validation.
-     */
-    record ValidationResult(
-            boolean valid,
-            MimeType detectedType,
-            String message
-    ) {
-        public static ValidationResult valid(MimeType detectedType) {
-            return new ValidationResult(true, detectedType, null);
-        }
-
-        public static ValidationResult invalid(MimeType detectedType, String message) {
-            return new ValidationResult(false, detectedType, message);
-        }
-    }
 }

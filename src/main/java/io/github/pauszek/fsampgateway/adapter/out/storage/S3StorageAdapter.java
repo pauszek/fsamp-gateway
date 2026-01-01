@@ -57,10 +57,10 @@ public class S3StorageAdapter implements FileStoragePort {
 
         try {
             Map<String, String> s3Metadata = new HashMap<>();
-            s3Metadata.put("correlation-id", metadata.correlationId());
-            s3Metadata.put("original-filename", sanitizeMetadataValue(metadata.originalFilename()));
-            if (metadata.checksum() != null) {
-                s3Metadata.put("checksum-sha256", metadata.checksum());
+            s3Metadata.put("correlation-id", metadata.getCorrelationId());
+            s3Metadata.put("original-filename", sanitizeMetadataValue(metadata.getOriginalFilename()));
+            if (metadata.getChecksum() != null) {
+                s3Metadata.put("checksum-sha256", metadata.getChecksum());
             }
 
             PutObjectRequest request = PutObjectRequest.builder()
@@ -80,7 +80,7 @@ public class S3StorageAdapter implements FileStoragePort {
 
             log.info("File stored successfully: fileId={}, etag={}", fileId, response.eTag());
 
-            return new StorageResult(
+            return StorageResult.of(
                     StorageLocation.of(bucketName, objectKey),
                     EncryptionMetadata.kmsEncrypted(properties.getKmsKeyId()),
                     response.eTag()

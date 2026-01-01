@@ -126,7 +126,7 @@ public class SnsEventPublisherAdapter implements EventPublisherPort {
             if (fileEvent.fileMetadata() != null) {
                 attributes.put("mimeType", MessageAttributeValue.builder()
                         .dataType("String")
-                        .stringValue(fileEvent.fileMetadata().mimeType())
+                        .stringValue(fileEvent.fileMetadata().getMimeType())
                         .build());
             }
         }

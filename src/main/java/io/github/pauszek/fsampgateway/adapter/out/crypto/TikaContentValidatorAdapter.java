@@ -2,14 +2,14 @@ package io.github.pauszek.fsampgateway.adapter.out.crypto;
 
 import io.github.pauszek.fsampgateway.domain.model.Checksum;
 import io.github.pauszek.fsampgateway.domain.model.MimeType;
+import io.github.pauszek.fsampgateway.domain.model.ValidationResult;
 import io.github.pauszek.fsampgateway.domain.port.out.ContentValidatorPort;
+import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.tika.Tika;
 import org.bouncycastle.jcajce.provider.BouncyCastleFipsProvider;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.MessageDigest;
@@ -25,9 +25,8 @@ import java.util.HexFormat;
  * - Content-type spoofing detection
  */
 @Component
+@Slf4j
 public class TikaContentValidatorAdapter implements ContentValidatorPort {
-
-    private static final Logger log = LoggerFactory.getLogger(TikaContentValidatorAdapter.class);
 
     private final Tika tika = new Tika();
     private boolean fipsEnabled = false;

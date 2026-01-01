@@ -38,16 +38,16 @@ public record FileUploadedEvent(
                 file.getCorrelationId().value(),
                 Instant.now(),
                 EVENT_TYPE,
-                new FilePayload(
+                FilePayload.of(
                         file.getFileName().value(),
                         file.getSize().bytes(),
                         file.getMimeType().value()
                 ),
-                new StoragePayload(
+                StoragePayload.of(
                         file.getStorageLocation().bucketName(),
                         file.getStorageLocation().objectKey()
                 ),
-                new SecurityPayload(
+                SecurityPayload.of(
                         true,
                         file.getEncryptionMetadata().getAlgorithmName(),
                         file.getEncryptionMetadata().kmsKeyId()
@@ -64,21 +64,4 @@ public record FileUploadedEvent(
     public Instant getOccurredAt() {
         return timestamp;
     }
-
-    public record FilePayload(
-            String originalFilename,
-            long fileSizeBytes,
-            String mimeType
-    ) {}
-
-    public record StoragePayload(
-            String bucketName,
-            String objectKey
-    ) {}
-
-    public record SecurityPayload(
-            boolean isEncrypted,
-            String encryptionAlgorithm,
-            String kmsKeyId
-    ) {}
 }

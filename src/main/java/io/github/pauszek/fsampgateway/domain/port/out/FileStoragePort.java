@@ -52,22 +52,4 @@ public interface FileStoragePort {
      * @return true if exists
      */
     boolean exists(StorageLocation location);
-
-    /**
-     * Result of a storage operation.
-     */
-    record StorageResult(
-            StorageLocation location,
-            EncryptionMetadata encryptionMetadata,
-            String etag
-    ) {}
-
-    /**
-     * Additional metadata for storage.
-     */
-    record StorageMetadata(
-            String correlationId,
-            String originalFilename,
-            String checksum
-    ) {}
 }
