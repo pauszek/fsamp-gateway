@@ -21,3 +21,8 @@ bump:
 release:
   full-release: true
   publish: true
+
+docker:
+  enabled: true
+  image-name: fsamp-gateway
+  registry: ghcr.io
