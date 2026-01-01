@@ -24,7 +24,7 @@
         <resilience4j.version>2.3.0</resilience4j.version>
         <archunit.version>1.4.0</archunit.version>
         <springdoc.version>2.8.6</springdoc.version>
-        <mapstruct.version>1.6.4</mapstruct.version>
+        <mapstruct.version>1.6.3</mapstruct.version>
     </properties>
 
     <dependencyManagement>
