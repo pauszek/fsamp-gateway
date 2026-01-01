@@ -1,0 +1,23 @@
+# =============================================================================
+# CI/CD Parameters for fsamp-gateway
+# =============================================================================
+# Configuration used by reusable workflows from fsamp-code-ci
+
+ci:
+  java-version: "21"
+  distribution: temurin
+
+files:
+  version: release.version
+
+qodana:
+  enabled: true
+
+bump:
+  enabled: true
+  base-branch: main
+  label: autobump
+
+release:
+  full-release: true
+  publish: true
