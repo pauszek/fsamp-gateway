@@ -7,7 +7,7 @@ import io.github.pauszek.fsampgateway.domain.port.out.ContentValidatorPort;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.tika.Tika;
-import org.bouncycastle.jcajce.provider.BouncyCastleFipsProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -21,7 +21,7 @@ import java.util.HexFormat;
  * 
  * Features:
  * - MIME type detection using Tika
- * - SHA-256 checksum with FIPS provider
+ * - SHA-256 checksum with FIPS provider (production) or default provider (local)
  * - Content-type spoofing detection
  */
 @Component
@@ -30,19 +30,32 @@ public class TikaContentValidatorAdapter implements ContentValidatorPort {
 
     private final Tika tika = new Tika();
     private boolean fipsEnabled = false;
+    
+    @Value("${spring.profiles.active:}")
+    private String activeProfile;
 
     @PostConstruct
     public void init() {
-        if (Security.getProvider(BouncyCastleFipsProvider.PROVIDER_NAME) == null) {
-            try {
-                Security.addProvider(new BouncyCastleFipsProvider());
+        // Skip FIPS provider for local development (LocalStack doesn't support FIPS)
+        if ("local".equals(activeProfile) || "test".equals(activeProfile) || "e2e".equals(activeProfile)) {
+            log.info("Skipping FIPS provider for profile: {}", activeProfile);
+            return;
+        }
+        
+        try {
+            // Dynamically load BouncyCastle FIPS only in production
+            Class<?> providerClass = Class.forName("org.bouncycastle.jcajce.provider.BouncyCastleFipsProvider");
+            String providerName = (String) providerClass.getField("PROVIDER_NAME").get(null);
+            
+            if (Security.getProvider(providerName) == null) {
+                Security.addProvider((java.security.Provider) providerClass.getDeclaredConstructor().newInstance());
                 fipsEnabled = true;
                 log.info("BouncyCastle FIPS provider registered for content validation");
-            } catch (Exception e) {
-                log.warn("Failed to register FIPS provider, using default: {}", e.getMessage());
+            } else {
+                fipsEnabled = true;
             }
-        } else {
-            fipsEnabled = true;
+        } catch (Exception e) {
+            log.warn("FIPS provider not available, using default: {}", e.getMessage());
         }
     }
 
@@ -88,13 +101,15 @@ public class TikaContentValidatorAdapter implements ContentValidatorPort {
             return ValidationResult.invalid(declaredType, "Failed to validate content: " + e.getMessage());
         }
     }
+    
+    private static final String FIPS_PROVIDER_NAME = "BCFIPS";
 
     @Override
     public Checksum computeChecksum(byte[] content) {
         try {
             MessageDigest digest;
             if (fipsEnabled) {
-                digest = MessageDigest.getInstance("SHA-256", BouncyCastleFipsProvider.PROVIDER_NAME);
+                digest = MessageDigest.getInstance("SHA-256", FIPS_PROVIDER_NAME);
             } else {
                 digest = MessageDigest.getInstance("SHA-256");
             }

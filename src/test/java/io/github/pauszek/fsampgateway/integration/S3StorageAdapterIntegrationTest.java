@@ -1,0 +1,213 @@
+package io.github.pauszek.fsampgateway.integration;
+
+import io.github.pauszek.fsampgateway.adapter.out.storage.S3StorageAdapter;
+import io.github.pauszek.fsampgateway.adapter.out.storage.S3StorageProperties;
+import io.github.pauszek.fsampgateway.domain.model.FileId;
+import io.github.pauszek.fsampgateway.domain.model.FileSize;
+import io.github.pauszek.fsampgateway.domain.model.MimeType;
+import io.github.pauszek.fsampgateway.domain.model.StorageMetadata;
+import io.github.pauszek.fsampgateway.domain.model.StorageResult;
+import org.junit.jupiter.api.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import software.amazon.awssdk.core.ResponseInputStream;
+import software.amazon.awssdk.services.s3.model.*;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.*;
+
+/**
+ * Integration tests for S3StorageAdapter with real LocalStack S3.
+ */
+@DisplayName("S3StorageAdapter Integration Tests")
+class S3StorageAdapterIntegrationTest extends BaseIntegrationTest {
+
+    @Autowired
+    private S3StorageProperties s3Properties;
+
+    private S3StorageAdapter s3StorageAdapter;
+
+    @BeforeEach
+    void setUp() {
+        // Override bucket name for tests
+        s3Properties.setBucketName(TEST_BUCKET);
+        s3StorageAdapter = new S3StorageAdapter(s3Client, s3Properties);
+    }
+
+    @Nested
+    @DisplayName("store")
+    class Store {
+
+        @Test
+        @DisplayName("should store file in S3 bucket")
+        void shouldStoreFileInS3Bucket() {
+            // given
+            String content = "Test file content for S3 integration test";
+            byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
+            FileId fileId = FileId.generate();
+            InputStream inputStream = new ByteArrayInputStream(contentBytes);
+            FileSize fileSize = FileSize.of(contentBytes.length);
+            MimeType mimeType = MimeType.of("text/plain");
+            StorageMetadata metadata = StorageMetadata.of(
+                    UUID.randomUUID().toString().replace("-", ""),
+                    "test-file.txt",
+                    "abc123def456"
+            );
+
+            // when
+            StorageResult result = s3StorageAdapter.store(fileId, inputStream, fileSize, mimeType, metadata);
+
+            // then
+            assertThat(result).isNotNull();
+            assertThat(result.getLocation()).isNotNull();
+            assertThat(result.getLocation().bucketName()).isEqualTo(TEST_BUCKET);
+            assertThat(result.getLocation().objectKey()).contains(fileId.value().toString());
+        }
+
+        @Test
+        @DisplayName("should store and retrieve file content")
+        void shouldStoreAndRetrieveFileContent() throws IOException {
+            // given
+            String content = "Hello, S3 Integration Test!";
+            byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
+            FileId fileId = FileId.generate();
+            InputStream inputStream = new ByteArrayInputStream(contentBytes);
+            FileSize fileSize = FileSize.of(contentBytes.length);
+            MimeType mimeType = MimeType.of("text/plain");
+            StorageMetadata metadata = StorageMetadata.of(
+                    UUID.randomUUID().toString().replace("-", ""),
+                    "hello.txt",
+                    null
+            );
+
+            // when
+            StorageResult result = s3StorageAdapter.store(fileId, inputStream, fileSize, mimeType, metadata);
+
+            // then - verify content can be retrieved from S3
+            GetObjectRequest getRequest = GetObjectRequest.builder()
+                    .bucket(result.getLocation().bucketName())
+                    .key(result.getLocation().objectKey())
+                    .build();
+
+            try (ResponseInputStream<GetObjectResponse> response = s3Client.getObject(getRequest)) {
+                String retrievedContent = new String(response.readAllBytes(), StandardCharsets.UTF_8);
+                assertThat(retrievedContent).isEqualTo(content);
+            }
+        }
+
+        @Test
+        @DisplayName("should set correct content type on S3 object")
+        void shouldSetCorrectContentType() {
+            // given
+            String content = "{\"key\": \"value\"}";
+            byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
+            FileId fileId = FileId.generate();
+            InputStream inputStream = new ByteArrayInputStream(contentBytes);
+            FileSize fileSize = FileSize.of(contentBytes.length);
+            MimeType mimeType = MimeType.of("application/json");
+            StorageMetadata metadata = StorageMetadata.of(
+                    UUID.randomUUID().toString().replace("-", ""),
+                    "data.json",
+                    null
+            );
+
+            // when
+            StorageResult result = s3StorageAdapter.store(fileId, inputStream, fileSize, mimeType, metadata);
+
+            // then
+            HeadObjectRequest headRequest = HeadObjectRequest.builder()
+                    .bucket(result.getLocation().bucketName())
+                    .key(result.getLocation().objectKey())
+                    .build();
+
+            HeadObjectResponse headResponse = s3Client.headObject(headRequest);
+            assertThat(headResponse.contentType()).isEqualTo("application/json");
+        }
+
+        @Test
+        @DisplayName("should store custom metadata on S3 object")
+        void shouldStoreCustomMetadata() {
+            // given
+            String content = "File with metadata";
+            byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
+            FileId fileId = FileId.generate();
+            InputStream inputStream = new ByteArrayInputStream(contentBytes);
+            FileSize fileSize = FileSize.of(contentBytes.length);
+            MimeType mimeType = MimeType.of("text/plain");
+            String correlationId = "a1b2c3d4e5f67890a1b2c3d4e5f67890";
+            String originalFilename = "original-file.txt";
+            StorageMetadata metadata = StorageMetadata.of(
+                    correlationId,
+                    originalFilename,
+                    "sha256checksum"
+            );
+
+            // when
+            StorageResult result = s3StorageAdapter.store(fileId, inputStream, fileSize, mimeType, metadata);
+
+            // then
+            HeadObjectRequest headRequest = HeadObjectRequest.builder()
+                    .bucket(result.getLocation().bucketName())
+                    .key(result.getLocation().objectKey())
+                    .build();
+
+            HeadObjectResponse headResponse = s3Client.headObject(headRequest);
+            assertThat(headResponse.metadata()).containsEntry("correlation-id", correlationId);
+            assertThat(headResponse.metadata()).containsEntry("original-filename", originalFilename);
+        }
+    }
+
+    @Nested
+    @DisplayName("download")
+    class Download {
+
+        @Test
+        @DisplayName("should download existing file from S3")
+        void shouldDownloadExistingFile() throws IOException {
+            // given - first upload a file
+            String content = "Content to download";
+            byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
+            String objectKey = "downloads/" + UUID.randomUUID() + "/test-download.txt";
+
+            s3Client.putObject(
+                    PutObjectRequest.builder()
+                            .bucket(TEST_BUCKET)
+                            .key(objectKey)
+                            .contentType("text/plain")
+                            .build(),
+                    software.amazon.awssdk.core.sync.RequestBody.fromBytes(contentBytes)
+            );
+
+            // when
+            GetObjectRequest getRequest = GetObjectRequest.builder()
+                    .bucket(TEST_BUCKET)
+                    .key(objectKey)
+                    .build();
+
+            // then
+            try (ResponseInputStream<GetObjectResponse> response = s3Client.getObject(getRequest)) {
+                String retrievedContent = new String(response.readAllBytes(), StandardCharsets.UTF_8);
+                assertThat(retrievedContent).isEqualTo(content);
+            }
+        }
+
+        @Test
+        @DisplayName("should throw exception for non-existent file")
+        void shouldThrowExceptionForNonExistentFile() {
+            // given
+            String nonExistentKey = "non-existent/" + UUID.randomUUID() + "/file.txt";
+
+            // when & then
+            assertThatThrownBy(() -> {
+                s3Client.getObject(GetObjectRequest.builder()
+                        .bucket(TEST_BUCKET)
+                        .key(nonExistentKey)
+                        .build());
+            }).isInstanceOf(NoSuchKeyException.class);
+        }
+    }
+}

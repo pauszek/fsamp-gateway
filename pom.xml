@@ -105,6 +105,10 @@
         </dependency>
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
+            <artifactId>sqs</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
             <artifactId>kms</artifactId>
         </dependency>
         <dependency>
@@ -282,7 +286,31 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                     <argLine>@{argLine} -Dorg.bouncycastle.fips.approved_only=true</argLine>
+                    <!-- Exclude integration tests from unit test phase -->
+                    <excludedGroups>integration</excludedGroups>
                 </configuration>
+            </plugin>
+            <!-- Failsafe for Integration Tests -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <argLine>-Dorg.bouncycastle.fips.approved_only=true</argLine>
+                    <!-- Only run integration tests -->
+                    <groups>integration</groups>
+                    <includes>
+                        <include>**/*IntegrationTest.java</include>
+                        <include>**/*IT.java</include>
+                    </includes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <!-- JaCoCo for Code Coverage (Open Source - Apache 2.0) -->
             <plugin>

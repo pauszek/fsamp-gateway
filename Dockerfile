@@ -25,8 +25,9 @@ RUN ./mvnw package -DskipTests -B
 # Stage 2: Runtime
 FROM eclipse-temurin:21-jre-alpine
 
-# Update Alpine packages to fix CVEs (libpng)
-RUN apk upgrade --no-cache
+# Update Alpine packages to fix CVEs + install curl for health checks and discovery
+RUN apk upgrade --no-cache && \
+    apk add --no-cache curl
 
 # Security: run as non-root user
 RUN addgroup -g 1001 -S fsamp && \
@@ -34,8 +35,15 @@ RUN addgroup -g 1001 -S fsamp && \
 
 WORKDIR /app
 
+# Copy entrypoint script
+COPY scripts/docker-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Copy built JAR
 COPY --from=builder /app/target/*.jar app.jar
+
+# Create config directory for shared volumes
+RUN mkdir -p /config && chown fsamp:fsamp /config
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
@@ -52,4 +60,4 @@ ENV JAVA_OPTS="-XX:+UseContainerSupport \
 
 EXPOSE 8080
 
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+ENTRYPOINT ["/entrypoint.sh"]

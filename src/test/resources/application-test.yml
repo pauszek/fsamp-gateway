@@ -23,12 +23,12 @@ storage:
 
 events:
   sns:
-    topic-arn: arn:aws:sns:eu-central-1:000000000000:test-topic
+    topic-arn: arn:aws:sns:us-west-2:000000000000:test-topic
     source: test
 
 # Mock AWS endpoints
 aws:
-  region: eu-central-1
+  region: us-west-2
   endpoint: http://localhost:4566
   credentials:
     access-key: test
