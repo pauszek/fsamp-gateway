@@ -28,7 +28,7 @@ class AwsConfigTest {
     @DisplayName("LocalStackAwsConfig")
     class LocalStackAwsConfigTest {
 
-        private final AwsConfig.LocalStackAwsConfig config = 
+        private final AwsConfig.LocalStackAwsConfig config =
                 new AwsConfig.LocalStackAwsConfig(LOCALSTACK_URL, TEST_REGION);
 
         @Test
@@ -132,7 +132,7 @@ class AwsConfigTest {
     @DisplayName("ProductionAwsConfig")
     class ProductionAwsConfigTest {
 
-        private final AwsConfig.ProductionAwsConfig config = 
+        private final AwsConfig.ProductionAwsConfig config =
                 new AwsConfig.ProductionAwsConfig(TEST_REGION);
 
         @Test
