@@ -25,6 +25,9 @@ RUN ./mvnw package -DskipTests -B
 # Stage 2: Runtime
 FROM eclipse-temurin:21-jre-alpine
 
+# Update Alpine packages to fix CVEs (libpng)
+RUN apk upgrade --no-cache
+
 # Security: run as non-root user
 RUN addgroup -g 1001 -S fsamp && \
     adduser -u 1001 -S fsamp -G fsamp

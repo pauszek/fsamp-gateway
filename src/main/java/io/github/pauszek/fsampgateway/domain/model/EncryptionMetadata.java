@@ -6,6 +6,7 @@ import java.util.Objects;
  * Value Object - Encryption Metadata.
  * 
  * Contains cryptographic information for FIPS 140-3 compliance.
+ * Only AES-256-GCM is permitted per NIST SP 800-38D.
  */
 public record EncryptionMetadata(
         String kmsKeyId,
@@ -13,9 +14,19 @@ public record EncryptionMetadata(
         boolean encrypted
 ) {
 
+    /**
+     * FIPS 140-3 compliant encryption algorithms.
+     * Only AES-GCM is permitted - provides authenticated encryption (AEAD).
+     */
     public enum EncryptionAlgorithm {
-        AES_256_GCM("AES/GCM/NoPadding", "AES-256-GCM"),
-        AES_256_CBC("AES/CBC/PKCS5Padding", "AES-256-CBC");
+        /**
+         * AES-256 in Galois/Counter Mode - NIST SP 800-38D approved.
+         * Provides both confidentiality and authenticity (AEAD).
+         */
+        AES_256_GCM("AES/GCM/NoPadding", "AES-256-GCM");
+        
+        // NOTE: AES-CBC removed - vulnerable to Padding Oracle attacks
+        // and requires separate MAC for integrity (not AEAD)
 
         private final String javaName;
         private final String displayName;

@@ -120,7 +120,7 @@ public class SnsEventPublisherAdapter implements EventPublisherPort {
         if (event instanceof FileUploadedEvent fileEvent) {
             attributes.put("correlationId", MessageAttributeValue.builder()
                     .dataType("String")
-                    .stringValue(fileEvent.correlationId())
+                    .stringValue(fileEvent.correlationId().toString())
                     .build());
             
             if (fileEvent.fileMetadata() != null) {
