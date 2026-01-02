@@ -507,5 +507,425 @@ class ValueObjectsTest {
             assertThat(FileStatus.PENDING.isTerminal()).isFalse();
             assertThat(FileStatus.PROCESSING.isTerminal()).isFalse();
         }
+
+        @Test
+        @DisplayName("should have correct codes")
+        void shouldHaveCorrectCodes() {
+            assertThat(FileStatus.PENDING.getCode()).isEqualTo("pending");
+            assertThat(FileStatus.UPLOADED.getCode()).isEqualTo("uploaded");
+            assertThat(FileStatus.SCANNING.getCode()).isEqualTo("scanning");
+            assertThat(FileStatus.PROCESSING.getCode()).isEqualTo("processing");
+            assertThat(FileStatus.COMPLETED.getCode()).isEqualTo("completed");
+            assertThat(FileStatus.FAILED.getCode()).isEqualTo("failed");
+        }
+
+        @Test
+        @DisplayName("should check canRetry")
+        void shouldCheckCanRetry() {
+            assertThat(FileStatus.FAILED.canRetry()).isTrue();
+            assertThat(FileStatus.COMPLETED.canRetry()).isFalse();
+            assertThat(FileStatus.PENDING.canRetry()).isFalse();
+        }
+
+        @Test
+        @DisplayName("should get status from code")
+        void shouldGetStatusFromCode() {
+            assertThat(FileStatus.fromCode("pending")).isEqualTo(FileStatus.PENDING);
+            assertThat(FileStatus.fromCode("UPLOADED")).isEqualTo(FileStatus.UPLOADED);
+            assertThat(FileStatus.fromCode("Processing")).isEqualTo(FileStatus.PROCESSING);
+        }
+
+        @Test
+        @DisplayName("should throw for unknown code")
+        void shouldThrowForUnknownCode() {
+            assertThatThrownBy(() -> FileStatus.fromCode("unknown"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Unknown status code");
+        }
+    }
+
+    @Nested
+    @DisplayName("SecureFile Aggregate")
+    class SecureFileTests {
+
+        @Test
+        @DisplayName("should create pending file")
+        void shouldCreatePendingFile() {
+            SecureFile file = SecureFile.createPending(
+                    FileName.of("test.pdf"),
+                    MimeType.of("application/pdf"),
+                    FileSize.of(1024),
+                    CorrelationId.generate(),
+                    "user-123"
+            );
+
+            assertThat(file.getId()).isNotNull();
+            assertThat(file.getStatus()).isEqualTo(FileStatus.PENDING);
+            assertThat(file.getFileName().value()).isEqualTo("test.pdf");
+        }
+
+        @Test
+        @DisplayName("should transition to uploaded state")
+        void shouldTransitionToUploaded() {
+            SecureFile pending = SecureFile.createPending(
+                    FileName.of("test.pdf"),
+                    MimeType.of("application/pdf"),
+                    FileSize.of(1024),
+                    CorrelationId.generate(),
+                    "user-123"
+            );
+
+            SecureFile uploaded = pending.markAsUploaded(
+                    StorageLocation.of("bucket", "key"),
+                    EncryptionMetadata.kmsEncrypted("key-id"),
+                    Checksum.sha256("a".repeat(64))
+            );
+
+            assertThat(uploaded.getStatus()).isEqualTo(FileStatus.UPLOADED);
+            assertThat(uploaded.getStorageLocation()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("should transition through full lifecycle")
+        void shouldTransitionThroughFullLifecycle() {
+            SecureFile file = SecureFile.createPending(
+                    FileName.of("test.pdf"),
+                    MimeType.of("application/pdf"),
+                    FileSize.of(1024),
+                    CorrelationId.generate(),
+                    "user-123"
+            );
+
+            file = file.markAsUploaded(
+                    StorageLocation.of("bucket", "key"),
+                    EncryptionMetadata.kmsEncrypted("key-id"),
+                    Checksum.sha256("a".repeat(64))
+            );
+            assertThat(file.getStatus()).isEqualTo(FileStatus.UPLOADED);
+
+            file = file.markAsProcessing();
+            assertThat(file.getStatus()).isEqualTo(FileStatus.PROCESSING);
+
+            file = file.markAsCompleted();
+            assertThat(file.getStatus()).isEqualTo(FileStatus.COMPLETED);
+        }
+
+        @Test
+        @DisplayName("should throw when marking uploaded from wrong state")
+        void shouldThrowWhenMarkingUploadedFromWrongState() {
+            SecureFile file = SecureFile.createPending(
+                    FileName.of("test.pdf"),
+                    MimeType.of("application/pdf"),
+                    FileSize.of(1024),
+                    CorrelationId.generate(),
+                    "user-123"
+            );
+            file = file.markAsUploaded(
+                    StorageLocation.of("bucket", "key"),
+                    EncryptionMetadata.kmsEncrypted("key-id"),
+                    Checksum.sha256("a".repeat(64))
+            );
+
+            SecureFile uploadedFile = file;
+            assertThatThrownBy(() -> uploadedFile.markAsUploaded(
+                    StorageLocation.of("bucket", "key"),
+                    EncryptionMetadata.kmsEncrypted("key-id"),
+                    Checksum.sha256("a".repeat(64))
+            )).isInstanceOf(IllegalStateException.class);
+        }
+
+        @Test
+        @DisplayName("should throw when marking processing from wrong state")
+        void shouldThrowWhenMarkingProcessingFromWrongState() {
+            SecureFile file = SecureFile.createPending(
+                    FileName.of("test.pdf"),
+                    MimeType.of("application/pdf"),
+                    FileSize.of(1024),
+                    CorrelationId.generate(),
+                    "user-123"
+            );
+
+            assertThatThrownBy(file::markAsProcessing)
+                    .isInstanceOf(IllegalStateException.class);
+        }
+
+        @Test
+        @DisplayName("should throw when marking completed from wrong state")
+        void shouldThrowWhenMarkingCompletedFromWrongState() {
+            SecureFile file = SecureFile.createPending(
+                    FileName.of("test.pdf"),
+                    MimeType.of("application/pdf"),
+                    FileSize.of(1024),
+                    CorrelationId.generate(),
+                    "user-123"
+            );
+
+            assertThatThrownBy(file::markAsCompleted)
+                    .isInstanceOf(IllegalStateException.class);
+        }
+
+        @Test
+        @DisplayName("should allow marking as failed from any state")
+        void shouldAllowMarkingAsFailedFromAnyState() {
+            SecureFile file = SecureFile.createPending(
+                    FileName.of("test.pdf"),
+                    MimeType.of("application/pdf"),
+                    FileSize.of(1024),
+                    CorrelationId.generate(),
+                    "user-123"
+            );
+
+            SecureFile failed = file.markAsFailed();
+            assertThat(failed.getStatus()).isEqualTo(FileStatus.FAILED);
+        }
+    }
+
+    @Nested
+    @DisplayName("EncryptionMetadata Extended Tests")
+    class EncryptionMetadataExtendedTests {
+
+        @Test
+        @DisplayName("should create with specific algorithm")
+        void shouldCreateWithSpecificAlgorithm() {
+            EncryptionMetadata metadata = EncryptionMetadata.of(
+                    "alias/my-key",
+                    EncryptionMetadata.EncryptionAlgorithm.AES_256_GCM
+            );
+
+            assertThat(metadata.kmsKeyId()).isEqualTo("alias/my-key");
+            assertThat(metadata.algorithm()).isEqualTo(EncryptionMetadata.EncryptionAlgorithm.AES_256_GCM);
+        }
+
+        @Test
+        @DisplayName("should throw for null algorithm")
+        void shouldThrowForNullAlgorithm() {
+            assertThatThrownBy(() -> EncryptionMetadata.of("key-id", null))
+                    .isInstanceOf(NullPointerException.class);
+        }
+
+        @Test
+        @DisplayName("should mask KMS key in toString")
+        void shouldMaskKmsKeyInToString() {
+            EncryptionMetadata metadata = EncryptionMetadata.kmsEncrypted("alias/very-long-key-id-12345");
+            
+            String str = metadata.toString();
+            assertThat(str).contains("alia...2345");
+            assertThat(str).doesNotContain("very-long-key-id");
+        }
+
+        @Test
+        @DisplayName("should mask short KMS key in toString")
+        void shouldMaskShortKmsKeyInToString() {
+            EncryptionMetadata metadata = EncryptionMetadata.kmsEncrypted("short");
+            
+            String str = metadata.toString();
+            assertThat(str).contains("***");
+        }
+
+        @Test
+        @DisplayName("should have correct algorithm display name")
+        void shouldHaveCorrectAlgorithmDisplayName() {
+            assertThat(EncryptionMetadata.EncryptionAlgorithm.AES_256_GCM.getDisplayName())
+                    .isEqualTo("AES-256-GCM");
+        }
+    }
+
+    @Nested
+    @DisplayName("FileSize Extended Tests")
+    class FileSizeExtendedTests {
+
+        @Test
+        @DisplayName("should convert to kilobytes")
+        void shouldConvertToKilobytes() {
+            FileSize size = FileSize.of(2048);
+            assertThat(size.toKilobytes()).isEqualTo(2.0);
+        }
+
+        @Test
+        @DisplayName("should convert to megabytes")
+        void shouldConvertToMegabytes() {
+            FileSize size = FileSize.of(10 * 1024 * 1024);
+            assertThat(size.toMegabytes()).isEqualTo(10.0);
+        }
+
+        @Test
+        @DisplayName("should throw for zero size")
+        void shouldThrowForZeroSize() {
+            assertThatThrownBy(() -> FileSize.of(0))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("at least");
+        }
+
+        @Test
+        @DisplayName("should throw for negative size")
+        void shouldThrowForNegativeSize() {
+            assertThatThrownBy(() -> FileSize.of(-1))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        @DisplayName("should create with custom limit")
+        void shouldCreateWithCustomLimit() {
+            FileSize size = FileSize.ofWithLimit(50 * 1024 * 1024, 200 * 1024 * 1024L);
+            assertThat(size.bytes()).isEqualTo(50 * 1024 * 1024);
+        }
+
+        @Test
+        @DisplayName("should throw when exceeding custom limit")
+        void shouldThrowWhenExceedingCustomLimit() {
+            assertThatThrownBy(() -> FileSize.ofWithLimit(100, 50))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("exceeds limit");
+        }
+
+        @Test
+        @DisplayName("toString should return human readable")
+        void toStringShouldReturnHumanReadable() {
+            FileSize size = FileSize.of(1024);
+            assertThat(size.toString()).isEqualTo("1.00 KB");
+        }
+    }
+
+    @Nested
+    @DisplayName("Checksum Extended Tests")
+    class ChecksumExtendedTests {
+
+        @Test
+        @DisplayName("should throw for non-hex checksum")
+        void shouldThrowForNonHexChecksum() {
+            assertThatThrownBy(() -> Checksum.sha256("g".repeat(64)))  // 'g' is not hex
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        @DisplayName("should have correct algorithm display name")
+        void shouldHaveCorrectAlgorithmDisplayName() {
+            assertThat(Checksum.Algorithm.SHA256.getDisplayName()).isEqualTo("SHA-256");
+        }
+
+        @Test
+        @DisplayName("should match equal checksums")
+        void shouldMatchEqualChecksums() {
+            Checksum checksum1 = Checksum.sha256("a".repeat(64));
+            Checksum checksum2 = Checksum.sha256("A".repeat(64));
+            
+            assertThat(checksum1.matches(checksum2)).isTrue();
+        }
+
+        @Test
+        @DisplayName("should not match different checksums")
+        void shouldNotMatchDifferentChecksums() {
+            Checksum checksum1 = Checksum.sha256("a".repeat(64));
+            Checksum checksum2 = Checksum.sha256("b".repeat(64));
+            
+            assertThat(checksum1.matches(checksum2)).isFalse();
+        }
+
+        @Test
+        @DisplayName("should not match null checksum")
+        void shouldNotMatchNullChecksum() {
+            Checksum checksum1 = Checksum.sha256("a".repeat(64));
+            assertThat(checksum1.matches(null)).isFalse();
+        }
+
+        @Test
+        @DisplayName("toString should contain algorithm and value")
+        void toStringShouldContainAlgorithmAndValue() {
+            Checksum checksum = Checksum.sha256("a".repeat(64));
+            assertThat(checksum.toString()).contains("SHA-256");
+            assertThat(checksum.toString()).contains("a".repeat(64));
+        }
+    }
+
+    @Nested
+    @DisplayName("UserPrincipal Extended Tests")
+    class UserPrincipalExtendedTests {
+
+        @Test
+        @DisplayName("should check isAdmin")
+        void shouldCheckIsAdmin() {
+            UserPrincipal admin = new UserPrincipal(
+                    "admin-1", "admin@test.com", "Admin",
+                    Set.of("admins"),
+                    Set.of(),
+                    null,
+                    Instant.now().minusSeconds(60),
+                    Instant.now().plusSeconds(3600)
+            );
+            assertThat(admin.isAdmin()).isTrue();
+
+            UserPrincipal user = new UserPrincipal(
+                    "user-1", "user@test.com", "User",
+                    Set.of("users"),
+                    Set.of(),
+                    null,
+                    Instant.now().minusSeconds(60),
+                    Instant.now().plusSeconds(3600)
+            );
+            assertThat(user.isAdmin()).isFalse();
+        }
+
+        @Test
+        @DisplayName("should check isTokenExpired")
+        void shouldCheckIsTokenExpired() {
+            UserPrincipal expiredUser = new UserPrincipal(
+                    "user-1", "user@test.com", "User",
+                    Set.of(),
+                    Set.of(),
+                    null,
+                    Instant.now().minusSeconds(7200),
+                    Instant.now().minusSeconds(3600)  // Expired 1 hour ago
+            );
+            assertThat(expiredUser.isTokenExpired()).isTrue();
+
+            UserPrincipal validUser = new UserPrincipal(
+                    "user-2", "user2@test.com", "User2",
+                    Set.of(),
+                    Set.of(),
+                    null,
+                    Instant.now().minusSeconds(60),
+                    Instant.now().plusSeconds(3600)  // Valid for 1 more hour
+            );
+            assertThat(validUser.isTokenExpired()).isFalse();
+        }
+
+        @Test
+        @DisplayName("should build with UserPrincipal.builder()")
+        void shouldBuildWithBuilder() {
+            UserPrincipal user = UserPrincipal.builder()
+                    .userId("user-123")
+                    .email("user@test.com")
+                    .name("Test User")
+                    .groups(Set.of("users"))
+                    .scopes(Set.of("files.read"))
+                    .tenantId("tenant-1")
+                    .tokenIssuedAt(Instant.now())
+                    .tokenExpiresAt(Instant.now().plusSeconds(3600))
+                    .build();
+
+            assertThat(user.userId()).isEqualTo("user-123");
+            assertThat(user.email()).isEqualTo("user@test.com");
+            assertThat(user.tenantId()).isEqualTo("tenant-1");
+        }
+    }
+
+    @Nested
+    @DisplayName("StorageLocation Extended Tests")
+    class StorageLocationExtendedTests {
+
+        @Test
+        @DisplayName("should return S3 URI")
+        void shouldReturnS3Uri() {
+            StorageLocation location = StorageLocation.of("my-bucket", "path/to/file.pdf");
+            assertThat(location.toS3Uri()).isEqualTo("s3://my-bucket/path/to/file.pdf");
+        }
+
+        @Test
+        @DisplayName("should implement toString")
+        void shouldImplementToString() {
+            StorageLocation location = StorageLocation.of("bucket", "key");
+            assertThat(location.toString()).contains("bucket").contains("key");
+        }
     }
 }
+

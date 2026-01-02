@@ -289,6 +289,14 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.12</version>
+                <configuration>
+                    <excludes>
+                        <!-- Exclude Spring Configuration classes - not unit testable -->
+                        <exclude>**/infrastructure/config/**</exclude>
+                        <!-- Exclude main Application class -->
+                        <exclude>**/FsampGatewayApplication.class</exclude>
+                    </excludes>
+                </configuration>
                 <executions>
                     <execution>
                         <id>prepare-agent</id>
