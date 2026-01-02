@@ -44,7 +44,7 @@ repos:
         language: script
         files: \.java$
         pass_filenames: false
-        stages: [push]
+        stages: [pre-push]
 
       - id: maven-test
         name: Maven Test
@@ -52,7 +52,7 @@ repos:
         language: script
         files: \.java$
         pass_filenames: false
-        stages: [push]
+        stages: [pre-push]
 
   # ============================================================
   # Secrets Detection
