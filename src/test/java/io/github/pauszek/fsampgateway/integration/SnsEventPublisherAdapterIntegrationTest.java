@@ -60,6 +60,26 @@ class SnsEventPublisherAdapterIntegrationTest extends BaseIntegrationTest {
                 .protocol("sqs")
                 .endpoint(queueArn)
                 .build());
+
+        // Purge queue before each test to avoid stale messages from previous tests
+        purgeQueue();
+    }
+
+    private void purgeQueue() {
+        // Drain all existing messages from the queue
+        ReceiveMessageResponse response;
+        do {
+            response = sqsClient.receiveMessage(ReceiveMessageRequest.builder()
+                    .queueUrl(queueUrl)
+                    .maxNumberOfMessages(10)
+                    .waitTimeSeconds(0)
+                    .build());
+            for (Message msg : response.messages()) {
+                sqsClient.deleteMessage(builder -> builder
+                        .queueUrl(queueUrl)
+                        .receiptHandle(msg.receiptHandle()));
+            }
+        } while (!response.messages().isEmpty());
     }
 
     @Nested
