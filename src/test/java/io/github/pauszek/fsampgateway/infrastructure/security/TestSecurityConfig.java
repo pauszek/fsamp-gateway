@@ -9,7 +9,6 @@ import io.github.pauszek.fsampgateway.domain.port.out.FileRepositoryPort;
 import io.github.pauszek.fsampgateway.domain.port.out.FileStoragePort;
 import io.github.pauszek.fsampgateway.infrastructure.security.cognito.CurrentUserService;
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import software.amazon.awssdk.services.s3.S3Client;

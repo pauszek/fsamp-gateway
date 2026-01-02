@@ -44,7 +44,7 @@ public record FileUploadedEvent(
         return new FileUploadedEvent(
                 SCHEMA_VERSION,
                 UUID.randomUUID(),
-                UUID.fromString(file.getCorrelationId().value()),
+                correlationIdToUUID(file.getCorrelationId().value()),
                 Instant.now(),
                 SOURCE,
                 EVENT_TYPE,
@@ -64,6 +64,23 @@ public record FileUploadedEvent(
                         file.getEncryptionMetadata().kmsKeyId()
                 )
         );
+    }
+    
+    /**
+     * Convert 32-character hex correlation ID to UUID format.
+     * Correlation ID format: 32 hex chars (e.g., "a1b2c3d4e5f67890a1b2c3d4e5f67890")
+     * UUID format: 8-4-4-4-12 with dashes (e.g., "a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890")
+     */
+    private static UUID correlationIdToUUID(String correlationId) {
+        if (correlationId.length() != 32) {
+            throw new IllegalArgumentException("Correlation ID must be 32 characters, got: " + correlationId.length());
+        }
+        String uuid = correlationId.substring(0, 8) + "-" +
+                correlationId.substring(8, 12) + "-" +
+                correlationId.substring(12, 16) + "-" +
+                correlationId.substring(16, 20) + "-" +
+                correlationId.substring(20, 32);
+        return UUID.fromString(uuid);
     }
 
     @Override
