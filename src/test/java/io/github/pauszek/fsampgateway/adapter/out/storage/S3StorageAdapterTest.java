@@ -191,6 +191,87 @@ class S3StorageAdapterTest {
             assertThat(originalFilename).doesNotContain("ż", "ó", "ł", "ć");
             assertThat(originalFilename).contains("plik-", ".pdf");
         }
+
+        @Test
+        @DisplayName("should handle null original filename in metadata")
+        void shouldHandleNullOriginalFilename() {
+            // given
+            FileId fileId = FileId.generate();
+            InputStream content = new ByteArrayInputStream(TEST_CONTENT);
+            FileSize size = FileSize.of(TEST_CONTENT.length);
+            MimeType mimeType = MimeType.of("application/pdf");
+            StorageMetadata metadata = StorageMetadata.of("a1b2c3d4e5f67890a1b2c3d4e5f67890", null, null);
+
+            given(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
+                    .willReturn(PutObjectResponse.builder().eTag("etag-123").build());
+
+            // when
+            adapter.store(fileId, content, size, mimeType, metadata);
+
+            // then
+            then(s3Client).should().putObject(requestCaptor.capture(), any(RequestBody.class));
+            String originalFilename = requestCaptor.getValue().metadata().get("original-filename");
+            assertThat(originalFilename).isEqualTo("");
+        }
+
+        @Test
+        @DisplayName("should use fallback KMS key when properties key is null")
+        void shouldUseFallbackKmsKeyWhenPropertiesKeyIsNull() {
+            // given
+            S3StorageProperties nullKeyProps = new S3StorageProperties();
+            nullKeyProps.setBucketName(BUCKET_NAME);
+            nullKeyProps.setKmsKeyId(null);
+            
+            S3StorageAdapter adapterWithNullKey = new S3StorageAdapter(s3Client, nullKeyProps);
+            // Use reflection to set fallbackKmsKeyId
+            org.springframework.test.util.ReflectionTestUtils.setField(
+                    adapterWithNullKey, "fallbackKmsKeyId", "alias/fallback-key");
+
+            FileId fileId = FileId.generate();
+            InputStream content = new ByteArrayInputStream(TEST_CONTENT);
+            FileSize size = FileSize.of(TEST_CONTENT.length);
+            MimeType mimeType = MimeType.of("application/pdf");
+            StorageMetadata metadata = StorageMetadata.of("a1b2c3d4e5f67890a1b2c3d4e5f67890", "test.pdf", null);
+
+            given(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
+                    .willReturn(PutObjectResponse.builder().eTag("etag-123").build());
+
+            // when
+            adapterWithNullKey.store(fileId, content, size, mimeType, metadata);
+
+            // then
+            then(s3Client).should().putObject(requestCaptor.capture(), any(RequestBody.class));
+            assertThat(requestCaptor.getValue().ssekmsKeyId()).isEqualTo("alias/fallback-key");
+        }
+
+        @Test
+        @DisplayName("should use fallback KMS key when properties key is blank")
+        void shouldUseFallbackKmsKeyWhenPropertiesKeyIsBlank() {
+            // given
+            S3StorageProperties blankKeyProps = new S3StorageProperties();
+            blankKeyProps.setBucketName(BUCKET_NAME);
+            blankKeyProps.setKmsKeyId("   ");
+            
+            S3StorageAdapter adapterWithBlankKey = new S3StorageAdapter(s3Client, blankKeyProps);
+            org.springframework.test.util.ReflectionTestUtils.setField(
+                    adapterWithBlankKey, "fallbackKmsKeyId", "alias/fallback-key");
+
+            FileId fileId = FileId.generate();
+            InputStream content = new ByteArrayInputStream(TEST_CONTENT);
+            FileSize size = FileSize.of(TEST_CONTENT.length);
+            MimeType mimeType = MimeType.of("application/pdf");
+            StorageMetadata metadata = StorageMetadata.of("a1b2c3d4e5f67890a1b2c3d4e5f67890", "test.pdf", null);
+
+            given(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
+                    .willReturn(PutObjectResponse.builder().eTag("etag-123").build());
+
+            // when
+            adapterWithBlankKey.store(fileId, content, size, mimeType, metadata);
+
+            // then
+            then(s3Client).should().putObject(requestCaptor.capture(), any(RequestBody.class));
+            assertThat(requestCaptor.getValue().ssekmsKeyId()).isEqualTo("alias/fallback-key");
+        }
     }
 
     @Nested

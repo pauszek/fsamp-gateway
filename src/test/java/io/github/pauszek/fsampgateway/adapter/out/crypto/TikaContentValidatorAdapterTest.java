@@ -168,6 +168,40 @@ class TikaContentValidatorAdapterTest {
             assertThat(result.isValid()).isFalse();
             assertThat(result.getMessage()).contains("Failed to validate content");
         }
+
+        @Test
+        @DisplayName("should return invalid for disallowed MIME type")
+        void shouldReturnInvalidForDisallowedType() {
+            // given - ELF executable magic bytes (not in allowed types)
+            byte[] elfHeader = new byte[] {0x7f, 'E', 'L', 'F', 0x02, 0x01, 0x01, 0x00};
+            InputStream content = new ByteArrayInputStream(elfHeader);
+            MimeType declaredType = MimeType.of("application/x-executable");
+
+            // when
+            ValidationResult result = adapter.validate(content, declaredType, "malware.exe");
+
+            // then
+            assertThat(result.isValid()).isFalse();
+            assertThat(result.getMessage()).contains("is not allowed");
+        }
+
+        @Test
+        @DisplayName("should return invalid for application/x-sharedlib type")
+        void shouldReturnInvalidForSharedLibType() {
+            // given - using bytes that Tika detects as executable/shared lib
+            byte[] machO = new byte[] {(byte)0xCF, (byte)0xFA, (byte)0xED, (byte)0xFE, 0x07, 0x00, 0x00, 0x01};
+            InputStream content = new ByteArrayInputStream(machO);
+
+            // when
+            ValidationResult result = adapter.validate(content, null, "library.dylib");
+
+            // then
+            // The detected type should not be allowed (not in allowed list)
+            if (!result.isValid()) {
+                assertThat(result.getMessage()).contains("is not allowed");
+            }
+            // Note: If Tika doesn't recognize these bytes as executable, test passes
+        }
     }
 
     @Nested

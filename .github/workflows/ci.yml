@@ -8,7 +8,7 @@ on:
 
 jobs:
   call-java:
-    uses: pauszek/fsamp-code-ci/.github/workflows/build-java.yml@v0.0.27
+    uses: pauszek/fsamp-code-ci/.github/workflows/build-java.yml@v0.0.29
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       GABRBA_SECRET: ${{ secrets.GABRBA_SECRET }}
