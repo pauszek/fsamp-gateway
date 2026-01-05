@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.io.InputStream;
 import java.time.LocalDate;
@@ -34,10 +35,25 @@ public class S3StorageAdapter implements FileStoragePort {
 
     private final S3Client s3Client;
     private final S3StorageProperties properties;
+    
+    // Fallback KMS Key ID from environment variable
+    @Value("${KMS_KEY_ID:#{null}}")
+    private String fallbackKmsKeyId;
 
     public S3StorageAdapter(S3Client s3Client, S3StorageProperties properties) {
         this.s3Client = s3Client;
         this.properties = properties;
+        log.info("S3StorageAdapter initialized: bucketName={}, kmsKeyId={}", 
+                properties.getBucketName(), properties.getKmsKeyId());
+    }
+    
+    private String getKmsKeyId() {
+        String keyId = properties.getKmsKeyId();
+        if (keyId == null || keyId.isBlank()) {
+            keyId = fallbackKmsKeyId;
+            log.debug("Using fallback KMS Key ID: {}", keyId);
+        }
+        return keyId;
     }
 
     @Override
@@ -69,7 +85,7 @@ public class S3StorageAdapter implements FileStoragePort {
                     .contentType(mimeType.value())
                     .contentLength(size.bytes())
                     .serverSideEncryption(ServerSideEncryption.AWS_KMS)
-                    .ssekmsKeyId(properties.getKmsKeyId())
+                    .ssekmsKeyId(getKmsKeyId())
                     .metadata(s3Metadata)
                     .build();
 
@@ -82,7 +98,7 @@ public class S3StorageAdapter implements FileStoragePort {
 
             return StorageResult.of(
                     StorageLocation.of(bucketName, objectKey),
-                    EncryptionMetadata.kmsEncrypted(properties.getKmsKeyId()),
+                    EncryptionMetadata.kmsEncrypted(getKmsKeyId()),
                     response.eTag()
             );
 

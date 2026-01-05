@@ -11,9 +11,11 @@ import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.kms.KmsClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.sns.SnsClient;
+import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sts.StsClient;
 
 import java.net.URI;
@@ -86,6 +88,24 @@ public class AwsConfig {
                     .credentialsProvider(credentialsProvider)
                     .build();
         }
+        
+        @Bean
+        public DynamoDbClient dynamoDbClient(AwsCredentialsProvider credentialsProvider) {
+            log.info("Creating DynamoDB client for region: {}", region);
+            return DynamoDbClient.builder()
+                    .region(Region.of(region))
+                    .credentialsProvider(credentialsProvider)
+                    .build();
+        }
+
+        @Bean
+        public SqsClient sqsClient(AwsCredentialsProvider credentialsProvider) {
+            log.info("Creating SQS client for region: {}", region);
+            return SqsClient.builder()
+                    .region(Region.of(region))
+                    .credentialsProvider(credentialsProvider)
+                    .build();
+        }
     }
 
     /**
@@ -99,8 +119,8 @@ public class AwsConfig {
         private final String region;
 
         LocalStackAwsConfig(
-                @Value("${localstack.url:http://localhost:4566}") String localstackUrl,
-                @Value("${aws.region:eu-central-1}") String region) {
+                @Value("${AWS_ENDPOINT_URL:${aws.endpoint:http://localhost:4566}}") String localstackUrl,
+                @Value("${AWS_REGION:${aws.region:us-west-2}}") String region) {
             this.localstackUrl = localstackUrl;
             this.region = region;
         }
@@ -148,6 +168,26 @@ public class AwsConfig {
         public StsClient stsClient(AwsCredentialsProvider credentialsProvider) {
             log.info("Creating STS client for LocalStack: {}", localstackUrl);
             return StsClient.builder()
+                    .region(Region.of(region))
+                    .endpointOverride(URI.create(localstackUrl))
+                    .credentialsProvider(credentialsProvider)
+                    .build();
+        }
+        
+        @Bean
+        public DynamoDbClient dynamoDbClient(AwsCredentialsProvider credentialsProvider) {
+            log.info("Creating DynamoDB client for LocalStack: {}", localstackUrl);
+            return DynamoDbClient.builder()
+                    .region(Region.of(region))
+                    .endpointOverride(URI.create(localstackUrl))
+                    .credentialsProvider(credentialsProvider)
+                    .build();
+        }
+
+        @Bean
+        public SqsClient sqsClient(AwsCredentialsProvider credentialsProvider) {
+            log.info("Creating SQS client for LocalStack: {}", localstackUrl);
+            return SqsClient.builder()
                     .region(Region.of(region))
                     .endpointOverride(URI.create(localstackUrl))
                     .credentialsProvider(credentialsProvider)

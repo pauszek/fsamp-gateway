@@ -161,7 +161,7 @@ storage:
 # Event publishing configuration
 events:
   sns:
-    topic-arn: ${SNS_TOPIC_ARN:arn:aws:sns:eu-central-1:000000000000:fsamp-file-events}
+    topic-arn: ${SNS_TOPIC_ARN:arn:aws:sns:us-west-2:000000000000:fsamp-local-file-events}
     source: fsamp-gateway
 
 ---
@@ -171,30 +171,30 @@ spring:
     activate:
       on-profile: local
 
-# LocalStack Cognito Mock (for local development without real Cognito)
-# In local mode, we'll use a mock JWT issuer
+# LocalStack Cognito - uses env vars set by entrypoint
 cognito:
-  region: us-west-2
-  user-pool-id: local_test_pool
-  client-id: local_test_client
-  # LocalStack doesn't fully support Cognito JWKS, use mock endpoint
-  jwks-endpoint: http://localhost:4566/.well-known/jwks.json
-  issuer-uri: http://localhost:4566
+  region: ${AWS_REGION:us-west-2}
+  user-pool-id: ${COGNITO_USER_POOL_ID:local_test_pool}
+  client-id: ${COGNITO_CLIENT_ID:local_test_client}
+  # Entrypoint sets these dynamically based on discovered Cognito
+  jwks-endpoint: ${COGNITO_JWKS_ENDPOINT:http://localstack:4566/.well-known/jwks.json}
+  issuer-uri: ${COGNITO_ISSUER_URI:http://localstack:4566}
 
 aws:
-  region: us-west-2
-  endpoint: http://localhost:4566
+  region: ${AWS_REGION:us-west-2}
+  endpoint: ${AWS_ENDPOINT_URL:http://localhost:4566}
   credentials:
     access-key: test
     secret-key: test
   s3:
-    bucket-name: fsamp-local-files
+    bucket-name: ${S3_BUCKET_NAME:fsamp-local-files}
+    kms-key-id: ${KMS_KEY_ID:alias/fsamp-local-master-key}
   sns:
-    file-events-topic-arn: arn:aws:sns:us-west-2:000000000000:fsamp-local-file-events
+    file-events-topic-arn: ${SNS_TOPIC_ARN:arn:aws:sns:us-west-2:000000000000:fsamp-local-file-events}
   kms:
-    key-id: alias/fsamp-local-master-key
+    key-id: ${KMS_KEY_ID:alias/fsamp-local-master-key}
   dynamodb:
-    table-name: fsamp-local-file-metadata
+    table-name: ${DYNAMODB_TABLE_NAME:fsamp-local-file-metadata}
 
 fsamp:
   security:
