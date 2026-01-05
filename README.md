@@ -3,8 +3,29 @@
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4-green?logo=springboot)](https://spring.io/projects/spring-boot)
 [![Java](https://img.shields.io/badge/Java-21-orange?logo=openjdk)](https://openjdk.org/)
 [![FIPS 140-3](https://img.shields.io/badge/FIPS-140--3-blue)](https://csrc.nist.gov/publications/detail/fips/140/3/final)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> Secure file upload gateway for the FSAMP platform with FIPS 140-3 compliant encryption.
+> Enterprise-grade, FIPS 140-3 compliant file upload microservice for the FSAMP platform.
+
+**FSAMP Gateway** is the secure ingress point for the File Security & Anti-Malware Platform. It handles file uploads with military-grade encryption, content validation, and event-driven architecture for downstream malware scanning.
+
+📚 **[Full Architecture Documentation](docs/ARCHITECTURE.md)**
+
+---
+
+## ✨ Key Features
+
+| Feature | Description |
+|---------|-------------|
+| 🔐 **FIPS 140-3 Compliance** | BouncyCastle FIPS provider with NIST-validated algorithms |
+| 🛡️ **KMS Encryption** | Server-side AES-256-GCM encryption via AWS KMS |
+| 🔍 **Content Validation** | Apache Tika-based MIME detection (anti-spoofing) |
+| ⚡ **Resilience Patterns** | Circuit breaker, retry, rate limiting (Resilience4j) |
+| 🎫 **Idempotency** | DynamoDB-backed duplicate prevention |
+| 🔑 **OAuth2 Security** | AWS Cognito JWT validation |
+| 📊 **Observability** | Metrics, structured logging, distributed tracing |
+
+---
 
 ## 🚀 Quick Start
 
@@ -13,16 +34,19 @@
 - Java 21+
 - Maven 3.9+
 - Docker (for LocalStack)
-- LocalStack running (see fsamp-infra)
+- [fsamp-infra](https://github.com/pauszek/fsamp-infra) (LocalStack setup)
 
 ### Run Locally
 
 ```bash
-# Start LocalStack first (from fsamp-infra)
+# 1. Start LocalStack (from fsamp-infra)
 cd ../fsamp-infra && make up && make apply-local
 
-# Run the gateway
+# 2. Run the gateway
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+
+# 3. Access Swagger UI
+open http://localhost:8080/swagger-ui.html
 ```
 
 ### Build & Test
@@ -38,20 +62,21 @@ cd ../fsamp-infra && make up && make apply-local
 docker build -t fsamp-gateway .
 ```
 
-## 📡 API Endpoints
+---
+
+## 📡 API Reference
 
 ### Upload File
 
 ```bash
-POST /api/v1/files/upload
-Content-Type: multipart/form-data
-
 curl -X POST http://localhost:8080/api/v1/files/upload \
+  -H "Authorization: Bearer <JWT_TOKEN>" \
+  -H "X-Idempotency-Key: $(uuidgen)" \
   -F "file=@document.pdf" \
   -F "correlationId=my-trace-123"
 ```
 
-**Response:**
+**Response** (`201 Created`):
 ```json
 {
   "fileId": "550e8400-e29b-41d4-a716-446655440000",
@@ -65,84 +90,77 @@ curl -X POST http://localhost:8080/api/v1/files/upload \
 }
 ```
 
-### Health Check
+### Endpoints
 
-```bash
-GET /actuator/health
-GET /api/v1/health
-GET /api/v1/info
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/files/upload` | Upload a file |
+| `GET` | `/api/v1/files/{id}` | Get file metadata |
+| `DELETE` | `/api/v1/files/{id}` | Delete file (admin only) |
+| `GET` | `/actuator/health` | Health check |
+| `GET` | `/swagger-ui.html` | API documentation |
 
-## 🔐 Security Features
-
-- **FIPS 140-3 Compliance**: BouncyCastle FIPS provider for cryptographic operations
-- **Server-Side Encryption**: All files encrypted with AWS KMS (AES-256-GCM)
-- **Content Validation**: Apache Tika-based MIME type detection (anti-spoofing)
-- **Checksum Verification**: SHA-256 hash for integrity validation
+---
 
 ## 🏗️ Architecture
+
+The gateway follows **Hexagonal Architecture** (Ports & Adapters):
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        File Upload Flow                          │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  Client                                                          │
-│    │                                                             │
-│    ▼                                                             │
-│  ┌──────────────────────┐                                       │
-│  │  FileUploadController │  ← REST API                          │
-│  └──────────┬───────────┘                                       │
-│             │                                                    │
-│             ▼                                                    │
-│  ┌──────────────────────┐                                       │
-│  │  FileValidationSvc   │  ← Size, MIME type (Tika)            │
-│  └──────────┬───────────┘                                       │
-│             │                                                    │
-│             ▼                                                    │
-│  ┌──────────────────────┐     ┌─────────────────┐               │
-│  │  FileUploadService   │────▶│  CryptoService  │ (SHA-256)    │
-│  └──────────┬───────────┘     └─────────────────┘               │
-│             │                                                    │
-│     ┌───────┴───────┐                                           │
-│     ▼               ▼                                            │
-│  ┌──────┐     ┌──────────┐                                      │
-│  │  S3  │     │   SNS    │                                      │
-│  │ (KMS)│     │ (events) │                                      │
-│  └──────┘     └──────────┘                                      │
+│  Client ──▶ REST API ──▶ Domain Service ──┬──▶ S3 (KMS)         │
+│              │                            │                      │
+│              ▼                            ├──▶ SNS (events)      │
+│        Validation (Tika)                  │                      │
+│        SHA-256 Checksum                   └──▶ DynamoDB          │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## 📁 Project Structure
+### Project Structure
 
 ```
 src/main/java/io/github/pauszek/fsampgateway/
-├── config/           # AWS & security configuration
-├── controller/       # REST endpoints
-├── domain/           # Domain entities (FileMetadata, FsampEvent)
-├── dto/              # Request/Response DTOs
-├── exception/        # Custom exceptions & global handler
-└── service/          # Business logic (upload, S3, SNS, crypto)
+├── adapter/           # Infrastructure adapters (REST, S3, SNS, DynamoDB)
+│   ├── in/web/        # REST controllers
+│   └── out/           # Storage, messaging, crypto adapters
+├── application/       # DTOs, mappers, use case orchestration
+├── domain/            # Core business logic (framework-agnostic)
+│   ├── model/         # Entities & Value Objects
+│   ├── port/          # Interfaces (in/out)
+│   └── service/       # Domain services
+└── infrastructure/    # Spring configs, security, observability
 ```
+
+📚 **[Detailed Architecture Docs](docs/ARCHITECTURE.md)**
+
+---
 
 ## ⚙️ Configuration
 
-### Environment Variables (AWS)
+### Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `SPRING_PROFILES_ACTIVE` | `local`, `dev`, or `prod` |
-| `AWS_REGION` | AWS region |
-| `SNS_FILE_EVENTS_TOPIC_ARN` | SNS topic for events |
-| `KMS_KEY_ID` | KMS key for encryption |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SPRING_PROFILES_ACTIVE` | Profile (`local`, `dev`, `prod`) | `local` |
+| `AWS_REGION` | AWS region | `us-west-2` |
+| `S3_BUCKET_NAME` | S3 bucket for files | `fsamp-files-local` |
+| `KMS_KEY_ID` | KMS key ID/alias | `alias/fsamp-files-key` |
+| `SNS_TOPIC_ARN` | SNS topic for events | - |
+| `COGNITO_USER_POOL_ID` | Cognito User Pool ID | - |
 
-### LocalStack (Development)
+### Profiles
 
-The `local` profile automatically configures:
-- Endpoint: `http://localhost:4566`
-- Credentials: `test/test`
-- Bucket: `fsamp-local-files`
+| Profile | Description |
+|---------|-------------|
+| `local` | LocalStack, FIPS disabled |
+| `dev` | AWS dev environment |
+| `prod` | Full FIPS compliance |
+
+---
 
 ## 🧪 Testing
 
@@ -150,9 +168,48 @@ The `local` profile automatically configures:
 # Unit tests
 ./mvnw test
 
-# Integration tests (requires Docker)
+# Integration tests (Testcontainers)
 ./mvnw verify -P integration-tests
 
-# With coverage
+# Coverage report
 ./mvnw test jacoco:report
+open target/site/jacoco/index.html
 ```
+
+---
+
+## 🐳 Docker
+
+```bash
+# Build
+docker build -t fsamp-gateway .
+
+# Run with LocalStack
+docker run -p 8080:8080 \
+  -e SPRING_PROFILES_ACTIVE=local \
+  -e AWS_ENDPOINT_URL=http://host.docker.internal:4566 \
+  fsamp-gateway
+```
+
+---
+
+## 📖 Documentation
+
+- **[Architecture Guide](docs/ARCHITECTURE.md)** - Deep dive into system design
+- **[API Docs](http://localhost:8080/swagger-ui.html)** - OpenAPI/Swagger (when running)
+- **[Event Schema](schema/event.schema.json)** - JSON Schema for domain events
+
+---
+
+## 🔒 Security
+
+### Reporting Vulnerabilities
+
+Please report security vulnerabilities to [security@fsamp.io](mailto:security@fsamp.io).
+
+### Compliance
+
+- FIPS 140-3 (cryptography)
+- OWASP Top 10 (secure coding)
+- SOC 2 ready (audit logging)
+
