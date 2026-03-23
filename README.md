@@ -7,7 +7,7 @@
 
 > Enterprise-grade, FIPS 140-3 compliant file upload microservice for the FSAMP platform.
 
-**FSAMP Gateway** is the secure ingress point for the File Security & Anti-Malware Platform. It handles file uploads with military-grade encryption, content validation, and event-driven architecture for downstream malware scanning.
+**FSAMP Gateway** is the secure ingress point for the FedRAMP-compliant Secure AWS Microservices Platform. It handles file uploads with military-grade encryption, content validation, and event-driven architecture for downstream malware scanning.
 
 📚 **[Full Architecture Documentation](docs/ARCHITECTURE.md)**
 
@@ -212,4 +212,25 @@ Please report security vulnerabilities to [security@fsamp.io](mailto:security@fs
 - FIPS 140-3 (cryptography)
 - OWASP Top 10 (secure coding)
 - SOC 2 ready (audit logging)
+
+---
+
+## 🔗 Related Repositories
+
+| Repository | Description |
+|---|---|
+| **fsamp-processor** | Python event processor (Lambda / standalone) — file scanning, metadata extraction |
+| **fsamp-infra** | Terraform IaC, Docker Compose, e2e tests, load tests |
+| **fsamp-event-schema** | Canonical JSON Schema for domain events |
+| **fsamp-code-ci** | Reusable GitHub Actions workflows & composite actions |
+
+### Central Compliance Documentation (fsamp-infra)
+
+| Document | Path |
+|---|---|
+| FedRAMP System Security Plan | `docs/compliance/FEDRAMP_SSP.md` |
+| NIST 800-53 Control Matrix | `docs/compliance/NIST_800_53_CONTROLS.md` |
+| Security Audit Report | `docs/compliance/SECURITY_AUDIT_REPORT.md` |
+| TLS Architecture | `docs/TLS_ARCHITECTURE.md` |
+| Architecture Decision Records | `docs/adr/` |
 

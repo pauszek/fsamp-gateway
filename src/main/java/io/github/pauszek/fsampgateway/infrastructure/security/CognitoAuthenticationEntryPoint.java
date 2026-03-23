@@ -29,7 +29,11 @@ import java.util.Map;
 @Slf4j
 public class CognitoAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private final ObjectMapper objectMapper;
+
+    public CognitoAuthenticationEntryPoint(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
 
     @Override
     public void commence(HttpServletRequest request, 
@@ -50,7 +54,7 @@ public class CognitoAuthenticationEntryPoint implements AuthenticationEntryPoint
         String wwwAuthenticate = buildWwwAuthenticateHeader(authException);
         response.setHeader("WWW-Authenticate", wwwAuthenticate);
         
-        OBJECT_MAPPER.writeValue(response.getOutputStream(), errorResponse);
+        objectMapper.writeValue(response.getOutputStream(), errorResponse);
     }
 
     private Map<String, Object> buildErrorResponse(AuthenticationException authException, 

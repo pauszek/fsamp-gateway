@@ -1,6 +1,5 @@
 package io.github.pauszek.fsampgateway.infrastructure.idempotency;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
@@ -34,10 +33,9 @@ import java.util.Optional;
  */
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class IdempotencyKeyService {
 
-    private static final String TABLE_NAME = "fsamp-idempotency-keys";
+    private final String tableName;
     private static final String PK = "idempotencyKey";
     private static final String SK = "userId";
     private static final String RESPONSE_ATTR = "response";
@@ -47,6 +45,13 @@ public class IdempotencyKeyService {
     private static final long TTL_HOURS = 24;
 
     private final DynamoDbClient dynamoDbClient;
+
+    public IdempotencyKeyService(
+            DynamoDbClient dynamoDbClient,
+            @org.springframework.beans.factory.annotation.Value("${aws.dynamodb.idempotency-table-name:${aws.dynamodb.table-name}-idempotency-keys}") String tableName) {
+        this.dynamoDbClient = dynamoDbClient;
+        this.tableName = tableName;
+    }
 
     /**
      * Status of idempotency key processing.
@@ -116,7 +121,7 @@ public class IdempotencyKeyService {
             long ttlEpochSeconds = now.plus(TTL_HOURS, ChronoUnit.HOURS).getEpochSecond();
 
             PutItemRequest putRequest = PutItemRequest.builder()
-                    .tableName(TABLE_NAME)
+                    .tableName(tableName)
                     .item(Map.of(
                             PK, AttributeValue.builder().s(idempotencyKey).build(),
                             SK, AttributeValue.builder().s(userId).build(),
@@ -157,7 +162,7 @@ public class IdempotencyKeyService {
         long ttlEpochSeconds = now.plus(TTL_HOURS, ChronoUnit.HOURS).getEpochSecond();
 
         UpdateItemRequest updateRequest = UpdateItemRequest.builder()
-                .tableName(TABLE_NAME)
+                .tableName(tableName)
                 .key(Map.of(
                         PK, AttributeValue.builder().s(idempotencyKey).build(),
                         SK, AttributeValue.builder().s(userId).build()
@@ -199,7 +204,7 @@ public class IdempotencyKeyService {
      */
     private Optional<IdempotencyRecord> getKey(String idempotencyKey, String userId) {
         GetItemRequest getRequest = GetItemRequest.builder()
-                .tableName(TABLE_NAME)
+                .tableName(tableName)
                 .key(Map.of(
                         PK, AttributeValue.builder().s(idempotencyKey).build(),
                         SK, AttributeValue.builder().s(userId).build()
@@ -227,7 +232,7 @@ public class IdempotencyKeyService {
      */
     private void deleteKey(String idempotencyKey, String userId) {
         DeleteItemRequest deleteRequest = DeleteItemRequest.builder()
-                .tableName(TABLE_NAME)
+                .tableName(tableName)
                 .key(Map.of(
                         PK, AttributeValue.builder().s(idempotencyKey).build(),
                         SK, AttributeValue.builder().s(userId).build()

@@ -24,7 +24,11 @@ import java.util.Map;
 @Slf4j
 public class CognitoAccessDeniedHandler implements AccessDeniedHandler {
 
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private final ObjectMapper objectMapper;
+
+    public CognitoAccessDeniedHandler(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
 
     @Override
     public void handle(HttpServletRequest request,
@@ -54,6 +58,6 @@ public class CognitoAccessDeniedHandler implements AccessDeniedHandler {
                 "Bearer error=\"insufficient_scope\", " +
                 "error_description=\"The access token lacks required scope\"");
         
-        OBJECT_MAPPER.writeValue(response.getOutputStream(), errorResponse);
+        objectMapper.writeValue(response.getOutputStream(), errorResponse);
     }
 }

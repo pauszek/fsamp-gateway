@@ -105,7 +105,7 @@ public class TikaContentValidatorAdapter implements ContentValidatorPort {
     private static final String FIPS_PROVIDER_NAME = "BCFIPS";
 
     @Override
-    public Checksum computeChecksum(byte[] content) {
+    public Checksum computeChecksum(InputStream content) {
         try {
             MessageDigest digest;
             if (fipsEnabled) {
@@ -113,8 +113,14 @@ public class TikaContentValidatorAdapter implements ContentValidatorPort {
             } else {
                 digest = MessageDigest.getInstance("SHA-256");
             }
-            
-            byte[] hash = digest.digest(content);
+
+            byte[] buffer = new byte[8192];
+            int bytesRead;
+            while ((bytesRead = content.read(buffer)) != -1) {
+                digest.update(buffer, 0, bytesRead);
+            }
+
+            byte[] hash = digest.digest();
             String hexHash = HexFormat.of().formatHex(hash);
             
             return Checksum.sha256(hexHash);

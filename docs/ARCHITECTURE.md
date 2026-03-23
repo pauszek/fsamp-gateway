@@ -2,7 +2,7 @@
 
 ## Overview
 
-**FSAMP Gateway** is an enterprise-grade, FIPS 140-3 compliant file upload microservice built with Spring Boot 3.4 and Java 21. It serves as the ingress point for the FSAMP (File Security & Anti-Malware Platform) system, handling secure file uploads, validation, encryption, and event publishing.
+**FSAMP Gateway** is an enterprise-grade, FIPS 140-3 compliant file upload microservice built with Spring Boot 3.4 and Java 21. It serves as the ingress point for the FSAMP (FedRAMP-compliant Secure AWS Microservices Platform) system, handling secure file uploads, validation, encryption, and event publishing.
 
 ---
 

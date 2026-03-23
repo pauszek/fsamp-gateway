@@ -142,6 +142,16 @@
             <version>2.0.7</version>
         </dependency>
 
+        <!-- Amazon Corretto Crypto Provider (ACCP) - FIPS 140-3 Level 1 validated -->
+        <!-- Provides FIPS-compliant TLS stack and high-performance crypto operations -->
+        <!-- Requires platform-specific native binary (os-maven-plugin detects classifier) -->
+        <dependency>
+            <groupId>software.amazon.cryptools</groupId>
+            <artifactId>AmazonCorrettoCryptoProvider</artifactId>
+            <version>2.4.1</version>
+            <classifier>${os.detected.classifier}</classifier>
+        </dependency>
+
         <!-- JSON Processing -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
@@ -244,6 +254,14 @@
     </dependencies>
 
     <build>
+        <extensions>
+            <!-- OS detection for platform-specific ACCP native libraries -->
+            <extension>
+                <groupId>kr.motd.maven</groupId>
+                <artifactId>os-maven-plugin</artifactId>
+                <version>1.7.1</version>
+            </extension>
+        </extensions>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -292,8 +310,8 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                     <argLine>@{argLine} -Dorg.bouncycastle.fips.approved_only=true</argLine>
-                    <!-- Exclude integration tests from unit test phase -->
-                    <excludedGroups>integration</excludedGroups>
+                    <!-- Exclude integration and FIPS tests from unit test phase -->
+                    <excludedGroups>integration,fips</excludedGroups>
                 </configuration>
             </plugin>
             <!-- Failsafe for Integration Tests -->
@@ -373,7 +391,69 @@
                     </execution>
                 </executions>
             </plugin>
+            <!-- CycloneDX SBOM Generation (FedRAMP SC-7 / Supply Chain Security) -->
+            <plugin>
+                <groupId>org.cyclonedx</groupId>
+                <artifactId>cyclonedx-maven-plugin</artifactId>
+                <version>2.9.1</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>makeAggregateBom</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <projectType>application</projectType>
+                    <schemaVersion>1.5</schemaVersion>
+                    <includeBomSerialNumber>true</includeBomSerialNumber>
+                    <includeCompileScope>true</includeCompileScope>
+                    <includeProvidedScope>true</includeProvidedScope>
+                    <includeRuntimeScope>true</includeRuntimeScope>
+                    <includeSystemScope>false</includeSystemScope>
+                    <includeTestScope>false</includeTestScope>
+                    <includeLicenseText>false</includeLicenseText>
+                    <outputFormat>json</outputFormat>
+                    <outputName>bom</outputName>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
+
+    <!-- Security Analysis Profiles -->
+    <profiles>
+        <!-- OWASP Dependency-Check (CI: mvn verify -Psecurity) -->
+        <profile>
+            <id>security</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.owasp</groupId>
+                        <artifactId>dependency-check-maven</artifactId>
+                        <version>11.1.1</version>
+                        <configuration>
+                            <failBuildOnCVSS>7</failBuildOnCVSS>
+                            <suppressionFiles>
+                                <suppressionFile>dependency-check-suppressions.xml</suppressionFile>
+                            </suppressionFiles>
+                            <formats>
+                                <format>HTML</format>
+                                <format>JSON</format>
+                            </formats>
+                            <nvdApiKey>${env.NVD_API_KEY}</nvdApiKey>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>check</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>

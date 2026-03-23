@@ -41,6 +41,7 @@ aws:
     key-id: alias/test-key
   dynamodb:
     table-name: test-metadata
+    idempotency-table-name: test-idempotency
 
 fsamp:
   security:

@@ -54,6 +54,14 @@ class SnsEventPublisherAdapterIntegrationTest extends BaseIntegrationTest {
                 .attributes()
                 .get(QueueAttributeName.QUEUE_ARN);
 
+        // Allow SNS to send messages to SQS (required when ENFORCE_IAM=1)
+        String queuePolicy = "{\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"sns.amazonaws.com\"},"
+                + "\"Action\":\"sqs:SendMessage\",\"Resource\":\"" + queueArn + "\","
+                + "\"Condition\":{\"ArnEquals\":{\"aws:SourceArn\":\"" + topicArn + "\"}}}]}";
+        sqsClient.setQueueAttributes(builder -> builder
+                .queueUrl(queueUrl)
+                .attributes(java.util.Map.of(QueueAttributeName.POLICY, queuePolicy)));
+
         // Subscribe SQS queue to SNS topic for message verification
         snsClient.subscribe(SubscribeRequest.builder()
                 .topicArn(topicArn)

@@ -4,6 +4,8 @@ import io.github.pauszek.fsampgateway.application.dto.FileUploadResponseDto;
 import io.github.pauszek.fsampgateway.application.mapper.FileMapper;
 import io.github.pauszek.fsampgateway.domain.command.UploadFileCommand;
 import io.github.pauszek.fsampgateway.domain.model.*;
+import io.github.pauszek.fsampgateway.domain.port.in.DeleteFileUseCase;
+import io.github.pauszek.fsampgateway.domain.port.in.GetFileUseCase;
 import io.github.pauszek.fsampgateway.domain.port.in.UploadFileUseCase;
 import io.github.pauszek.fsampgateway.infrastructure.security.cognito.CurrentUserService;
 import org.junit.jupiter.api.*;
@@ -12,7 +14,10 @@ import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -28,6 +33,12 @@ class FileUploadRestAdapterTest {
 
     @Mock
     private UploadFileUseCase uploadFileUseCase;
+
+    @Mock
+    private GetFileUseCase getFileUseCase;
+
+    @Mock
+    private DeleteFileUseCase deleteFileUseCase;
 
     @Mock
     private FileMapper fileMapper;
@@ -47,6 +58,21 @@ class FileUploadRestAdapterTest {
     @Nested
     @DisplayName("uploadFile")
     class UploadFile {
+
+        @BeforeEach
+        void setUpRequestContext() {
+            MockHttpServletRequest request = new MockHttpServletRequest();
+            request.setRequestURI("/api/v1/files/upload");
+            request.setScheme("http");
+            request.setServerName("localhost");
+            request.setServerPort(8080);
+            RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        }
+
+        @AfterEach
+        void clearRequestContext() {
+            RequestContextHolder.resetRequestAttributes();
+        }
 
         @Test
         @DisplayName("should upload file successfully with valid data")
@@ -153,16 +179,21 @@ class FileUploadRestAdapterTest {
     class GetFile {
 
         @Test
-        @DisplayName("should return 501 NOT_IMPLEMENTED (not yet implemented)")
-        void shouldReturnNotImplemented() {
+        @DisplayName("should return 200 OK with file data")
+        void shouldReturnFileSuccessfully() {
             // given
+            SecureFile file = createUploadedFile();
+            String fileId = file.getId().toString();
             given(currentUserService.getCurrentUserId()).willReturn(Optional.of(USER_ID));
+            given(getFileUseCase.getByIdOrThrow(any(FileId.class))).willReturn(file);
+            given(fileMapper.toResponseDto(file)).willReturn(createResponseDto());
 
             // when
-            ResponseEntity<FileUploadResponseDto> response = adapter.getFile("file-123");
+            ResponseEntity<FileUploadResponseDto> response = adapter.getFile(fileId);
 
             // then
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_IMPLEMENTED);
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(response.getBody()).isNotNull();
         }
     }
 
@@ -171,16 +202,19 @@ class FileUploadRestAdapterTest {
     class DeleteFile {
 
         @Test
-        @DisplayName("should return 501 NOT_IMPLEMENTED (not yet implemented)")
-        void shouldReturnNotImplemented() {
+        @DisplayName("should return 204 NO_CONTENT on successful delete")
+        void shouldDeleteFileSuccessfully() {
             // given
+            FileId fileId = FileId.generate();
             given(currentUserService.getCurrentUserId()).willReturn(Optional.of(USER_ID));
+            willDoNothing().given(deleteFileUseCase).execute(any(FileId.class));
 
             // when
-            ResponseEntity<Void> response = adapter.deleteFile("file-123");
+            ResponseEntity<Void> response = adapter.deleteFile(fileId.toString());
 
             // then
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_IMPLEMENTED);
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+            then(deleteFileUseCase).should().execute(any(FileId.class));
         }
     }
 

@@ -40,7 +40,7 @@ public class OpenApiConfig {
                 .description("""
                         ## Bezpieczna platforma mikroserwisowa w chmurze AWS
                         
-                        **FSAMP (File Secure Access & Management Platform)** - Gateway Service
+                        **FSAMP (FedRAMP-compliant Secure AWS Microservices Platform)** - Gateway Service
                         
                         ### Features:
                         - 🔐 FIPS 140-3 compliant encryption (AWS KMS)

@@ -12,6 +12,7 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.sns.SnsClient;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sts.StsClient;
+import software.amazon.awssdk.services.cloudwatch.CloudWatchClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -126,6 +127,20 @@ class AwsConfigTest {
             assertThat(sqsClient).isNotNull();
             sqsClient.close();
         }
+
+        @Test
+        @DisplayName("should create CloudWatch client with LocalStack endpoint")
+        void shouldCreateCloudWatchClientWithLocalStackEndpoint() {
+            // given
+            AwsCredentialsProvider provider = config.awsCredentialsProvider();
+
+            // when
+            CloudWatchClient cloudWatchClient = config.cloudWatchClient(provider);
+
+            // then
+            assertThat(cloudWatchClient).isNotNull();
+            cloudWatchClient.close();
+        }
     }
 
     @Nested
@@ -133,7 +148,7 @@ class AwsConfigTest {
     class ProductionAwsConfigTest {
 
         private final AwsConfig.ProductionAwsConfig config =
-                new AwsConfig.ProductionAwsConfig(TEST_REGION);
+                new AwsConfig.ProductionAwsConfig(TEST_REGION, true);
 
         @Test
         @DisplayName("should create default credentials provider")
@@ -143,6 +158,36 @@ class AwsConfigTest {
 
             // then
             assertThat(provider).isNotNull();
+        }
+
+        @Test
+        @DisplayName("should enable FIPS endpoints for US regions")
+        void shouldEnableFipsEndpointsForUsRegions() {
+            // given
+            var usConfig = new AwsConfig.ProductionAwsConfig("us-west-2", true);
+            var provider = testCredentials();
+
+            // when
+            S3Client client = usConfig.s3Client(provider);
+
+            // then
+            assertThat(client).isNotNull();
+            client.close();
+        }
+
+        @Test
+        @DisplayName("should disable FIPS endpoints for non-US regions")
+        void shouldDisableFipsEndpointsForNonUsRegions() {
+            // given - FIPS requested but region is EU (should auto-disable)
+            var euConfig = new AwsConfig.ProductionAwsConfig("eu-west-1", true);
+            var provider = testCredentials();
+
+            // when - should not throw (FIPS not available in EU regions)
+            S3Client client = euConfig.s3Client(provider);
+
+            // then
+            assertThat(client).isNotNull();
+            client.close();
         }
 
         @Test
@@ -227,6 +272,20 @@ class AwsConfigTest {
             // then
             assertThat(sqsClient).isNotNull();
             sqsClient.close();
+        }
+
+        @Test
+        @DisplayName("should create CloudWatch client for production")
+        void shouldCreateCloudWatchClientForProduction() {
+            // given
+            AwsCredentialsProvider provider = testCredentials();
+
+            // when
+            CloudWatchClient cloudWatchClient = config.cloudWatchClient(provider);
+
+            // then
+            assertThat(cloudWatchClient).isNotNull();
+            cloudWatchClient.close();
         }
 
         private AwsCredentialsProvider testCredentials() {

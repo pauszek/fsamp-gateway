@@ -238,7 +238,7 @@ class FileUploadDomainServiceTest {
             // when/then
             assertThatThrownBy(() -> service.execute(command))
                     .isInstanceOf(FileValidationException.class)
-                    .hasMessageContaining("Failed to read file content");
+                    .hasMessageContaining("Failed to buffer file content");
         }
 
         @Test

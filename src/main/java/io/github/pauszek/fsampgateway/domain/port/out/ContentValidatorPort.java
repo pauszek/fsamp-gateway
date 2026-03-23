@@ -36,8 +36,8 @@ public interface ContentValidatorPort {
     /**
      * Compute checksum of content.
      *
-     * @param content file content
+     * @param content file content stream (will be consumed but not closed)
      * @return SHA-256 checksum
      */
-    Checksum computeChecksum(byte[] content);
+    Checksum computeChecksum(InputStream content);
 }
