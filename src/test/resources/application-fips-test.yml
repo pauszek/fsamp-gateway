@@ -1,0 +1,66 @@
+# =============================================================================
+# FIPS Test Profile Configuration
+# =============================================================================
+# Activates FIPS 140-3 crypto providers (ACCP + BouncyCastle FIPS).
+#
+# Requirements:
+#   - Amazon Corretto 21 JDK (ACCP requires Corretto-specific native libs)
+#   - Run with: mvn test -Dgroups=fips -Dspring.profiles.active=fips-test
+#
+# NOTE: This profile intentionally DOES NOT include "local" so that
+# FipsCryptoConfig (@Profile("!local")) is activated.
+# =============================================================================
+
+spring:
+  config:
+    activate:
+      on-profile: fips-test
+  main:
+    lazy-initialization: true
+    allow-bean-definition-overriding: true
+
+# FIPS must be enabled for this profile
+fsamp:
+  security:
+    fips-mode: true
+    allowed-content-types:
+      - application/pdf
+      - image/png
+      - image/jpeg
+      - text/plain
+    max-file-size-bytes: 10485760
+
+# FIPS approved-only mode for BouncyCastle
+security:
+  fips:
+    approved-only: true
+
+# Mock Cognito (not needed for crypto tests)  
+cognito:
+  region: us-west-2
+  user-pool-id: test-pool-id
+  client-id: test-client-id
+  jwks-endpoint: http://localhost:9999/.well-known/jwks.json
+  issuer-uri: https://cognito-idp.us-west-2.amazonaws.com/test-pool
+
+# Mock AWS (not connecting to real endpoints)
+aws:
+  region: us-west-2
+  endpoint: http://localhost:4566
+  fips-endpoints: false
+  credentials:
+    access-key: test
+    secret-key: test
+  s3:
+    bucket-name: test-bucket
+  sns:
+    file-events-topic-arn: arn:aws:sns:us-west-2:000000000000:test-topic
+  kms:
+    key-id: alias/test-key
+  dynamodb:
+    table-name: test-metadata
+
+logging:
+  level:
+    root: WARN
+    io.github.pauszek: DEBUG
