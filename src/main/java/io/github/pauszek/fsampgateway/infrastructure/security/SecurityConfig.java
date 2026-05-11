@@ -183,6 +183,7 @@ public class SecurityConfig {
                 "Authorization",
                 "Content-Type",
                 "X-Correlation-ID",
+                "X-Idempotency-Key",
                 "X-Requested-With",
                 "X-XSRF-TOKEN"
         ));

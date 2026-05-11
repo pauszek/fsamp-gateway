@@ -162,7 +162,8 @@ class SnsEventPublisherAdapterIntegrationTest extends BaseIntegrationTest {
             // given
             String uniqueFilename = "unique-test-file-" + UUID.randomUUID() + ".pdf";
             FileUploadedEvent event = new FileUploadedEvent(
-                    "1.0.0",
+                    FileUploadedEvent.SCHEMA_VERSION,
+                    UUID.randomUUID(),
                     UUID.randomUUID(),
                     UUID.randomUUID(),
                     Instant.now(),
@@ -225,7 +226,8 @@ class SnsEventPublisherAdapterIntegrationTest extends BaseIntegrationTest {
         );
 
         return new FileUploadedEvent(
-                "1.0.0",
+                FileUploadedEvent.SCHEMA_VERSION,
+                UUID.randomUUID(),
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 Instant.now(),

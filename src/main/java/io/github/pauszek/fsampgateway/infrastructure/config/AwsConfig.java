@@ -27,10 +27,10 @@ import java.net.URI;
  * Configures AWS clients for S3, SNS, SQS, KMS, DynamoDB, STS.
  * Supports LocalStack for local development.
  * 
- * FIPS 140-3 Compliance:
+ * FIPS 140-3-oriented posture:
  * - Production clients use FIPS endpoints (.fipsEnabled(true))
  * - FIPS endpoints route traffic to FIPS-validated TLS termination points
- * - Combined with ACCP FIPS provider for end-to-end FIPS-compliant communication
+ * - Combined with ACCP FIPS provider for a FIPS-oriented communication path
  * 
  * @see <a href="https://aws.amazon.com/compliance/fips/">AWS FIPS Endpoints</a>
  */
@@ -44,7 +44,7 @@ public class AwsConfig {
 
     /**
      * Production AWS configuration using default credentials chain.
-     * All clients use FIPS endpoints for FIPS 140-3 compliance.
+     * All clients use FIPS endpoints for the FIPS 140-3-oriented posture.
      */
     @Configuration
     @Profile("!local")

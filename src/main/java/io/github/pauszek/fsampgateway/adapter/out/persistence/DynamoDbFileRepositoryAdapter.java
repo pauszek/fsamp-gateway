@@ -1,5 +1,10 @@
 package io.github.pauszek.fsampgateway.adapter.out.persistence;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.pauszek.fsampgateway.domain.event.DomainEvent;
+import io.github.pauszek.fsampgateway.domain.event.FileUploadedEvent;
+import io.github.pauszek.fsampgateway.domain.exception.EventPublishException;
 import io.github.pauszek.fsampgateway.domain.model.*;
 import io.github.pauszek.fsampgateway.domain.port.out.FileRepositoryPort;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
@@ -26,9 +31,9 @@ import java.util.Optional;
  * 
  * Table schema (matches Terraform {@code storage} module):
  * <ul>
- *   <li>PK: {@code fileId} (String) - UUID of the file</li>
- *   <li>SK: {@code uploadTimestamp} (String) - ISO-8601 timestamp</li>
- *   <li>GSI: {@code status-index} (status → uploadTimestamp) for status-based queries</li>
+ *   <li>PK: {@code FILE#<fileId>} - stable file aggregate key</li>
+ *   <li>SK: {@code TS#<timestamp>} - ISO-8601 metadata version key</li>
+ *   <li>GSI1: {@code STATUS#<status>} → {@code <timestamp>} for status-based queries</li>
  * </ul>
  * 
  * FedRAMP AU-3: All persistence operations are logged with correlation context.
@@ -41,8 +46,11 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
     private static final Logger log = LoggerFactory.getLogger(DynamoDbFileRepositoryAdapter.class);
 
     // Attribute names matching Terraform table definition
-    private static final String PK = "fileId";
-    private static final String SK = "uploadTimestamp";
+    private static final String PK = "PK";
+    private static final String SK = "SK";
+    private static final String GSI1_PK = "GSI1PK";
+    private static final String GSI1_SK = "GSI1SK";
+    private static final String ATTR_FILE_ID = "fileId";
     private static final String ATTR_CORRELATION_ID = "correlationId";
     private static final String ATTR_FILE_NAME = "fileName";
     private static final String ATTR_MIME_TYPE = "mimeType";
@@ -60,14 +68,21 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
     private static final String ATTR_UPDATED_AT = "updatedAt";
 
     private final DynamoDbClient dynamoDbClient;
+    private final ObjectMapper objectMapper;
     private final String tableName;
+    private final String outboxTableName;
 
     public DynamoDbFileRepositoryAdapter(
             DynamoDbClient dynamoDbClient,
-            @Value("${aws.dynamodb.table-name}") String tableName) {
+            ObjectMapper objectMapper,
+            @Value("${aws.dynamodb.table-name}") String tableName,
+            @Value("${aws.dynamodb.outbox-table-name:}") String outboxTableName) {
         this.dynamoDbClient = dynamoDbClient;
+        this.objectMapper = objectMapper;
         this.tableName = tableName;
-        log.info("DynamoDB file repository initialized: table={}", tableName);
+        this.outboxTableName = outboxTableName;
+        log.info("DynamoDB file repository initialized: table={}, outboxEnabled={}",
+                tableName, supportsTransactionalOutbox());
     }
 
     @Override
@@ -90,18 +105,58 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
     }
 
     @Override
+    public boolean supportsTransactionalOutbox() {
+        return outboxTableName != null && !outboxTableName.isBlank();
+    }
+
+    @Override
+    @CircuitBreaker(name = "dynamoDb")
+    @Retry(name = "dynamoDb")
+    public SecureFile saveWithOutbox(SecureFile file, DomainEvent event) {
+        if (!supportsTransactionalOutbox()) {
+            return save(file);
+        }
+
+        Map<String, AttributeValue> metadataItem = toItem(file);
+        Map<String, AttributeValue> outboxItem = toOutboxItem(file, event);
+
+        TransactWriteItemsRequest request = TransactWriteItemsRequest.builder()
+                .transactItems(
+                        TransactWriteItem.builder()
+                                .put(Put.builder()
+                                        .tableName(tableName)
+                                        .item(metadataItem)
+                                        .build())
+                                .build(),
+                        TransactWriteItem.builder()
+                                .put(Put.builder()
+                                        .tableName(outboxTableName)
+                                        .item(outboxItem)
+                                        .conditionExpression("attribute_not_exists(PK) AND attribute_not_exists(SK)")
+                                        .build())
+                                .build()
+                )
+                .build();
+
+        dynamoDbClient.transactWriteItems(request);
+        log.info("File and outbox event saved to DynamoDB transactionally: fileId={}, eventType={}",
+                file.getId(), event.getEventType());
+        return file;
+    }
+
+    @Override
     @CircuitBreaker(name = "dynamoDb")
     @Retry(name = "dynamoDb")
     public Optional<SecureFile> findById(FileId fileId) {
         log.debug("Finding file in DynamoDB: fileId={}", fileId);
 
-        // Query by PK (fileId), get the most recent entry
+        // Query by PK (FILE#fileId), get the most recent entry
         QueryRequest queryRequest = QueryRequest.builder()
                 .tableName(tableName)
                 .keyConditionExpression("#pk = :pkVal")
                 .expressionAttributeNames(Map.of("#pk", PK))
                 .expressionAttributeValues(Map.of(
-                        ":pkVal", AttributeValue.builder().s(fileId.toString()).build()
+                        ":pkVal", AttributeValue.builder().s(filePk(fileId)).build()
                 ))
                 .scanIndexForward(false) // Descending order - most recent first
                 .limit(1)
@@ -136,8 +191,8 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
         DeleteItemRequest request = DeleteItemRequest.builder()
                 .tableName(tableName)
                 .key(Map.of(
-                        PK, AttributeValue.builder().s(fileId.toString()).build(),
-                        SK, AttributeValue.builder().s(file.getAuditInfo().createdAt().toString()).build()
+                        PK, AttributeValue.builder().s(filePk(fileId)).build(),
+                        SK, AttributeValue.builder().s(timestampSk(file.getAuditInfo().createdAt().toString())).build()
                 ))
                 .build();
 
@@ -152,7 +207,7 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
                 .keyConditionExpression("#pk = :pkVal")
                 .expressionAttributeNames(Map.of("#pk", PK))
                 .expressionAttributeValues(Map.of(
-                        ":pkVal", AttributeValue.builder().s(fileId.toString()).build()
+                        ":pkVal", AttributeValue.builder().s(filePk(fileId)).build()
                 ))
                 .select(Select.COUNT)
                 .limit(1)
@@ -170,15 +225,18 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
         Map<String, AttributeValue> item = new HashMap<>();
 
         // Keys
-        item.put(PK, s(file.getId().toString()));
-        item.put(SK, s(file.getAuditInfo().createdAt().toString()));
+        item.put(PK, s(filePk(file.getId())));
+        item.put(SK, s(timestampSk(file.getAuditInfo().createdAt().toString())));
 
         // Core metadata
+        item.put(ATTR_FILE_ID, s(file.getId().toString()));
         item.put(ATTR_CORRELATION_ID, s(file.getCorrelationId().value()));
         item.put(ATTR_FILE_NAME, s(file.getFileName().value()));
         item.put(ATTR_MIME_TYPE, s(file.getMimeType().value()));
         item.put(ATTR_FILE_SIZE, n(file.getSize().bytes()));
         item.put(ATTR_STATUS, s(file.getStatus().name()));
+        item.put(GSI1_PK, s("STATUS#" + file.getStatus().name()));
+        item.put(GSI1_SK, s(file.getAuditInfo().createdAt().toString()));
 
         // Checksum (may be null for PENDING files)
         if (file.getChecksum() != null) {
@@ -207,13 +265,42 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
         return item;
     }
 
+    private Map<String, AttributeValue> toOutboxItem(SecureFile file, DomainEvent event) {
+        try {
+            String eventId = event instanceof FileUploadedEvent fileEvent
+                    ? fileEvent.eventId().toString()
+                    : file.getId().toString() + "-" + event.getOccurredAt().toEpochMilli();
+            String eventType = event.getEventType();
+            String aggregateType = "FileUpload";
+            String createdAt = event.getOccurredAt().toString();
+
+            Map<String, AttributeValue> item = new HashMap<>();
+            item.put(PK, s("OUTBOX#" + aggregateType));
+            item.put(SK, s("EVENT#" + eventId));
+            item.put("eventId", s(eventId));
+            item.put("eventType", s(eventType));
+            item.put("aggregateId", s(file.getId().toString()));
+            item.put("aggregateType", s(aggregateType));
+            item.put("payload", s(objectMapper.writeValueAsString(event)));
+            item.put("status", s("PENDING"));
+            item.put("createdAt", s(createdAt));
+            item.put("retryCount", n(0));
+            item.put("messageGroupId", s(file.getId().toString()));
+            item.put(GSI1_PK, s("STATUS#PENDING"));
+            item.put(GSI1_SK, s(createdAt));
+            return item;
+        } catch (JsonProcessingException e) {
+            throw new EventPublishException("Failed to serialize event for outbox", e);
+        }
+    }
+
     // ========================================================================
     // Deserialization: DynamoDB Item → SecureFile
     // ========================================================================
 
     private SecureFile fromItem(Map<String, AttributeValue> item) {
         SecureFile.Builder builder = SecureFile.builder()
-                .id(FileId.of(item.get(PK).s()))
+                .id(FileId.of(readFileId(item)))
                 .correlationId(CorrelationId.of(item.get(ATTR_CORRELATION_ID).s()))
                 .fileName(FileName.of(item.get(ATTR_FILE_NAME).s()))
                 .mimeType(MimeType.of(item.get(ATTR_MIME_TYPE).s()))
@@ -268,5 +355,21 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
 
     private static AttributeValue bool(boolean value) {
         return AttributeValue.builder().bool(value).build();
+    }
+
+    private static String filePk(FileId fileId) {
+        return "FILE#" + fileId;
+    }
+
+    private static String timestampSk(String timestamp) {
+        return "TS#" + timestamp;
+    }
+
+    private static String readFileId(Map<String, AttributeValue> item) {
+        AttributeValue fileId = item.get(ATTR_FILE_ID);
+        if (fileId != null && fileId.s() != null) {
+            return fileId.s();
+        }
+        return item.get(PK).s().replaceFirst("^FILE#", "");
     }
 }

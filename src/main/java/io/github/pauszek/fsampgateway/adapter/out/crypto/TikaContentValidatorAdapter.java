@@ -34,8 +34,16 @@ public class TikaContentValidatorAdapter implements ContentValidatorPort {
     @Value("${spring.profiles.active:}")
     private String activeProfile;
 
+    @Value("${fsamp.security.fips-mode:false}")
+    private boolean fipsModeEnabled;
+
     @PostConstruct
     public void init() {
+        if (!fipsModeEnabled) {
+            log.info("FIPS mode disabled; skipping FIPS provider registration");
+            return;
+        }
+
         // Skip FIPS provider for local development (LocalStack doesn't support FIPS)
         if ("local".equals(activeProfile) || "test".equals(activeProfile) || "e2e".equals(activeProfile)) {
             log.info("Skipping FIPS provider for profile: {}", activeProfile);

@@ -129,6 +129,7 @@ load_config_file() {
         export S3_BUCKET_NAME
         export SNS_TOPIC_ARN
         export DYNAMODB_TABLE_NAME
+        export OUTBOX_TABLE_NAME
         export KMS_KEY_ID
         
         log "✓ Configuration loaded from file"

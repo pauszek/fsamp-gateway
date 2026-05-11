@@ -143,7 +143,7 @@ class FipsCryptoConfigTest {
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
             cipher.init(Cipher.ENCRYPT_MODE, key);
             byte[] iv = cipher.getIV();
-            byte[] plaintext = "FIPS 140-3 compliant encryption test".getBytes();
+            byte[] plaintext = "FIPS 140-3-oriented encryption test".getBytes();
             byte[] ciphertext = cipher.doFinal(plaintext);
 
             // Verify the cipher was provided by ACCP or BC-FIPS

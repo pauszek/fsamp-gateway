@@ -6,6 +6,7 @@ import io.github.pauszek.fsampgateway.domain.port.out.FileRepositoryPort;
 import io.github.pauszek.fsampgateway.domain.port.out.FileStoragePort;
 import io.github.pauszek.fsampgateway.domain.service.FileQueryDomainService;
 import io.github.pauszek.fsampgateway.domain.service.FileUploadDomainService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -26,13 +27,15 @@ public class DomainConfig {
             FileStoragePort fileStorage,
             EventPublisherPort eventPublisher,
             FileRepositoryPort fileRepository,
-            ContentValidatorPort contentValidator) {
+            ContentValidatorPort contentValidator,
+            @Value("${aws.dynamodb.direct-publish-after-outbox:false}") boolean directPublishAfterOutbox) {
         
         return new FileUploadDomainService(
                 contentValidator,
                 fileStorage,
                 eventPublisher,
-                fileRepository
+                fileRepository,
+                directPublishAfterOutbox
         );
     }
 

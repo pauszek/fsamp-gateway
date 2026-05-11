@@ -40,10 +40,10 @@ public class OpenApiConfig {
                 .description("""
                         ## Bezpieczna platforma mikroserwisowa w chmurze AWS
                         
-                        **FSAMP (FedRAMP-compliant Secure AWS Microservices Platform)** - Gateway Service
+                        **FSAMP (FedRAMP-aligned Secure AWS Microservices Platform)** - Gateway Service
                         
                         ### Features:
-                        - 🔐 FIPS 140-3 compliant encryption (AWS KMS)
+                        - 🔐 FIPS 140-3-oriented encryption controls (AWS KMS)
                         - 📁 Secure file upload with content validation
                         - 🔄 Event-driven architecture (SNS/SQS)
                         - 📊 Full observability (metrics, tracing, logging)
@@ -58,7 +58,7 @@ public class OpenApiConfig {
                         Master's thesis implementation demonstrating cloud-native microservices
                         with AWS Free Tier and LocalStack for local development.
                         """)
-                .version("1.0.0")
+                .version("1.1.0")
                 .contact(new Contact()
                         .name("FSAMP Team")
                         .email("contact@fsamp.io")

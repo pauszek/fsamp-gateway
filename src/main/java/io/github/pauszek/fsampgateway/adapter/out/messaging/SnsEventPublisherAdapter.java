@@ -118,6 +118,11 @@ public class SnsEventPublisherAdapter implements EventPublisherPort {
                 .build());
 
         if (event instanceof FileUploadedEvent fileEvent) {
+            attributes.put("fileId", MessageAttributeValue.builder()
+                    .dataType("String")
+                    .stringValue(fileEvent.fileId().toString())
+                    .build());
+
             attributes.put("correlationId", MessageAttributeValue.builder()
                     .dataType("String")
                     .stringValue(fileEvent.correlationId().toString())

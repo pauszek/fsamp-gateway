@@ -12,7 +12,7 @@
     <artifactId>fsamp-gateway</artifactId>
     <version>${revision}</version>
     <name>fsamp-gateway</name>
-    <description>FSAMP Gateway - Enterprise-grade secure file upload microservice with FIPS 140-3 compliance</description>
+    <description>FSAMP Gateway - Enterprise-grade secure file upload microservice with a FIPS 140-3-oriented security posture</description>
 
     <properties>
         <revision>0.0.1-SNAPSHOT</revision>

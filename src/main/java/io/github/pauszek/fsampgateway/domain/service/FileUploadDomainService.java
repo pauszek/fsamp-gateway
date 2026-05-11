@@ -21,8 +21,8 @@ import java.nio.file.Path;
  * 1. Validate content
  * 2. Create domain entity
  * 3. Store file
- * 4. Publish event
- * 5. Persist metadata
+ * 4. Persist metadata and enqueue event via transactional outbox when available
+ * 5. Publish event directly only as an explicit local fallback
  * 
  * This is a pure domain service - no framework dependencies.
  */
@@ -34,6 +34,7 @@ public class FileUploadDomainService implements UploadFileUseCase {
     private final FileStoragePort fileStorage;
     private final EventPublisherPort eventPublisher;
     private final FileRepositoryPort fileRepository;
+    private final boolean directPublishAfterOutbox;
 
     public FileUploadDomainService(
             ContentValidatorPort contentValidator,
@@ -41,10 +42,21 @@ public class FileUploadDomainService implements UploadFileUseCase {
             EventPublisherPort eventPublisher,
             FileRepositoryPort fileRepository
     ) {
+        this(contentValidator, fileStorage, eventPublisher, fileRepository, false);
+    }
+
+    public FileUploadDomainService(
+            ContentValidatorPort contentValidator,
+            FileStoragePort fileStorage,
+            EventPublisherPort eventPublisher,
+            FileRepositoryPort fileRepository,
+            boolean directPublishAfterOutbox
+    ) {
         this.contentValidator = contentValidator;
         this.fileStorage = fileStorage;
         this.eventPublisher = eventPublisher;
         this.fileRepository = fileRepository;
+        this.directPublishAfterOutbox = directPublishAfterOutbox;
     }
 
     @Override
@@ -121,15 +133,25 @@ public class FileUploadDomainService implements UploadFileUseCase {
                     checksum
             );
 
-            // 7. Persist metadata
-            file = fileRepository.save(file);
-            log.debug("File metadata persisted: fileId={}", file.getId());
-
-            // 8. Publish domain event
+            // 7. Persist metadata and publish/enqueue domain event
             FileUploadedEvent event = FileUploadedEvent.from(file);
-            String messageId = eventPublisher.publish(event);
-            log.info("Published FILE_UPLOADED event: messageId={}, fileId={}",
-                    messageId, file.getId());
+            if (fileRepository.supportsTransactionalOutbox()) {
+                file = fileRepository.saveWithOutbox(file, event);
+                log.info("File metadata and FILE_UPLOADED outbox event persisted: fileId={}, eventId={}",
+                        file.getId(), event.eventId());
+                if (directPublishAfterOutbox) {
+                    String messageId = eventPublisher.publish(event);
+                    log.info("Published FILE_UPLOADED event directly after outbox write (local fallback): messageId={}, fileId={}",
+                            messageId, file.getId());
+                }
+            } else {
+                file = fileRepository.save(file);
+                log.debug("File metadata persisted: fileId={}", file.getId());
+
+                String messageId = eventPublisher.publish(event);
+                log.info("Published FILE_UPLOADED event directly: messageId={}, fileId={}",
+                        messageId, file.getId());
+            }
 
             log.info("File upload completed: fileId={}, status={}",
                     file.getId(), file.getStatus());

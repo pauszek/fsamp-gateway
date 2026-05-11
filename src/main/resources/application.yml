@@ -44,7 +44,7 @@ management:
     tags:
       application: ${spring.application.name}
       environment: ${spring.profiles.active:local}
-      fips_enabled: "true"
+      fips_enabled: ${FSAMP_FIPS_ENABLED:${fsamp.security.fips-mode:false}}
     distribution:
       percentiles-histogram:
         http.server.requests: true
@@ -214,6 +214,8 @@ aws:
     key-id: ${KMS_KEY_ID:alias/fsamp-local-master-key}
   dynamodb:
     table-name: ${DYNAMODB_TABLE_NAME:fsamp-local-file-metadata}
+    outbox-table-name: ${OUTBOX_TABLE_NAME:fsamp-local-outbox}
+    direct-publish-after-outbox: ${DIRECT_PUBLISH_AFTER_OUTBOX:true}
     idempotency-table-name: ${DYNAMODB_IDEMPOTENCY_TABLE_NAME:fsamp-local-idempotency-keys}
 
 fsamp:
@@ -253,7 +255,60 @@ aws:
     key-id: ${KMS_KEY_ID}
   dynamodb:
     table-name: fsamp-dev-file-metadata
+    outbox-table-name: ${OUTBOX_TABLE_NAME:fsamp-dev-outbox}
+    direct-publish-after-outbox: ${DIRECT_PUBLISH_AFTER_OUTBOX:false}
     idempotency-table-name: fsamp-dev-idempotency-keys
+
+fsamp:
+  security:
+    fips-mode: true
+    allowed-content-types:
+      - application/pdf
+      - image/png
+      - image/jpeg
+      - application/json
+      - text/plain
+      - application/xml
+    max-file-size-bytes: 104857600
+
+management:
+  metrics:
+    export:
+      cloudwatch:
+        enabled: true
+        namespace: FSAMP/Gateway
+        step: 1m
+
+---
+# Staging profile (AWS)
+spring:
+  config:
+    activate:
+      on-profile: staging
+
+cognito:
+  region: ${AWS_REGION:us-west-2}
+  user-pool-id: ${COGNITO_USER_POOL_ID}
+  client-id: ${COGNITO_CLIENT_ID}
+
+aws:
+  region: ${AWS_REGION:us-west-2}
+  fips-endpoints: true
+  s3:
+    bucket-name: fsamp-staging-files
+  sns:
+    file-events-topic-arn: ${SNS_FILE_EVENTS_TOPIC_ARN}
+  kms:
+    key-id: ${KMS_KEY_ID}
+  dynamodb:
+    table-name: fsamp-staging-file-metadata
+    outbox-table-name: ${OUTBOX_TABLE_NAME:fsamp-staging-outbox}
+    direct-publish-after-outbox: ${DIRECT_PUBLISH_AFTER_OUTBOX:false}
+    idempotency-table-name: fsamp-staging-idempotency-keys
+
+security:
+  cors:
+    allowed-origins: ${SECURITY_CORS_ALLOWED_ORIGINS:https://*.execute-api.us-west-2.amazonaws.com}
 
 fsamp:
   security:
@@ -298,6 +353,8 @@ aws:
     key-id: ${KMS_KEY_ID}
   dynamodb:
     table-name: fsamp-prod-file-metadata
+    outbox-table-name: ${OUTBOX_TABLE_NAME:fsamp-prod-outbox}
+    direct-publish-after-outbox: ${DIRECT_PUBLISH_AFTER_OUTBOX:false}
     idempotency-table-name: fsamp-prod-idempotency-keys
 
 security:

@@ -73,7 +73,7 @@ public class FileUploadRestAdapter {
                     
                     The file will be:
                     1. Validated (size, content type)
-                    2. Encrypted and stored in S3 using KMS (FIPS 140-3 compliant)
+                    2. Encrypted and stored in S3 using KMS (FIPS 140-3-oriented posture)
                     3. An event will be published for async processing
                     
                     **Allowed file types:** PDF, PNG, JPEG, JSON, XML, TXT, CSV

@@ -1,5 +1,8 @@
 package io.github.pauszek.fsampgateway.adapter.out.persistence;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import io.github.pauszek.fsampgateway.domain.event.FileUploadedEvent;
 import io.github.pauszek.fsampgateway.domain.model.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,11 +42,14 @@ class DynamoDbFileRepositoryAdapterTest {
     @Captor
     private ArgumentCaptor<DeleteItemRequest> deleteRequestCaptor;
 
+    @Captor
+    private ArgumentCaptor<TransactWriteItemsRequest> transactWriteItemsRequestCaptor;
+
     private DynamoDbFileRepositoryAdapter adapter;
 
     @BeforeEach
     void setUp() {
-        adapter = new DynamoDbFileRepositoryAdapter(dynamoDbClient, TABLE_NAME);
+        adapter = new DynamoDbFileRepositoryAdapter(dynamoDbClient, objectMapper(), TABLE_NAME, "");
     }
 
     // ========================================================================
@@ -73,13 +79,16 @@ class DynamoDbFileRepositoryAdapterTest {
             assertThat(request.tableName()).isEqualTo(TABLE_NAME);
 
             Map<String, AttributeValue> item = request.item();
+            assertThat(item.get("PK").s()).isEqualTo("FILE#" + file.getId());
+            assertThat(item.get("SK").s()).isEqualTo("TS#" + file.getAuditInfo().createdAt());
             assertThat(item.get("fileId").s()).isEqualTo(file.getId().toString());
-            assertThat(item.get("uploadTimestamp").s()).isEqualTo(file.getAuditInfo().createdAt().toString());
             assertThat(item.get("correlationId").s()).isEqualTo(file.getCorrelationId().value());
             assertThat(item.get("fileName").s()).isEqualTo(file.getFileName().value());
             assertThat(item.get("mimeType").s()).isEqualTo(file.getMimeType().value());
             assertThat(item.get("fileSizeBytes").n()).isEqualTo(String.valueOf(file.getSize().bytes()));
             assertThat(item.get("status").s()).isEqualTo("PENDING");
+            assertThat(item.get("GSI1PK").s()).isEqualTo("STATUS#PENDING");
+            assertThat(item.get("GSI1SK").s()).isEqualTo(file.getAuditInfo().createdAt().toString());
             assertThat(item.get("createdBy").s()).isEqualTo("user-123");
 
             // Nullable fields should not be present for pending files
@@ -126,6 +135,50 @@ class DynamoDbFileRepositoryAdapterTest {
             assertThatThrownBy(() -> adapter.save(file))
                     .isInstanceOf(DynamoDbException.class)
                     .hasMessageContaining("Provisioned throughput exceeded");
+        }
+    }
+
+    // ========================================================================
+    // saveWithOutbox()
+    // ========================================================================
+
+    @Nested
+    @DisplayName("saveWithOutbox")
+    class SaveWithOutbox {
+
+        @Test
+        @DisplayName("should persist metadata and outbox event transactionally when outbox table is configured")
+        void shouldPersistMetadataAndOutboxEventTransactionally() {
+            // given
+            SecureFile file = createUploadedFile();
+            FileUploadedEvent event = FileUploadedEvent.from(file);
+            DynamoDbFileRepositoryAdapter outboxAdapter =
+                    new DynamoDbFileRepositoryAdapter(dynamoDbClient, objectMapper(), TABLE_NAME, "test-outbox");
+            given(dynamoDbClient.transactWriteItems(any(TransactWriteItemsRequest.class)))
+                    .willReturn(TransactWriteItemsResponse.builder().build());
+
+            // when
+            SecureFile result = outboxAdapter.saveWithOutbox(file, event);
+
+            // then
+            assertThat(result).isEqualTo(file);
+            then(dynamoDbClient).should().transactWriteItems(transactWriteItemsRequestCaptor.capture());
+
+            TransactWriteItemsRequest request = transactWriteItemsRequestCaptor.getValue();
+            assertThat(request.transactItems()).hasSize(2);
+
+            Put metadataPut = request.transactItems().get(0).put();
+            assertThat(metadataPut.tableName()).isEqualTo(TABLE_NAME);
+            assertThat(metadataPut.item().get("PK").s()).isEqualTo("FILE#" + file.getId());
+
+            Put outboxPut = request.transactItems().get(1).put();
+            assertThat(outboxPut.tableName()).isEqualTo("test-outbox");
+            assertThat(outboxPut.conditionExpression()).isEqualTo("attribute_not_exists(PK) AND attribute_not_exists(SK)");
+            assertThat(outboxPut.item().get("PK").s()).isEqualTo("OUTBOX#FileUpload");
+            assertThat(outboxPut.item().get("eventType").s()).isEqualTo("FILE_UPLOADED");
+            assertThat(outboxPut.item().get("aggregateId").s()).isEqualTo(file.getId().toString());
+            assertThat(outboxPut.item().get("status").s()).isEqualTo("PENDING");
+            assertThat(outboxPut.item().get("payload").s()).contains("\"fileId\":\"" + file.getId() + "\"");
         }
     }
 
@@ -188,8 +241,8 @@ class DynamoDbFileRepositoryAdapterTest {
 
             assertThat(request.tableName()).isEqualTo(TABLE_NAME);
             assertThat(request.keyConditionExpression()).isEqualTo("#pk = :pkVal");
-            assertThat(request.expressionAttributeNames().get("#pk")).isEqualTo("fileId");
-            assertThat(request.expressionAttributeValues().get(":pkVal").s()).isEqualTo(fileId.toString());
+            assertThat(request.expressionAttributeNames().get("#pk")).isEqualTo("PK");
+            assertThat(request.expressionAttributeValues().get(":pkVal").s()).isEqualTo("FILE#" + fileId);
             assertThat(request.scanIndexForward()).isFalse();
             assertThat(request.limit()).isEqualTo(1);
         }
@@ -263,9 +316,9 @@ class DynamoDbFileRepositoryAdapterTest {
 
             DeleteItemRequest request = deleteRequestCaptor.getValue();
             assertThat(request.tableName()).isEqualTo(TABLE_NAME);
-            assertThat(request.key().get("fileId").s()).isEqualTo(file.getId().toString());
-            assertThat(request.key().get("uploadTimestamp").s())
-                    .isEqualTo(file.getAuditInfo().createdAt().toString());
+            assertThat(request.key().get("PK").s()).isEqualTo("FILE#" + file.getId());
+            assertThat(request.key().get("SK").s())
+                    .isEqualTo("TS#" + file.getAuditInfo().createdAt());
         }
 
         @Test
@@ -366,8 +419,9 @@ class DynamoDbFileRepositoryAdapterTest {
         Map<String, AttributeValue> item = new HashMap<>();
 
         // Keys
+        item.put("PK", s("FILE#" + file.getId()));
+        item.put("SK", s("TS#" + file.getAuditInfo().createdAt()));
         item.put("fileId", s(file.getId().toString()));
-        item.put("uploadTimestamp", s(file.getAuditInfo().createdAt().toString()));
 
         // Core attributes
         item.put("correlationId", s(file.getCorrelationId().value()));
@@ -375,6 +429,8 @@ class DynamoDbFileRepositoryAdapterTest {
         item.put("mimeType", s(file.getMimeType().value()));
         item.put("fileSizeBytes", n(file.getSize().bytes()));
         item.put("status", s(file.getStatus().name()));
+        item.put("GSI1PK", s("STATUS#" + file.getStatus().name()));
+        item.put("GSI1SK", s(file.getAuditInfo().createdAt().toString()));
         item.put("createdBy", s(file.getAuditInfo().createdBy()));
         item.put("createdAt", s(file.getAuditInfo().createdAt().toString()));
         item.put("updatedAt", s(file.getAuditInfo().updatedAt().toString()));
@@ -404,5 +460,9 @@ class DynamoDbFileRepositoryAdapterTest {
 
     private static AttributeValue n(long value) {
         return AttributeValue.builder().n(String.valueOf(value)).build();
+    }
+
+    private static ObjectMapper objectMapper() {
+        return new ObjectMapper().registerModule(new JavaTimeModule());
     }
 }

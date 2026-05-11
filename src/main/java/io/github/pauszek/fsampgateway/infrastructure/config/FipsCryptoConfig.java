@@ -26,7 +26,7 @@ import java.security.Security;
  * 
  * Only active in non-local profiles (dev, staging, prod).
  * 
- * <p>FIPS 140-3 Compliance:
+ * <p>FIPS 140-3-oriented posture:
  * <ul>
  *   <li>ACCP provides FIPS-validated TLS 1.2/1.3 stack (solves Temurin gap)</li>
  *   <li>BouncyCastle FIPS enforces approved-only mode</li>

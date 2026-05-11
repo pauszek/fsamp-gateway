@@ -15,6 +15,7 @@ import java.util.UUID;
  */
 public record FileUploadedEvent(
         String schemaVersion,
+        UUID fileId,
         UUID eventId,
         UUID correlationId,
         Instant timestamp,
@@ -25,12 +26,13 @@ public record FileUploadedEvent(
         SecurityPayload securityContext
 ) implements DomainEvent {
 
-    public static final String SCHEMA_VERSION = "1.0.0";
+    public static final String SCHEMA_VERSION = "1.1.0";
     public static final String EVENT_TYPE = "FILE_UPLOADED";
     public static final String SOURCE = "fsamp-gateway";
 
     public FileUploadedEvent {
         if (schemaVersion == null) schemaVersion = SCHEMA_VERSION;
+        if (fileId == null) fileId = UUID.randomUUID();
         if (eventId == null) eventId = UUID.randomUUID();
         if (timestamp == null) timestamp = Instant.now();
         if (source == null) source = SOURCE;
@@ -43,6 +45,7 @@ public record FileUploadedEvent(
     public static FileUploadedEvent from(SecureFile file) {
         return new FileUploadedEvent(
                 SCHEMA_VERSION,
+                file.getId().value(),
                 UUID.randomUUID(),
                 correlationIdToUUID(file.getCorrelationId().value()),
                 Instant.now(),
