@@ -93,7 +93,7 @@ public class FipsCryptoConfig {
             // 4. Verify FIPS mode is active
             verifyFipsMode();
             
-        } catch (Exception e) {
+        } catch (ReflectiveOperationException | IllegalStateException e) {
             log.error("Failed to initialize FIPS providers", e);
             throw new IllegalStateException("FIPS initialization failed - cannot start in non-FIPS mode", e);
         }
@@ -102,18 +102,22 @@ public class FipsCryptoConfig {
     /**
      * Verify FIPS mode is properly activated for both providers.
      */
-    private void verifyFipsMode() throws Exception {
+    private void verifyFipsMode() {
         // Verify ACCP is installed and healthy
         Provider accpProvider = Security.getProvider(ACCP_PROVIDER_NAME);
         if (accpProvider == null) {
             throw new IllegalStateException("ACCP provider not found after installation");
         }
 
-        // Run ACCP self-test to verify FIPS integrity (via reflection)
-        Class<?> accpClass = Class.forName(ACCP_CLASS);
-        Object instance = accpClass.getField("INSTANCE").get(null);
-        Method assertHealthy = instance.getClass().getMethod("assertHealthy");
-        assertHealthy.invoke(instance);
+        try {
+            // Run ACCP self-test to verify FIPS integrity (via reflection)
+            Class<?> accpClass = Class.forName(ACCP_CLASS);
+            Object instance = accpClass.getField("INSTANCE").get(null);
+            Method assertHealthy = instance.getClass().getMethod("assertHealthy");
+            assertHealthy.invoke(instance);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("ACCP self-test failed", e);
+        }
         log.info("ACCP self-test passed — FIPS 140-3 crypto operational");
 
         // Verify BouncyCastle FIPS

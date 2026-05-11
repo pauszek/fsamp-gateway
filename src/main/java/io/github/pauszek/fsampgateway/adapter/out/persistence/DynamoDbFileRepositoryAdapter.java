@@ -66,6 +66,7 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
     private static final String ATTR_CREATED_BY = "createdBy";
     private static final String ATTR_CREATED_AT = "createdAt";
     private static final String ATTR_UPDATED_AT = "updatedAt";
+    private static final String OUTBOX_STATUS_PENDING = FileStatus.PENDING.name();
 
     private final DynamoDbClient dynamoDbClient;
     private final ObjectMapper objectMapper;
@@ -282,11 +283,11 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
             item.put("aggregateId", s(file.getId().toString()));
             item.put("aggregateType", s(aggregateType));
             item.put("payload", s(objectMapper.writeValueAsString(event)));
-            item.put("status", s("PENDING"));
-            item.put("createdAt", s(createdAt));
+            item.put(ATTR_STATUS, s(OUTBOX_STATUS_PENDING));
+            item.put(ATTR_CREATED_AT, s(createdAt));
             item.put("retryCount", n(0));
             item.put("messageGroupId", s(file.getId().toString()));
-            item.put(GSI1_PK, s("STATUS#PENDING"));
+            item.put(GSI1_PK, s("STATUS#" + OUTBOX_STATUS_PENDING));
             item.put(GSI1_SK, s(createdAt));
             return item;
         } catch (JsonProcessingException e) {

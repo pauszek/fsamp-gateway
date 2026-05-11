@@ -56,6 +56,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
+    private static final String ROLE_ADMINS = "ADMINS";
+    private static final String ROLE_ADMINS_AUTHORITY = "ROLE_" + ROLE_ADMINS;
+    private static final String ROLE_USERS_AUTHORITY = "ROLE_USERS";
+
     private final JwtDecoder jwtDecoder;
     private final Converter<Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter;
     private final ObjectMapper objectMapper;
@@ -119,7 +123,7 @@ public class SecurityConfig {
                             auth.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll();
                         } else {
                             auth.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
-                                    .hasRole("ADMINS");
+                                    .hasRole(ROLE_ADMINS);
                         }
                         
                         // OPTIONS requests - public (CORS preflight)
@@ -127,19 +131,19 @@ public class SecurityConfig {
                         
                         // File upload - requires authentication and write scope
                         .requestMatchers(HttpMethod.POST, "/api/v1/files/**")
-                                .hasAnyAuthority("SCOPE_files.write", "ROLE_ADMINS", "ROLE_USERS")
+                                .hasAnyAuthority("SCOPE_files.write", ROLE_ADMINS_AUTHORITY, ROLE_USERS_AUTHORITY)
                         
                         // File download - requires authentication and read scope
                         .requestMatchers(HttpMethod.GET, "/api/v1/files/**")
-                                .hasAnyAuthority("SCOPE_files.read", "ROLE_ADMINS", "ROLE_USERS")
+                                .hasAnyAuthority("SCOPE_files.read", ROLE_ADMINS_AUTHORITY, ROLE_USERS_AUTHORITY)
                         
                         // File deletion - admin only
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/files/**")
-                                .hasRole("ADMINS")
+                                .hasRole(ROLE_ADMINS)
                         
                         // Admin endpoints - admin role only
                         .requestMatchers("/api/v1/admin/**")
-                                .hasRole("ADMINS")
+                                .hasRole(ROLE_ADMINS)
                         
                         // All other API endpoints - authenticated
                         .requestMatchers("/api/v1/**").authenticated()

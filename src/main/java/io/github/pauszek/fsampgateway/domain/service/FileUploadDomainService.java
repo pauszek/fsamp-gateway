@@ -10,9 +10,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Set;
 
 /**
  * Domain Service - File Upload Orchestrator.
@@ -29,6 +36,15 @@ import java.nio.file.Path;
 public class FileUploadDomainService implements UploadFileUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(FileUploadDomainService.class);
+    private static final String UPLOAD_TEMP_DIR_NAME = "fsamp-gateway-uploads";
+    private static final Set<PosixFilePermission> OWNER_ONLY_DIRECTORY_PERMISSIONS =
+            PosixFilePermissions.fromString("rwx------");
+    private static final Set<PosixFilePermission> OWNER_ONLY_FILE_PERMISSIONS =
+            PosixFilePermissions.fromString("rw-------");
+    private static final FileAttribute<Set<PosixFilePermission>> OWNER_ONLY_DIRECTORY =
+            PosixFilePermissions.asFileAttribute(OWNER_ONLY_DIRECTORY_PERMISSIONS);
+    private static final FileAttribute<Set<PosixFilePermission>> OWNER_ONLY_FILE =
+            PosixFilePermissions.asFileAttribute(OWNER_ONLY_FILE_PERMISSIONS);
 
     private final ContentValidatorPort contentValidator;
     private final FileStoragePort fileStorage;
@@ -168,7 +184,7 @@ public class FileUploadDomainService implements UploadFileUseCase {
 
     private Path bufferToTempFile(UploadFileCommand command) {
         try {
-            Path temp = Files.createTempFile("fsamp-upload-", ".tmp");
+            Path temp = createSecureTempFile();
             try (InputStream in = command.getContent();
                  OutputStream out = Files.newOutputStream(temp)) {
                 in.transferTo(out);
@@ -176,6 +192,38 @@ public class FileUploadDomainService implements UploadFileUseCase {
             return temp;
         } catch (IOException e) {
             throw new FileValidationException("Failed to buffer file content", e);
+        }
+    }
+
+    @SuppressWarnings("java:S5443")
+    private Path createSecureTempFile() throws IOException {
+        Path uploadTempDirectory = secureUploadTempDirectory();
+        try {
+            return Files.createTempFile(uploadTempDirectory, "fsamp-upload-", ".tmp", OWNER_ONLY_FILE);
+        } catch (UnsupportedOperationException e) {
+            return Files.createTempFile(uploadTempDirectory, "fsamp-upload-", ".tmp");
+        }
+    }
+
+    @SuppressWarnings("java:S5443")
+    private Path secureUploadTempDirectory() throws IOException {
+        Path baseTempDirectory = Path.of(System.getProperty("java.io.tmpdir"))
+                .toAbsolutePath()
+                .normalize();
+        Path uploadTempDirectory = baseTempDirectory.resolve(UPLOAD_TEMP_DIR_NAME);
+
+        if (Files.isSymbolicLink(uploadTempDirectory)
+                || (Files.exists(uploadTempDirectory, LinkOption.NOFOLLOW_LINKS)
+                && !Files.isDirectory(uploadTempDirectory, LinkOption.NOFOLLOW_LINKS))) {
+            throw new FileValidationException("Unsafe upload temp directory");
+        }
+
+        try {
+            Path directory = Files.createDirectories(uploadTempDirectory, OWNER_ONLY_DIRECTORY);
+            Files.setPosixFilePermissions(directory, OWNER_ONLY_DIRECTORY_PERMISSIONS);
+            return directory;
+        } catch (UnsupportedOperationException e) {
+            return Files.createDirectories(uploadTempDirectory);
         }
     }
 
