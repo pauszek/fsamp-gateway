@@ -126,6 +126,11 @@ class S3StorageAdapterIntegrationTest extends BaseIntegrationTest {
 
             HeadObjectResponse headResponse = s3Client.headObject(headRequest);
             assertThat(headResponse.contentType()).isEqualTo("application/json");
+
+            // Verify SSE-KMS encryption is applied (FedRAMP SC-28)
+            assertThat(headResponse.serverSideEncryption())
+                    .as("Uploaded objects must be encrypted with SSE-KMS")
+                    .isEqualTo(ServerSideEncryption.AWS_KMS);
         }
 
         @Test

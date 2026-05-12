@@ -5,7 +5,7 @@ import java.util.Objects;
 /**
  * Value Object - Encryption Metadata.
  * 
- * Contains cryptographic information for FIPS 140-3 compliance.
+ * Contains cryptographic information for the FIPS 140-3-oriented security posture.
  * Only AES-256-GCM is permitted per NIST SP 800-38D.
  */
 public record EncryptionMetadata(
@@ -15,7 +15,7 @@ public record EncryptionMetadata(
 ) {
 
     /**
-     * FIPS 140-3 compliant encryption algorithms.
+     * FIPS 140-3-oriented encryption algorithms.
      * Only AES-GCM is permitted - provides authenticated encryption (AEAD).
      */
     public enum EncryptionAlgorithm {

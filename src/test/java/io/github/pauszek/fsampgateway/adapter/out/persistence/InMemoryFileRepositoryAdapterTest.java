@@ -75,8 +75,7 @@ class InMemoryFileRepositoryAdapterTest {
             Optional<SecureFile> result = adapter.findById(file.getId());
 
             // then
-            assertThat(result).isPresent();
-            assertThat(result.get()).isEqualTo(file);
+            assertThat(result).contains(file);
         }
 
         @Test

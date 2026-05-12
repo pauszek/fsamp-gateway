@@ -5,6 +5,7 @@ import io.github.pauszek.fsampgateway.domain.model.SecureFile;
 import io.github.pauszek.fsampgateway.domain.port.out.FileRepositoryPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
 import java.util.Map;
@@ -14,12 +15,11 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Adapter - In-Memory File Repository.
  * 
- * Temporary implementation for development.
- * Production should use DynamoDbFileRepositoryAdapter.
- * 
- * TODO: Implement DynamoDB adapter
+ * Test/fallback implementation using a ConcurrentHashMap.
+ * Production uses {@link DynamoDbFileRepositoryAdapter}.
  */
 @Repository
+@Profile("test")
 public class InMemoryFileRepositoryAdapter implements FileRepositoryPort {
 
     private static final Logger log = LoggerFactory.getLogger(InMemoryFileRepositoryAdapter.class);

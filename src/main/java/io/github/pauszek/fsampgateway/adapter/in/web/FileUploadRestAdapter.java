@@ -5,8 +5,11 @@ import io.github.pauszek.fsampgateway.application.dto.FileUploadRequestDto;
 import io.github.pauszek.fsampgateway.application.dto.FileUploadResponseDto;
 import io.github.pauszek.fsampgateway.application.mapper.FileMapper;
 import io.github.pauszek.fsampgateway.domain.command.UploadFileCommand;
+import io.github.pauszek.fsampgateway.domain.model.FileId;
 import io.github.pauszek.fsampgateway.domain.model.SecureFile;
 import io.github.pauszek.fsampgateway.domain.model.UserPrincipal;
+import io.github.pauszek.fsampgateway.domain.port.in.DeleteFileUseCase;
+import io.github.pauszek.fsampgateway.domain.port.in.GetFileUseCase;
 import io.github.pauszek.fsampgateway.domain.port.in.UploadFileUseCase;
 import io.github.pauszek.fsampgateway.infrastructure.idempotency.Idempotent;
 import io.github.pauszek.fsampgateway.infrastructure.security.cognito.CurrentUserService;
@@ -30,8 +33,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.io.IOException;
+import java.net.URI;
 
 /**
  * REST Adapter - File Upload Controller.
@@ -56,6 +61,8 @@ import java.io.IOException;
 public class FileUploadRestAdapter {
 
     private final UploadFileUseCase uploadFileUseCase;
+    private final GetFileUseCase getFileUseCase;
+    private final DeleteFileUseCase deleteFileUseCase;
     private final FileMapper fileMapper;
     private final CurrentUserService currentUserService;
 
@@ -66,7 +73,7 @@ public class FileUploadRestAdapter {
                     
                     The file will be:
                     1. Validated (size, content type)
-                    2. Encrypted and stored in S3 using KMS (FIPS 140-3 compliant)
+                    2. Encrypted and stored in S3 using KMS (FIPS 140-3-oriented posture)
                     3. An event will be published for async processing
                     
                     **Allowed file types:** PDF, PNG, JPEG, JSON, XML, TXT, CSV
@@ -163,7 +170,12 @@ public class FileUploadRestAdapter {
         log.info("Upload successful: fileId={}, status={}, userId={}", 
                 uploadedFile.getId(), uploadedFile.getStatus(), currentUser.userId());
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
+                .path("/../{fileId}")
+                .buildAndExpand(uploadedFile.getId())
+                .toUri();
+
+        return ResponseEntity.created(location).body(response);
     }
 
     /**
@@ -226,8 +238,11 @@ public class FileUploadRestAdapter {
     ) {
         String userId = currentUserService.getCurrentUserId().orElse("unknown");
         log.info("Get file request: fileId={}, userId={}", fileId, userId);
-        // TODO: Implement GetFileUseCase
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+
+        SecureFile file = getFileUseCase.getByIdOrThrow(FileId.of(fileId));
+        FileUploadResponseDto response = fileMapper.toResponseDto(file);
+
+        return ResponseEntity.ok(response);
     }
 
     @Operation(
@@ -268,7 +283,10 @@ public class FileUploadRestAdapter {
     ) {
         String userId = currentUserService.getCurrentUserId().orElse("unknown");
         log.info("Delete file request: fileId={}, userId={}", fileId, userId);
-        // TODO: Implement DeleteFileUseCase
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+
+        deleteFileUseCase.execute(FileId.of(fileId));
+
+        log.info("File deleted successfully: fileId={}, userId={}", fileId, userId);
+        return ResponseEntity.noContent().build();
     }
 }

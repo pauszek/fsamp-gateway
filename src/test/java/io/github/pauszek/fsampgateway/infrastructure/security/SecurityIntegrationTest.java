@@ -74,9 +74,9 @@ class SecurityIntegrationTest {
         when(jwtDecoder.decode(anyString())).thenReturn(jwt);
 
         // When/Then
-        mockMvc.perform(get("/api/v1/files/123")
+        mockMvc.perform(get("/api/v1/files/" + java.util.UUID.randomUUID())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN))
-                .andExpect(status().isNotImplemented()); // Endpoint not implemented yet
+                .andExpect(status().isNotFound()); // File doesn't exist, but auth passed
     }
 
     @Test
@@ -87,9 +87,9 @@ class SecurityIntegrationTest {
         when(jwtDecoder.decode(anyString())).thenReturn(jwt);
 
         // When/Then
-        mockMvc.perform(get("/api/v1/files/123")
+        mockMvc.perform(get("/api/v1/files/" + java.util.UUID.randomUUID())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN))
-                .andExpect(status().isNotImplemented());
+                .andExpect(status().isNotFound()); // File doesn't exist, but auth passed
     }
 
     @Test
@@ -113,9 +113,9 @@ class SecurityIntegrationTest {
         when(jwtDecoder.decode(anyString())).thenReturn(jwt);
 
         // When/Then
-        mockMvc.perform(delete("/api/v1/files/123")
+        mockMvc.perform(delete("/api/v1/files/" + java.util.UUID.randomUUID())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN))
-                .andExpect(status().isNotImplemented()); // Endpoint not implemented yet
+                .andExpect(status().isNotFound()); // File doesn't exist, but auth passed
     }
 
     @Test

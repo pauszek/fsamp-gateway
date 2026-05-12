@@ -36,7 +36,6 @@ class FileUploadDomainServiceTest {
     @Mock
     private FileRepositoryPort fileRepository;
 
-    @InjectMocks
     private FileUploadDomainService service;
 
     @Captor
@@ -52,6 +51,16 @@ class FileUploadDomainServiceTest {
     private static final String TEST_CORRELATION_ID = "a1b2c3d4e5f67890a1b2c3d4e5f67890";
     private static final String TEST_CHECKSUM = "abc123hash";
     private static final String TEST_MESSAGE_ID = "msg-123";
+
+    @BeforeEach
+    void setUp() {
+        service = new FileUploadDomainService(
+                contentValidator,
+                fileStorage,
+                eventPublisher,
+                fileRepository
+        );
+    }
 
     @AfterEach
     void cleanup() {
@@ -149,9 +158,57 @@ class FileUploadDomainServiceTest {
             // then
             then(eventPublisher).should().publish(eventCaptor.capture());
             FileUploadedEvent event = eventCaptor.getValue();
+            assertThat(event.fileId()).isNotNull();
             assertThat(event.eventId()).isNotNull();
             assertThat(event.fileMetadata().getOriginalFilename()).isEqualTo(TEST_FILENAME);
             assertThat(event.fileMetadata().getMimeType()).isEqualTo(TEST_CONTENT_TYPE);
+        }
+
+        @Test
+        @DisplayName("should use transactional outbox instead of direct SNS publish when repository supports it")
+        void shouldUseTransactionalOutboxWhenAvailable() {
+            // given
+            var command = createValidCommand();
+            mockSuccessfulValidation();
+            mockSuccessfulStorage();
+            given(fileRepository.supportsTransactionalOutbox()).willReturn(true);
+            given(fileRepository.saveWithOutbox(any(), any())).willAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            SecureFile result = service.execute(command);
+
+            // then
+            assertThat(result.getStatus()).isEqualTo(FileStatus.UPLOADED);
+            then(fileRepository).should().saveWithOutbox(fileCaptor.capture(), eventCaptor.capture());
+            assertThat(eventCaptor.getValue().fileId()).isEqualTo(fileCaptor.getValue().getId().value());
+            then(eventPublisher).shouldHaveNoInteractions();
+            then(fileRepository).should(never()).save(any());
+        }
+
+        @Test
+        @DisplayName("should allow direct SNS publish after outbox write only for local fallback")
+        void shouldAllowLocalDirectPublishAfterOutboxWrite() {
+            // given
+            var localFallbackService = new FileUploadDomainService(
+                    contentValidator,
+                    fileStorage,
+                    eventPublisher,
+                    fileRepository,
+                    true
+            );
+            var command = createValidCommand();
+            mockSuccessfulValidation();
+            mockSuccessfulStorage();
+            given(fileRepository.supportsTransactionalOutbox()).willReturn(true);
+            given(fileRepository.saveWithOutbox(any(), any())).willAnswer(invocation -> invocation.getArgument(0));
+            mockSuccessfulEventPublish();
+
+            // when
+            localFallbackService.execute(command);
+
+            // then
+            then(fileRepository).should().saveWithOutbox(any(), eventCaptor.capture());
+            then(eventPublisher).should().publish(eventCaptor.getValue());
         }
 
         @Test
@@ -238,7 +295,7 @@ class FileUploadDomainServiceTest {
             // when/then
             assertThatThrownBy(() -> service.execute(command))
                     .isInstanceOf(FileValidationException.class)
-                    .hasMessageContaining("Failed to read file content");
+                    .hasMessageContaining("Failed to buffer file content");
         }
 
         @Test

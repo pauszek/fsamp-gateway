@@ -17,14 +17,14 @@ import lombok.RequiredArgsConstructor;
 public final class SecurityPayload {
     
     /**
-     * Whether the file is encrypted (always true per schema v1.0.0).
+     * Whether the file is encrypted (always true per schema v1.1.0).
      * JSON: "isEncrypted"
      */
     @JsonProperty("isEncrypted")
     private final boolean encrypted;
     
     /**
-     * FIPS 140-3 compliant encryption algorithm.
+     * FIPS 140-3-oriented encryption algorithm constraint.
      * Must be "AES/GCM/NoPadding" (NIST SP 800-38D AEAD).
      * AES-CBC is NOT allowed (Padding Oracle vulnerability).
      */
@@ -32,7 +32,7 @@ public final class SecurityPayload {
     
     /**
      * ARN of the AWS KMS key used for envelope encryption.
-     * Required per schema v1.0.0. Must match pattern:
+     * Required per schema v1.1.0. Must match pattern:
      * arn:aws:kms:[region]:[account]:key/[key-id]
      */
     private final String kmsKeyId;

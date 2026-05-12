@@ -34,8 +34,16 @@ public class TikaContentValidatorAdapter implements ContentValidatorPort {
     @Value("${spring.profiles.active:}")
     private String activeProfile;
 
+    @Value("${fsamp.security.fips-mode:false}")
+    private boolean fipsModeEnabled;
+
     @PostConstruct
     public void init() {
+        if (!fipsModeEnabled) {
+            log.info("FIPS mode disabled; skipping FIPS provider registration");
+            return;
+        }
+
         // Skip FIPS provider for local development (LocalStack doesn't support FIPS)
         if ("local".equals(activeProfile) || "test".equals(activeProfile) || "e2e".equals(activeProfile)) {
             log.info("Skipping FIPS provider for profile: {}", activeProfile);
@@ -105,7 +113,7 @@ public class TikaContentValidatorAdapter implements ContentValidatorPort {
     private static final String FIPS_PROVIDER_NAME = "BCFIPS";
 
     @Override
-    public Checksum computeChecksum(byte[] content) {
+    public Checksum computeChecksum(InputStream content) {
         try {
             MessageDigest digest;
             if (fipsEnabled) {
@@ -113,8 +121,14 @@ public class TikaContentValidatorAdapter implements ContentValidatorPort {
             } else {
                 digest = MessageDigest.getInstance("SHA-256");
             }
-            
-            byte[] hash = digest.digest(content);
+
+            byte[] buffer = new byte[8192];
+            int bytesRead;
+            while ((bytesRead = content.read(buffer)) != -1) {
+                digest.update(buffer, 0, bytesRead);
+            }
+
+            byte[] hash = digest.digest();
             String hexHash = HexFormat.of().formatHex(hash);
             
             return Checksum.sha256(hexHash);

@@ -2,7 +2,7 @@
 
 ## Overview
 
-**FSAMP Gateway** is an enterprise-grade, FIPS 140-3 compliant file upload microservice built with Spring Boot 3.4 and Java 21. It serves as the ingress point for the FSAMP (File Security & Anti-Malware Platform) system, handling secure file uploads, validation, encryption, and event publishing.
+**FSAMP Gateway** is an enterprise-grade, FIPS 140-3-oriented file upload microservice built with Spring Boot 3.4 and Java 21. It serves as the ingress point for the FSAMP (FedRAMP Moderate-aligned Secure AWS Microservices Platform) system, handling secure file uploads, validation, encryption, and event publishing.
 
 ---
 
@@ -225,7 +225,7 @@ SecureFile
 
 ## Security Features
 
-### FIPS 140-3 Compliance
+### FIPS 140-3-Oriented Security
 
 The gateway implements FIPS 140-3 Level 3 compliant cryptography:
 
@@ -338,7 +338,7 @@ security:
 │                 │ (Data Key Gen)  │  Server-Side Encryption │
 │                 └─────────────────┘                         │
 │                                                              │
-│  Encryption: AES-256-GCM (FIPS 140-3 compliant)             │
+│  Encryption: AES-256-GCM with FIPS-oriented runtime controls │
 │  Key Management: AWS KMS (FIPS 140-3 Level 3 HSM)           │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
@@ -350,8 +350,9 @@ Events follow a standardized JSON schema for interoperability:
 
 ```json
 {
-  "schemaVersion": "1.0.0",
-  "eventId": "550e8400-e29b-41d4-a716-446655440000",
+  "schemaVersion": "1.1.0",
+  "fileId": "550e8400-e29b-41d4-a716-446655440000",
+  "eventId": "123e4567-e89b-42d3-a456-426614174000",
   "correlationId": "123e4567-e89b-12d3-a456-426614174000",
   "timestamp": "2026-01-05T12:00:00.000Z",
   "source": "fsamp-gateway",
@@ -521,7 +522,7 @@ GET /actuator/health
 |---------|---------|
 | `local` | LocalStack development, FIPS disabled |
 | `dev` | AWS development environment |
-| `prod` | Production with full FIPS compliance |
+| `prod` | Production with FIPS endpoints and fail-closed crypto posture |
 
 ---
 
@@ -611,4 +612,3 @@ Structured logging with correlation ID:
 - [BouncyCastle FIPS](https://www.bouncycastle.org/fips-java/)
 - [Resilience4j](https://resilience4j.readme.io/)
 - [AWS SDK for Java v2](https://docs.aws.amazon.com/sdk-for-java/latest/developer-guide/)
-

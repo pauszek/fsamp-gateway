@@ -215,7 +215,7 @@ class TikaContentValidatorAdapterTest {
             byte[] content = "Hello, World!".getBytes(StandardCharsets.UTF_8);
 
             // when
-            Checksum result = adapter.computeChecksum(content);
+            Checksum result = adapter.computeChecksum(new ByteArrayInputStream(content));
 
             // then
             assertThat(result.value()).isNotBlank();
@@ -229,8 +229,8 @@ class TikaContentValidatorAdapterTest {
             byte[] content = "Test content for checksum".getBytes(StandardCharsets.UTF_8);
 
             // when
-            Checksum result1 = adapter.computeChecksum(content);
-            Checksum result2 = adapter.computeChecksum(content);
+            Checksum result1 = adapter.computeChecksum(new ByteArrayInputStream(content));
+            Checksum result2 = adapter.computeChecksum(new ByteArrayInputStream(content));
 
             // then
             assertThat(result1).isEqualTo(result2);
@@ -244,8 +244,8 @@ class TikaContentValidatorAdapterTest {
             byte[] content2 = "Content B".getBytes(StandardCharsets.UTF_8);
 
             // when
-            Checksum result1 = adapter.computeChecksum(content1);
-            Checksum result2 = adapter.computeChecksum(content2);
+            Checksum result1 = adapter.computeChecksum(new ByteArrayInputStream(content1));
+            Checksum result2 = adapter.computeChecksum(new ByteArrayInputStream(content2));
 
             // then
             assertThat(result1).isNotEqualTo(result2);
@@ -258,7 +258,7 @@ class TikaContentValidatorAdapterTest {
             byte[] content = new byte[0];
 
             // when
-            Checksum result = adapter.computeChecksum(content);
+            Checksum result = adapter.computeChecksum(new ByteArrayInputStream(content));
 
             // then
             assertThat(result.value()).isNotBlank();

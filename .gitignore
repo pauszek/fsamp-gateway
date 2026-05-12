@@ -35,5 +35,8 @@ build/
 # Maven flatten plugin
 .flattened-pom.xml
 
+# OWASP Dependency-Check local database/cache
+.dependency-check-data/
+
 # Downloaded schema (fetched from fsamp-event-schema)
 schema/

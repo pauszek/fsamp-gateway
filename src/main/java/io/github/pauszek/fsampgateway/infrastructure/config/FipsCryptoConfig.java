@@ -4,57 +4,79 @@ import org.bouncycastle.jcajce.provider.BouncyCastleFipsProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
 
 import jakarta.annotation.PostConstruct;
+import java.lang.reflect.Method;
+import java.security.Provider;
 import java.security.Security;
 
 /**
  * FIPS 140-3 Security Configuration.
  * 
- * Configures BouncyCastle FIPS provider for cryptographic operations.
+ * Configures a dual-provider FIPS cryptographic stack:
+ * <ol>
+ *   <li><strong>Amazon Corretto Crypto Provider (ACCP)</strong> — Position 1 (highest priority).
+ *       FIPS 140-3 Level 1 validated. Handles TLS, AES-GCM, SHA, ECDSA, RSA.
+ *       Uses AWS-LC (libcrypto) which is FIPS validated (CMVP Certificate #4631).</li>
+ *   <li><strong>BouncyCastle FIPS</strong> — Position 2. Provides additional FIPS-validated
+ *       algorithms not covered by ACCP (e.g., PKCS#12, CMS, additional key agreement schemes).</li>
+ * </ol>
+ * 
  * Only active in non-local profiles (dev, staging, prod).
  * 
- * FIPS 140-3 Compliance:
- * - Uses BouncyCastle FIPS provider (NIST validated)
- * - Enforces approved-only mode
- * - All cryptographic operations use FIPS-validated algorithms
+ * <p>FIPS 140-3-oriented posture:
+ * <ul>
+ *   <li>ACCP provides FIPS-validated TLS 1.2/1.3 stack (solves Temurin gap)</li>
+ *   <li>BouncyCastle FIPS enforces approved-only mode</li>
+ *   <li>All cryptographic operations use NIST-validated algorithms</li>
+ *   <li>AWS KMS HSMs are FIPS 140-3 Level 3 validated</li>
+ * </ul>
  * 
- * Note: AWS KMS operations are inherently FIPS compliant as KMS HSMs
- * are FIPS 140-3 Level 3 validated.
- * 
+ * @see <a href="https://github.com/corretto/amazon-corretto-crypto-provider">ACCP GitHub</a>
  * @see <a href="https://csrc.nist.gov/publications/detail/fips/140/3/final">FIPS 140-3</a>
  * @see <a href="https://www.bouncycastle.org/fips-java/BCFipsIn100.pdf">BouncyCastle FIPS</a>
  */
 @Configuration
-@Profile("!local")
+@ConditionalOnProperty(name = "fsamp.security.fips-mode", havingValue = "true")
 public class FipsCryptoConfig {
 
     private static final Logger log = LoggerFactory.getLogger(FipsCryptoConfig.class);
-    
+    private static final String ACCP_CLASS = "com.amazon.corretto.crypto.provider.AmazonCorrettoCryptoProvider";
+    private static final String ACCP_PROVIDER_NAME = "AmazonCorrettoCryptoProvider";
+
     @Value("${security.fips.approved-only:true}")
     private boolean approvedOnlyMode;
 
-    @Value("${security.fips.provider-position:1}")
-    private int providerPosition;
-
     @PostConstruct
     public void initializeFipsProvider() {
-        log.info("Initializing FIPS 140-3 security configuration");
+        log.info("Initializing FIPS 140-3 security configuration (ACCP + BouncyCastle FIPS)");
         
         try {
-            // Set system property for approved-only mode before provider initialization
+            // 1. Set BouncyCastle FIPS approved-only mode before provider initialization
             if (approvedOnlyMode) {
                 System.setProperty("org.bouncycastle.fips.approved_only", "true");
-                log.info("FIPS approved-only mode enabled");
+                log.info("BouncyCastle FIPS approved-only mode enabled");
             }
 
-            // Check if FIPS provider is already registered
+            // 2. Install ACCP as highest-priority provider (position 1)
+            //    ACCP provides FIPS-validated TLS stack and high-performance crypto
+            //    Uses reflection to avoid compile-time dependency on platform-specific native library
+            if (Security.getProvider(ACCP_PROVIDER_NAME) == null) {
+                Class<?> accpClass = Class.forName(ACCP_CLASS);
+                Method installMethod = accpClass.getMethod("install");
+                installMethod.invoke(null);
+                log.info("Amazon Corretto Crypto Provider (ACCP) installed at position 1 — FIPS 140-3 Level 1 TLS");
+            } else {
+                log.info("ACCP already registered");
+            }
+
+            // 3. Register BouncyCastle FIPS as secondary provider (position 2)
+            //    BC-FIPS handles algorithms not covered by ACCP
             if (Security.getProvider(BouncyCastleFipsProvider.PROVIDER_NAME) == null) {
-                // Insert FIPS provider at specified position (1 = highest priority)
-                Security.insertProviderAt(new BouncyCastleFipsProvider(), providerPosition);
-                log.info("BouncyCastle FIPS provider registered at position {}", providerPosition);
+                Security.insertProviderAt(new BouncyCastleFipsProvider(), 2);
+                log.info("BouncyCastle FIPS provider registered at position 2");
             } else {
                 log.info("BouncyCastle FIPS provider already registered");
             }
@@ -68,26 +90,43 @@ public class FipsCryptoConfig {
                 }
             }
 
-            // Verify FIPS mode is active
+            // 4. Verify FIPS mode is active
             verifyFipsMode();
             
-        } catch (Exception e) {
-            log.error("Failed to initialize FIPS provider", e);
+        } catch (ReflectiveOperationException | IllegalStateException e) {
+            log.error("Failed to initialize FIPS providers", e);
             throw new IllegalStateException("FIPS initialization failed - cannot start in non-FIPS mode", e);
         }
     }
 
     /**
-     * Verify FIPS mode is properly activated.
+     * Verify FIPS mode is properly activated for both providers.
      */
     private void verifyFipsMode() {
-        var fipsProvider = Security.getProvider(BouncyCastleFipsProvider.PROVIDER_NAME);
-        
-        if (fipsProvider == null) {
-            throw new IllegalStateException("FIPS provider not found after registration");
+        // Verify ACCP is installed and healthy
+        Provider accpProvider = Security.getProvider(ACCP_PROVIDER_NAME);
+        if (accpProvider == null) {
+            throw new IllegalStateException("ACCP provider not found after installation");
         }
 
-        // Verify approved-only mode if enabled
+        try {
+            // Run ACCP self-test to verify FIPS integrity (via reflection)
+            Class<?> accpClass = Class.forName(ACCP_CLASS);
+            Object instance = accpClass.getField("INSTANCE").get(null);
+            Method assertHealthy = instance.getClass().getMethod("assertHealthy");
+            assertHealthy.invoke(instance);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("ACCP self-test failed", e);
+        }
+        log.info("ACCP self-test passed — FIPS 140-3 crypto operational");
+
+        // Verify BouncyCastle FIPS
+        Provider bcFipsProvider = Security.getProvider(BouncyCastleFipsProvider.PROVIDER_NAME);
+        if (bcFipsProvider == null) {
+            throw new IllegalStateException("BouncyCastle FIPS provider not found after registration");
+        }
+
+        // Verify approved-only mode
         if (approvedOnlyMode) {
             String approvedOnly = System.getProperty("org.bouncycastle.fips.approved_only");
             if (!"true".equals(approvedOnly)) {
@@ -95,9 +134,9 @@ public class FipsCryptoConfig {
             }
         }
 
-        log.info("FIPS 140-3 mode verified successfully: provider={}, version={}, approved_only={}",
-                fipsProvider.getName(),
-                fipsProvider.getVersionStr(),
+        log.info("FIPS 140-3 mode verified: ACCP={} (pos 1, TLS+crypto), BC-FIPS={} (pos 2, supplementary), approved_only={}",
+                accpProvider.getVersionStr(),
+                bcFipsProvider.getVersionStr(),
                 approvedOnlyMode);
     }
 }

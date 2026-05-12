@@ -1,8 +1,7 @@
 package io.github.pauszek.fsampgateway.domain.model;
 
-import java.security.SecureRandom;
-import java.util.HexFormat;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
@@ -14,7 +13,6 @@ import java.util.regex.Pattern;
 public record CorrelationId(String value) {
 
     private static final Pattern VALID_PATTERN = Pattern.compile("^[a-f0-9]{32}$");
-    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     public CorrelationId {
         Objects.requireNonNull(value, "Correlation ID value cannot be null");
@@ -29,9 +27,7 @@ public record CorrelationId(String value) {
      * Generate a new random CorrelationId.
      */
     public static CorrelationId generate() {
-        byte[] bytes = new byte[16];
-        SECURE_RANDOM.nextBytes(bytes);
-        return new CorrelationId(HexFormat.of().formatHex(bytes));
+        return new CorrelationId(UUID.randomUUID().toString().replace("-", ""));
     }
 
     /**

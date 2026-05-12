@@ -5,7 +5,7 @@
 
 ci:
   java-version: "21"
-  distribution: temurin
+  distribution: corretto
 
 files:
   version: release.version

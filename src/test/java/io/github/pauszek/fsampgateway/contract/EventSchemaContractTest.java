@@ -3,6 +3,7 @@ package io.github.pauszek.fsampgateway.contract;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.networknt.schema.*;
 import io.github.pauszek.fsampgateway.domain.event.*;
@@ -21,7 +22,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Contract tests validating that domain events conform to the shared
- * fsamp-event-schema JSON Schema definition (v1.0.0).
+ * fsamp-event-schema JSON Schema definition (v1.1.0).
  * 
  * <p>This ensures compatibility between Gateway (producer) and Processor (consumer).
  * 
@@ -79,7 +80,7 @@ class EventSchemaContractTest {
     class FileUploadedEventContract {
 
         @Test
-        @DisplayName("should produce valid JSON according to schema v1.0.0")
+        @DisplayName("should produce valid JSON according to schema v1.1.0")
         void shouldProduceValidJson() throws Exception {
             // Given
             FileUploadedEvent event = createSampleEvent();
@@ -96,7 +97,7 @@ class EventSchemaContractTest {
         }
 
         @Test
-        @DisplayName("should include all required fields per schema v1.0.0")
+        @DisplayName("should include all required fields per schema v1.1.0")
         void shouldIncludeAllRequiredFields() throws Exception {
             // Given
             FileUploadedEvent event = createSampleEvent();
@@ -107,6 +108,7 @@ class EventSchemaContractTest {
 
             // Then - verify all required fields from schema are present
             assertThat(jsonNode.has("schemaVersion")).isTrue();
+            assertThat(jsonNode.has("fileId")).isTrue();
             assertThat(jsonNode.has("eventId")).isTrue();
             assertThat(jsonNode.has("correlationId")).isTrue();
             assertThat(jsonNode.has("timestamp")).isTrue();
@@ -118,7 +120,7 @@ class EventSchemaContractTest {
         }
 
         @Test
-        @DisplayName("should use schema version 1.0.0")
+        @DisplayName("should use schema version 1.1.0")
         void shouldUseSchemaVersion() throws Exception {
             // Given
             FileUploadedEvent event = createSampleEvent();
@@ -128,7 +130,7 @@ class EventSchemaContractTest {
             JsonNode jsonNode = OBJECT_MAPPER.readTree(json);
 
             // Then
-            assertThat(jsonNode.get("schemaVersion").asText()).isEqualTo("1.0.0");
+            assertThat(jsonNode.get("schemaVersion").asText()).isEqualTo("1.1.0");
         }
 
         @Test
@@ -168,6 +170,7 @@ class EventSchemaContractTest {
                     FileUploadedEvent.SCHEMA_VERSION,
                     UUID.randomUUID(),
                     UUID.randomUUID(),
+                    UUID.randomUUID(),
                     Instant.now(),
                     FileUploadedEvent.SOURCE,
                     eventType,
@@ -202,7 +205,7 @@ class EventSchemaContractTest {
             String json = OBJECT_MAPPER.writeValueAsString(event);
             JsonNode fileMetadata = OBJECT_MAPPER.readTree(json).get("fileMetadata");
 
-            // Then - per schema v1.0.0 checksumSHA256 is now required
+            // Then - per schema v1.1.0 checksumSHA256 is now required
             assertThat(fileMetadata.has("originalFilename")).isTrue();
             assertThat(fileMetadata.has("fileSizeBytes")).isTrue();
             assertThat(fileMetadata.has("checksumSHA256")).isTrue();
@@ -229,6 +232,7 @@ class EventSchemaContractTest {
             // Given - 100MB = 104857600 bytes
             FileUploadedEvent event = new FileUploadedEvent(
                     FileUploadedEvent.SCHEMA_VERSION,
+                    UUID.randomUUID(),
                     UUID.randomUUID(),
                     UUID.randomUUID(),
                     Instant.now(),
@@ -327,7 +331,8 @@ class EventSchemaContractTest {
             // Given - manually construct JSON with invalid event type
             String invalidJson = """
                 {
-                    "schemaVersion": "1.0.0",
+                    "schemaVersion": "1.1.0",
+                    "fileId": "550e8400-e29b-41d4-a716-446655440002",
                     "eventId": "550e8400-e29b-41d4-a716-446655440000",
                     "correlationId": "550e8400-e29b-41d4-a716-446655440001",
                     "timestamp": "2026-01-01T12:00:00Z",
@@ -365,7 +370,8 @@ class EventSchemaContractTest {
             // Given - JSON without source field
             String invalidJson = """
                 {
-                    "schemaVersion": "1.0.0",
+                    "schemaVersion": "1.1.0",
+                    "fileId": "550e8400-e29b-41d4-a716-446655440002",
                     "eventId": "550e8400-e29b-41d4-a716-446655440000",
                     "correlationId": "550e8400-e29b-41d4-a716-446655440001",
                     "timestamp": "2026-01-01T12:00:00Z",
@@ -397,12 +403,29 @@ class EventSchemaContractTest {
         }
 
         @Test
+        @DisplayName("should reject legacy event without fileId")
+        void shouldRejectLegacyEventWithoutFileId() throws Exception {
+            // Given
+            FileUploadedEvent event = createSampleEvent();
+            ObjectNode jsonNode = (ObjectNode) OBJECT_MAPPER.readTree(OBJECT_MAPPER.writeValueAsString(event));
+            jsonNode.remove("fileId");
+
+            // When
+            Set<ValidationMessage> errors = schema.validate(jsonNode);
+
+            // Then
+            assertThat(errors).isNotEmpty();
+            assertThat(errors.toString()).containsIgnoringCase("fileId");
+        }
+
+        @Test
         @DisplayName("should reject invalid encryption algorithm (AES-CBC not allowed)")
         void shouldRejectAesCbc() throws Exception {
             // Given - using AES-CBC which is NOT FIPS 140-3 recommended
             String invalidJson = """
                 {
-                    "schemaVersion": "1.0.0",
+                    "schemaVersion": "1.1.0",
+                    "fileId": "550e8400-e29b-41d4-a716-446655440002",
                     "eventId": "550e8400-e29b-41d4-a716-446655440000",
                     "correlationId": "550e8400-e29b-41d4-a716-446655440001",
                     "timestamp": "2026-01-01T12:00:00Z",
@@ -440,7 +463,8 @@ class EventSchemaContractTest {
             // Given - isEncrypted: false violates FIPS requirements
             String invalidJson = """
                 {
-                    "schemaVersion": "1.0.0",
+                    "schemaVersion": "1.1.0",
+                    "fileId": "550e8400-e29b-41d4-a716-446655440002",
                     "eventId": "550e8400-e29b-41d4-a716-446655440000",
                     "correlationId": "550e8400-e29b-41d4-a716-446655440001",
                     "timestamp": "2026-01-01T12:00:00Z",
@@ -478,7 +502,8 @@ class EventSchemaContractTest {
             // Given - 100MB + 1 byte = 104857601
             String invalidJson = """
                 {
-                    "schemaVersion": "1.0.0",
+                    "schemaVersion": "1.1.0",
+                    "fileId": "550e8400-e29b-41d4-a716-446655440002",
                     "eventId": "550e8400-e29b-41d4-a716-446655440000",
                     "correlationId": "550e8400-e29b-41d4-a716-446655440001",
                     "timestamp": "2026-01-01T12:00:00Z",
@@ -512,11 +537,12 @@ class EventSchemaContractTest {
     }
 
     /**
-     * Creates a sample FileUploadedEvent that conforms to schema v1.0.0
+     * Creates a sample FileUploadedEvent that conforms to schema v1.1.0
      */
     private FileUploadedEvent createSampleEvent() {
         return new FileUploadedEvent(
                 FileUploadedEvent.SCHEMA_VERSION,
+                UUID.randomUUID(),
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 Instant.now(),

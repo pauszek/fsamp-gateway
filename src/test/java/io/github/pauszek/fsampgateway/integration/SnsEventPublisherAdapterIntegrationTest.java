@@ -54,6 +54,14 @@ class SnsEventPublisherAdapterIntegrationTest extends BaseIntegrationTest {
                 .attributes()
                 .get(QueueAttributeName.QUEUE_ARN);
 
+        // Allow SNS to send messages to SQS (required when ENFORCE_IAM=1)
+        String queuePolicy = "{\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"sns.amazonaws.com\"},"
+                + "\"Action\":\"sqs:SendMessage\",\"Resource\":\"" + queueArn + "\","
+                + "\"Condition\":{\"ArnEquals\":{\"aws:SourceArn\":\"" + topicArn + "\"}}}]}";
+        sqsClient.setQueueAttributes(builder -> builder
+                .queueUrl(queueUrl)
+                .attributes(java.util.Map.of(QueueAttributeName.POLICY, queuePolicy)));
+
         // Subscribe SQS queue to SNS topic for message verification
         snsClient.subscribe(SubscribeRequest.builder()
                 .topicArn(topicArn)
@@ -154,7 +162,8 @@ class SnsEventPublisherAdapterIntegrationTest extends BaseIntegrationTest {
             // given
             String uniqueFilename = "unique-test-file-" + UUID.randomUUID() + ".pdf";
             FileUploadedEvent event = new FileUploadedEvent(
-                    "1.0.0",
+                    FileUploadedEvent.SCHEMA_VERSION,
+                    UUID.randomUUID(),
                     UUID.randomUUID(),
                     UUID.randomUUID(),
                     Instant.now(),
@@ -217,7 +226,8 @@ class SnsEventPublisherAdapterIntegrationTest extends BaseIntegrationTest {
         );
 
         return new FileUploadedEvent(
-                "1.0.0",
+                FileUploadedEvent.SCHEMA_VERSION,
+                UUID.randomUUID(),
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 Instant.now(),

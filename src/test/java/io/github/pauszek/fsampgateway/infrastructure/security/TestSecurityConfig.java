@@ -37,6 +37,12 @@ public class TestSecurityConfig {
 
     @Bean
     @Primary
+    public FileMapper mockFileMapper() {
+        return mock(FileMapper.class);
+    }
+
+    @Bean
+    @Primary
     public S3StorageProperties testS3Properties() {
         S3StorageProperties props = new S3StorageProperties();
         props.setBucketName("test-bucket");

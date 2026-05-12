@@ -11,10 +11,12 @@ import org.testcontainers.containers.localstack.LocalStackContainer;
 import org.testcontainers.utility.DockerImageName;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.*;
+import software.amazon.awssdk.services.kms.KmsClient;
+import software.amazon.awssdk.services.kms.model.CreateAliasRequest;
+import software.amazon.awssdk.services.kms.model.CreateKeyRequest;
+import software.amazon.awssdk.services.kms.model.CreateKeyResponse;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
-import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
-import software.amazon.awssdk.services.s3.model.NoSuchBucketException;
+import software.amazon.awssdk.services.s3.model.*;
 import software.amazon.awssdk.services.sns.SnsClient;
 import software.amazon.awssdk.services.sns.model.CreateTopicRequest;
 import software.amazon.awssdk.services.sqs.SqsClient;
@@ -41,19 +43,55 @@ public abstract class BaseIntegrationTest {
     protected static final String TEST_TOPIC_NAME = "fsamp-file-events-integration";
     protected static final String TEST_QUEUE_NAME = "fsamp-file-events-queue-integration";
     protected static final String TEST_IDEMPOTENCY_TABLE = "fsamp-idempotency-keys";
+    protected static final String TEST_KMS_ALIAS = "alias/fsamp-integration-key";
 
     private static final DockerImageName LOCALSTACK_IMAGE = 
-            DockerImageName.parse("localstack/localstack:3.8.1");
+            DockerImageName.parse("localstack/localstack-pro:4.14.0");
 
     /**
-     * Shared LocalStack container - started once and reused across all integration tests.
+     * Shared LocalStack Pro container - started once and reused across all integration tests.
+     * 
+     * Uses Pro edition for full AWS parity: KMS, IAM enforcement, CloudWatch.
+     * LOCALSTACK_AUTH_TOKEN must be set as environment variable.
      */
     protected static final LocalStackContainer LOCALSTACK;
 
+    /** KMS key ID created during container init — available for subclass tests. */
+    protected static String kmsKeyId;
+
     static {
         LOCALSTACK = new LocalStackContainer(LOCALSTACK_IMAGE)
-                .withServices(S3, SNS, SQS, DYNAMODB);
+                .withServices(S3, SNS, SQS, DYNAMODB, KMS, IAM, STS, CLOUDWATCH)
+                .withEnv("LOCALSTACK_AUTH_TOKEN", System.getenv("LOCALSTACK_AUTH_TOKEN"))
+                .withEnv("ENFORCE_IAM", "1")
+                .withEnv("IAM_SOFT_MODE", "0");
         LOCALSTACK.start();
+
+        // Create KMS key once for all integration tests
+        initKmsKey();
+    }
+
+    /**
+     * Initialise a shared KMS key in LocalStack for SSE-KMS encryption tests.
+     */
+    private static void initKmsKey() {
+        KmsClient kms = KmsClient.builder()
+                .endpointOverride(LOCALSTACK.getEndpoint())
+                .region(software.amazon.awssdk.regions.Region.of(LOCALSTACK.getRegion()))
+                .credentialsProvider(software.amazon.awssdk.auth.credentials.StaticCredentialsProvider.create(
+                        software.amazon.awssdk.auth.credentials.AwsBasicCredentials.create("test", "test")))
+                .build();
+
+        CreateKeyResponse key = kms.createKey(CreateKeyRequest.builder()
+                .description("FSAMP integration test key")
+                .build());
+        kmsKeyId = key.keyMetadata().keyId();
+
+        kms.createAlias(CreateAliasRequest.builder()
+                .aliasName(TEST_KMS_ALIAS)
+                .targetKeyId(kmsKeyId)
+                .build());
+        kms.close();
     }
 
     /**
@@ -66,6 +104,9 @@ public abstract class BaseIntegrationTest {
         registry.add("AWS_ENDPOINT_URL", () -> endpoint);
         registry.add("aws.region", LOCALSTACK::getRegion);
         registry.add("AWS_REGION", LOCALSTACK::getRegion);
+        registry.add("aws.kms.key-id", () -> kmsKeyId);
+        registry.add("KMS_KEY_ID", () -> kmsKeyId);
+        registry.add("aws.dynamodb.idempotency-table-name", () -> TEST_IDEMPOTENCY_TABLE);
     }
 
     @Autowired
@@ -96,6 +137,29 @@ public abstract class BaseIntegrationTest {
             s3Client.headBucket(HeadBucketRequest.builder().bucket(TEST_BUCKET).build());
         } catch (NoSuchBucketException e) {
             s3Client.createBucket(CreateBucketRequest.builder().bucket(TEST_BUCKET).build());
+
+            // Enable SSE-KMS encryption (mirrors production / init-aws.sh)
+            s3Client.putBucketEncryption(PutBucketEncryptionRequest.builder()
+                    .bucket(TEST_BUCKET)
+                    .serverSideEncryptionConfiguration(ServerSideEncryptionConfiguration.builder()
+                            .rules(ServerSideEncryptionRule.builder()
+                                    .applyServerSideEncryptionByDefault(
+                                            ServerSideEncryptionByDefault.builder()
+                                                    .sseAlgorithm(ServerSideEncryption.AWS_KMS)
+                                                    .kmsMasterKeyID(kmsKeyId)
+                                                    .build())
+                                    .bucketKeyEnabled(true)
+                                    .build())
+                            .build())
+                    .build());
+
+            // Enable versioning
+            s3Client.putBucketVersioning(PutBucketVersioningRequest.builder()
+                    .bucket(TEST_BUCKET)
+                    .versioningConfiguration(VersioningConfiguration.builder()
+                            .status(BucketVersioningStatus.ENABLED)
+                            .build())
+                    .build());
         }
     }
 

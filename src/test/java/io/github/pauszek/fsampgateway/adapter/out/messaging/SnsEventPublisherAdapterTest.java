@@ -237,7 +237,8 @@ class SnsEventPublisherAdapterTest {
         SecurityPayload securityPayload = SecurityPayload.of(true, "AES-256-GCM", "kms-key-id");
 
         return new FileUploadedEvent(
-                "1.0.0",
+                FileUploadedEvent.SCHEMA_VERSION,
+                UUID.randomUUID(),
                 UUID.randomUUID(),
                 UUID.fromString("00000000-0000-0000-0000-000000000123"),
                 Instant.now(),
