@@ -177,10 +177,9 @@ class IdempotencyKeyServiceTest {
             // then
             then(dynamoDbClient).should().updateItem(updateRequestCaptor.capture());
             UpdateItemRequest request = updateRequestCaptor.getValue();
-            assertThat(request.expressionAttributeValues().get(":status").s())
-                    .isEqualTo("COMPLETED");
-            assertThat(request.expressionAttributeValues().get(":response").s())
-                    .isEqualTo(response);
+            assertThat(request.expressionAttributeValues())
+                    .containsEntry(":status", AttributeValue.fromS("COMPLETED"))
+                    .containsEntry(":response", AttributeValue.fromS(response));
         }
 
         @Test

@@ -81,7 +81,7 @@ class FipsCryptoConfigTest {
 
             // Verify it's at position 2 (index 1)
             Provider[] providers = Security.getProviders();
-            assertThat(providers.length).isGreaterThanOrEqualTo(2);
+            assertThat(providers).hasSizeGreaterThanOrEqualTo(2);
             assertThat(providers[1].getName())
                     .as("BC-FIPS must be the second provider")
                     .isEqualTo(BouncyCastleFipsProvider.PROVIDER_NAME);

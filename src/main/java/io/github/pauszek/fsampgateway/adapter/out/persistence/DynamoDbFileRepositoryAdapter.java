@@ -124,17 +124,15 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
         TransactWriteItemsRequest request = TransactWriteItemsRequest.builder()
                 .transactItems(
                         TransactWriteItem.builder()
-                                .put(Put.builder()
+                                .put(put -> put
                                         .tableName(tableName)
-                                        .item(metadataItem)
-                                        .build())
+                                        .item(metadataItem))
                                 .build(),
                         TransactWriteItem.builder()
-                                .put(Put.builder()
+                                .put(put -> put
                                         .tableName(outboxTableName)
                                         .item(outboxItem)
-                                        .conditionExpression("attribute_not_exists(PK) AND attribute_not_exists(SK)")
-                                        .build())
+                                        .conditionExpression("attribute_not_exists(PK) AND attribute_not_exists(SK)"))
                                 .build()
                 )
                 .build();

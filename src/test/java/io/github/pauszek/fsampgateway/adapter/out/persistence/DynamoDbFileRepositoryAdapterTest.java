@@ -11,7 +11,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.*;
 
-import java.time.Instant;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.*;
@@ -92,9 +91,7 @@ class DynamoDbFileRepositoryAdapterTest {
             assertThat(item.get("createdBy").s()).isEqualTo("user-123");
 
             // Nullable fields should not be present for pending files
-            assertThat(item).doesNotContainKey("checksumSHA256");
-            assertThat(item).doesNotContainKey("bucketName");
-            assertThat(item).doesNotContainKey("kmsKeyId");
+            assertThat(item).doesNotContainKeys("checksumSHA256", "bucketName", "kmsKeyId");
         }
 
         @Test
@@ -241,8 +238,9 @@ class DynamoDbFileRepositoryAdapterTest {
 
             assertThat(request.tableName()).isEqualTo(TABLE_NAME);
             assertThat(request.keyConditionExpression()).isEqualTo("#pk = :pkVal");
-            assertThat(request.expressionAttributeNames().get("#pk")).isEqualTo("PK");
-            assertThat(request.expressionAttributeValues().get(":pkVal").s()).isEqualTo("FILE#" + fileId);
+            assertThat(request.expressionAttributeNames()).containsEntry("#pk", "PK");
+            assertThat(request.expressionAttributeValues())
+                    .containsEntry(":pkVal", AttributeValue.fromS("FILE#" + fileId));
             assertThat(request.scanIndexForward()).isFalse();
             assertThat(request.limit()).isEqualTo(1);
         }

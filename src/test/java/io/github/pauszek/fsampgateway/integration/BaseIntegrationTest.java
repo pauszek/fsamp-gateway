@@ -22,9 +22,6 @@ import software.amazon.awssdk.services.sns.model.CreateTopicRequest;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.CreateQueueRequest;
 
-import java.net.URI;
-import java.util.Map;
-
 import static org.testcontainers.containers.localstack.LocalStackContainer.Service.*;
 
 /**

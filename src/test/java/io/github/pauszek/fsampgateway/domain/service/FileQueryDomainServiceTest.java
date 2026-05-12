@@ -59,8 +59,7 @@ class FileQueryDomainServiceTest {
             Optional<SecureFile> result = service.getById(file.getId());
 
             // then
-            assertThat(result).isPresent();
-            assertThat(result.get()).isEqualTo(file);
+            assertThat(result).contains(file);
         }
 
         @Test
