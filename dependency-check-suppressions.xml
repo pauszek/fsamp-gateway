@@ -20,4 +20,16 @@
         Last Review: N/A (initial file)
         Next Review: TBD
     -->
+    <suppress until="2026-08-12Z">
+        <notes><![CDATA[
+            False positive from broad CPE matching. CVE-2026-39882 and CVE-2026-39883
+            affect the Go implementation of OpenTelemetry (CPE target language "go"),
+            not the Java Maven artifact io.opentelemetry.semconv:opentelemetry-semconv.
+            NVD describes both CVEs as OpenTelemetry-Go issues fixed in Go module v1.43.0.
+            Review by 2026-08-12.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.semconv/opentelemetry-semconv@.*$</packageUrl>
+        <cve>CVE-2026-39882</cve>
+        <cve>CVE-2026-39883</cve>
+    </suppress>
 </suppressions>

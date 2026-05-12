@@ -22,6 +22,7 @@
         <kotlin.version>2.3.21</kotlin.version>
         <log4j2.version>2.26.0</log4j2.version>
         <netty.version>4.1.133.Final</netty.version>
+        <okio.version>3.17.0</okio.version>
         <opentelemetry.semconv.version>1.41.1</opentelemetry.semconv.version>
         <aws.sdk.version>2.31.3</aws.sdk.version>
         <bouncycastle.version>2.0.0</bouncycastle.version>
@@ -57,6 +58,16 @@
                 <groupId>io.opentelemetry.semconv</groupId>
                 <artifactId>opentelemetry-semconv</artifactId>
                 <version>${opentelemetry.semconv.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.squareup.okio</groupId>
+                <artifactId>okio</artifactId>
+                <version>${okio.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.squareup.okio</groupId>
+                <artifactId>okio-jvm</artifactId>
+                <version>${okio.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.webjars</groupId>
