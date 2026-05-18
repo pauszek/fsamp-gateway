@@ -24,7 +24,7 @@
         <netty.version>4.1.133.Final</netty.version>
         <okio.version>3.17.0</okio.version>
         <opentelemetry.semconv.version>1.41.1</opentelemetry.semconv.version>
-        <aws.sdk.version>2.31.3</aws.sdk.version>
+        <aws.sdk.version>2.44.7</aws.sdk.version>
         <bouncycastle.version>2.0.0</bouncycastle.version>
         <testcontainers.version>1.21.0</testcontainers.version>
         <lombok.version>1.18.38</lombok.version>
