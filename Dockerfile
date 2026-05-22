@@ -31,8 +31,12 @@ RUN ./mvnw package -DskipTests -B
 # ACCP is FIPS 140-3 Level 1 validated — provides FIPS-compliant TLS and crypto
 FROM amazoncorretto:21-al2023-headless
 
-# Install curl for health checks and shadow-utils for useradd
-RUN dnf install -y --allowerasing curl shadow-utils && dnf clean all
+# Install curl for health checks and shadow-utils for useradd.
+# Remove inherited pip wheel metadata; the runtime does not use pip and this reduces scanner surface.
+RUN dnf update -y python3-pip-wheel && \
+    dnf install -y --allowerasing curl shadow-utils && \
+    dnf clean all && \
+    rpm -e --nodeps python3-pip-wheel
 
 # Security: run as non-root user
 RUN groupadd -g 1001 fsamp && \
