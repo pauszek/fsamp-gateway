@@ -32,16 +32,4 @@
         <cve>CVE-2026-39882</cve>
         <cve>CVE-2026-39883</cve>
     </suppress>
-    <suppress until="2026-08-23Z">
-        <notes><![CDATA[
-            False positive from broad Netty CPE matching. CVE-2026-42582 affects
-            netty-codec-http3 QPACK decoding, while this application does not
-            include io.netty:netty-codec-http3. Dependency-Check reports the CVE
-            against Netty transport artifacts via the generic cpe:2.3:a:netty:netty
-            identifier. These transport artifacts are pulled by AWS SDK netty-nio-client.
-            Review by 2026-08-23.
-        ]]></notes>
-        <packageUrl regex="true">^pkg:maven/io\.netty/netty-transport[^@]*@.*$</packageUrl>
-        <cve>CVE-2026-42582</cve>
-    </suppress>
 </suppressions>
