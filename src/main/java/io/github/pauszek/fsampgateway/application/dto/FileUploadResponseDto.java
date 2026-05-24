@@ -6,9 +6,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * Response DTO for successful file upload.
- */
 @Schema(description = "File upload response")
 public record FileUploadResponseDto(
         

@@ -16,9 +16,6 @@ import software.amazon.awssdk.services.cloudwatch.CloudWatchClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Unit tests for AwsConfig.
- */
 @DisplayName("AwsConfig")
 class AwsConfigTest {
 
@@ -35,10 +32,8 @@ class AwsConfigTest {
         @Test
         @DisplayName("should create static credentials provider for LocalStack")
         void shouldCreateStaticCredentialsProvider() {
-            // when
             AwsCredentialsProvider provider = config.awsCredentialsProvider();
 
-            // then
             assertThat(provider).isNotNull();
             assertThat(provider.resolveCredentials().accessKeyId()).isEqualTo("test");
             assertThat(provider.resolveCredentials().secretAccessKey()).isEqualTo("test");
@@ -47,13 +42,10 @@ class AwsConfigTest {
         @Test
         @DisplayName("should create S3 client with LocalStack endpoint")
         void shouldCreateS3ClientWithLocalStackEndpoint() {
-            // given
             AwsCredentialsProvider provider = config.awsCredentialsProvider();
 
-            // when
             S3Client s3Client = config.s3Client(provider);
 
-            // then
             assertThat(s3Client).isNotNull();
             s3Client.close();
         }
@@ -61,13 +53,10 @@ class AwsConfigTest {
         @Test
         @DisplayName("should create SNS client with LocalStack endpoint")
         void shouldCreateSnsClientWithLocalStackEndpoint() {
-            // given
             AwsCredentialsProvider provider = config.awsCredentialsProvider();
 
-            // when
             SnsClient snsClient = config.snsClient(provider);
 
-            // then
             assertThat(snsClient).isNotNull();
             snsClient.close();
         }
@@ -75,13 +64,10 @@ class AwsConfigTest {
         @Test
         @DisplayName("should create KMS client with LocalStack endpoint")
         void shouldCreateKmsClientWithLocalStackEndpoint() {
-            // given
             AwsCredentialsProvider provider = config.awsCredentialsProvider();
 
-            // when
             KmsClient kmsClient = config.kmsClient(provider);
 
-            // then
             assertThat(kmsClient).isNotNull();
             kmsClient.close();
         }
@@ -89,13 +75,10 @@ class AwsConfigTest {
         @Test
         @DisplayName("should create STS client with LocalStack endpoint")
         void shouldCreateStsClientWithLocalStackEndpoint() {
-            // given
             AwsCredentialsProvider provider = config.awsCredentialsProvider();
 
-            // when
             StsClient stsClient = config.stsClient(provider);
 
-            // then
             assertThat(stsClient).isNotNull();
             stsClient.close();
         }
@@ -103,13 +86,10 @@ class AwsConfigTest {
         @Test
         @DisplayName("should create DynamoDB client with LocalStack endpoint")
         void shouldCreateDynamoDbClientWithLocalStackEndpoint() {
-            // given
             AwsCredentialsProvider provider = config.awsCredentialsProvider();
 
-            // when
             DynamoDbClient dynamoDbClient = config.dynamoDbClient(provider);
 
-            // then
             assertThat(dynamoDbClient).isNotNull();
             dynamoDbClient.close();
         }
@@ -117,13 +97,10 @@ class AwsConfigTest {
         @Test
         @DisplayName("should create SQS client with LocalStack endpoint")
         void shouldCreateSqsClientWithLocalStackEndpoint() {
-            // given
             AwsCredentialsProvider provider = config.awsCredentialsProvider();
 
-            // when
             SqsClient sqsClient = config.sqsClient(provider);
 
-            // then
             assertThat(sqsClient).isNotNull();
             sqsClient.close();
         }
@@ -131,13 +108,10 @@ class AwsConfigTest {
         @Test
         @DisplayName("should create CloudWatch client with LocalStack endpoint")
         void shouldCreateCloudWatchClientWithLocalStackEndpoint() {
-            // given
             AwsCredentialsProvider provider = config.awsCredentialsProvider();
 
-            // when
             CloudWatchClient cloudWatchClient = config.cloudWatchClient(provider);
 
-            // then
             assertThat(cloudWatchClient).isNotNull();
             cloudWatchClient.close();
         }
@@ -153,24 +127,19 @@ class AwsConfigTest {
         @Test
         @DisplayName("should create default credentials provider")
         void shouldCreateDefaultCredentialsProvider() {
-            // when
             AwsCredentialsProvider provider = config.awsCredentialsProvider();
 
-            // then
             assertThat(provider).isNotNull();
         }
 
         @Test
         @DisplayName("should enable FIPS endpoints for US regions")
         void shouldEnableFipsEndpointsForUsRegions() {
-            // given
             var usConfig = new AwsConfig.ProductionAwsConfig("us-west-2", true);
             var provider = testCredentials();
 
-            // when
             S3Client client = usConfig.s3Client(provider);
 
-            // then
             assertThat(client).isNotNull();
             client.close();
         }
@@ -178,14 +147,11 @@ class AwsConfigTest {
         @Test
         @DisplayName("should disable FIPS endpoints for non-US regions")
         void shouldDisableFipsEndpointsForNonUsRegions() {
-            // given - FIPS requested but region is EU (should auto-disable)
             var euConfig = new AwsConfig.ProductionAwsConfig("eu-west-1", true);
             var provider = testCredentials();
 
-            // when - should not throw (FIPS not available in EU regions)
             S3Client client = euConfig.s3Client(provider);
 
-            // then
             assertThat(client).isNotNull();
             client.close();
         }
@@ -193,13 +159,10 @@ class AwsConfigTest {
         @Test
         @DisplayName("should create S3 client for production")
         void shouldCreateS3ClientForProduction() {
-            // given - use static creds for test (avoid real AWS calls)
             AwsCredentialsProvider provider = testCredentials();
 
-            // when
             S3Client s3Client = config.s3Client(provider);
 
-            // then
             assertThat(s3Client).isNotNull();
             s3Client.close();
         }
@@ -207,13 +170,10 @@ class AwsConfigTest {
         @Test
         @DisplayName("should create SNS client for production")
         void shouldCreateSnsClientForProduction() {
-            // given
             AwsCredentialsProvider provider = testCredentials();
 
-            // when
             SnsClient snsClient = config.snsClient(provider);
 
-            // then
             assertThat(snsClient).isNotNull();
             snsClient.close();
         }
@@ -221,13 +181,10 @@ class AwsConfigTest {
         @Test
         @DisplayName("should create KMS client for production")
         void shouldCreateKmsClientForProduction() {
-            // given
             AwsCredentialsProvider provider = testCredentials();
 
-            // when
             KmsClient kmsClient = config.kmsClient(provider);
 
-            // then
             assertThat(kmsClient).isNotNull();
             kmsClient.close();
         }
@@ -235,13 +192,10 @@ class AwsConfigTest {
         @Test
         @DisplayName("should create STS client for production")
         void shouldCreateStsClientForProduction() {
-            // given
             AwsCredentialsProvider provider = testCredentials();
 
-            // when
             StsClient stsClient = config.stsClient(provider);
 
-            // then
             assertThat(stsClient).isNotNull();
             stsClient.close();
         }
@@ -249,13 +203,10 @@ class AwsConfigTest {
         @Test
         @DisplayName("should create DynamoDB client for production")
         void shouldCreateDynamoDbClientForProduction() {
-            // given
             AwsCredentialsProvider provider = testCredentials();
 
-            // when
             DynamoDbClient dynamoDbClient = config.dynamoDbClient(provider);
 
-            // then
             assertThat(dynamoDbClient).isNotNull();
             dynamoDbClient.close();
         }
@@ -263,13 +214,10 @@ class AwsConfigTest {
         @Test
         @DisplayName("should create SQS client for production")
         void shouldCreateSqsClientForProduction() {
-            // given
             AwsCredentialsProvider provider = testCredentials();
 
-            // when
             SqsClient sqsClient = config.sqsClient(provider);
 
-            // then
             assertThat(sqsClient).isNotNull();
             sqsClient.close();
         }
@@ -277,13 +225,10 @@ class AwsConfigTest {
         @Test
         @DisplayName("should create CloudWatch client for production")
         void shouldCreateCloudWatchClientForProduction() {
-            // given
             AwsCredentialsProvider provider = testCredentials();
 
-            // when
             CloudWatchClient cloudWatchClient = config.cloudWatchClient(provider);
 
-            // then
             assertThat(cloudWatchClient).isNotNull();
             cloudWatchClient.close();
         }

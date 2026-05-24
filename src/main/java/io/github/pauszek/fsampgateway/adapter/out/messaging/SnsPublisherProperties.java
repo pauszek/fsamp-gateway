@@ -2,9 +2,6 @@ package io.github.pauszek.fsampgateway.adapter.out.messaging;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-/**
- * Configuration properties for SNS publisher.
- */
 @ConfigurationProperties(prefix = "aws.sns")
 public class SnsPublisherProperties {
 

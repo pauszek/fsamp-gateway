@@ -2,14 +2,6 @@ package io.github.pauszek.fsampgateway.domain.model;
 
 import java.util.Objects;
 
-/**
- * File Aggregate Root - Domain Entity.
- * 
- * Represents a file in the system with all its metadata and state.
- * This is the central entity in our bounded context.
- * 
- * Immutable after creation - state changes create new instances or domain events.
- */
 public final class SecureFile {
 
     private final FileId id;
@@ -36,9 +28,6 @@ public final class SecureFile {
         this.auditInfo = Objects.requireNonNull(builder.auditInfo, "Audit info is required");
     }
 
-    /**
-     * Factory method to create a new file pending upload.
-     */
     public static SecureFile createPending(
             FileName fileName,
             MimeType mimeType,
@@ -57,9 +46,6 @@ public final class SecureFile {
                 .build();
     }
 
-    /**
-     * Transition to UPLOADED state after successful storage.
-     */
     public SecureFile markAsUploaded(
             StorageLocation storageLocation,
             EncryptionMetadata encryptionMetadata,
@@ -79,9 +65,6 @@ public final class SecureFile {
                 .build();
     }
 
-    /**
-     * Transition to PROCESSING state.
-     */
     public SecureFile markAsProcessing() {
         if (this.status != FileStatus.UPLOADED) {
             throw new IllegalStateException(
@@ -94,9 +77,6 @@ public final class SecureFile {
                 .build();
     }
 
-    /**
-     * Transition to COMPLETED state.
-     */
     public SecureFile markAsCompleted() {
         if (this.status != FileStatus.PROCESSING) {
             throw new IllegalStateException(
@@ -109,9 +89,6 @@ public final class SecureFile {
                 .build();
     }
 
-    /**
-     * Transition to FAILED state.
-     */
     public SecureFile markAsFailed() {
         return toBuilder()
                 .status(FileStatus.FAILED)
@@ -119,7 +96,6 @@ public final class SecureFile {
                 .build();
     }
 
-    // Getters
     public FileId getId() { return id; }
     public CorrelationId getCorrelationId() { return correlationId; }
     public FileName getFileName() { return fileName; }

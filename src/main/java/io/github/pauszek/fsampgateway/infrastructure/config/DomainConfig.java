@@ -10,18 +10,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * Domain Layer Configuration.
- * 
- * Wires together domain services with their ports/adapters.
- * This is the composition root where dependency injection happens.
- */
 @Configuration
 public class DomainConfig {
 
-    /**
-     * Primary domain service for file upload orchestration.
-     */
     @Bean
     public FileUploadDomainService fileUploadDomainService(
             FileStoragePort fileStorage,
@@ -39,9 +30,6 @@ public class DomainConfig {
         );
     }
 
-    /**
-     * Domain service for file query and deletion operations.
-     */
     @Bean
     public FileQueryDomainService fileQueryDomainService(
             FileRepositoryPort fileRepository,
@@ -50,6 +38,4 @@ public class DomainConfig {
         return new FileQueryDomainService(fileRepository, fileStorage);
     }
 
-    // Note: Adapter beans are registered via @Component annotations on the adapters themselves.
-    // No additional @Bean definitions needed here for ports - Spring autowires by type.
 }

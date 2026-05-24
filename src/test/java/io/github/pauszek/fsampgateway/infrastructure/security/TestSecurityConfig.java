@@ -16,10 +16,6 @@ import software.amazon.awssdk.services.sns.SnsClient;
 
 import static org.mockito.Mockito.mock;
 
-/**
- * Test configuration that provides mock beans for security integration tests.
- * This allows SecurityIntegrationTest to run without full AWS infrastructure.
- */
 @TestConfiguration
 public class TestSecurityConfig {
 

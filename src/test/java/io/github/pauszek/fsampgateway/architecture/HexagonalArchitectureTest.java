@@ -12,18 +12,6 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.*;
 import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
-/**
- * Architecture Tests using ArchUnit.
- * 
- * Ensures the Hexagonal Architecture constraints are maintained.
- * Run as part of the build to prevent architectural drift.
- * 
- * Layer Rules:
- * - Domain → No external dependencies (pure Java)
- * - Application → Can depend on Domain
- * - Adapter → Can depend on Application, Domain
- * - Infrastructure → Can depend on all layers
- */
 @DisplayName("Hexagonal Architecture Tests")
 class HexagonalArchitectureTest {
 
@@ -74,10 +62,6 @@ class HexagonalArchitectureTest {
         @Test
         @DisplayName("Adapters should not depend on Infrastructure (except security/idempotency)")
         void adaptersShouldNotDependOnInfrastructure() {
-            // Note: Security and idempotency are cross-cutting concerns that are 
-            // allowed as exceptions to the hexagonal architecture rules.
-            // In a strict implementation, these would be ports, but for pragmatism
-            // we allow adapter -> infrastructure.security and infrastructure.idempotency
             noClasses()
                     .that().resideInAPackage("..adapter..")
                     .should().dependOnClassesThat()
@@ -89,8 +73,6 @@ class HexagonalArchitectureTest {
         @Test
         @DisplayName("Layered architecture is respected (with security exceptions)")
         void layeredArchitectureIsRespected() {
-            // Cross-cutting concerns (security, idempotency) are allowed to be accessed
-            // from adapters. This is a pragmatic exception to strict hexagonal architecture.
             layeredArchitecture()
                     .consideringOnlyDependenciesInLayers()
                     .layer("Domain").definedBy("..domain..")
@@ -103,7 +85,6 @@ class HexagonalArchitectureTest {
                     .whereLayer("Domain").mayOnlyBeAccessedByLayers("Application", "Adapter", "InfraConfig", "InfraSecurity", "InfraObservability")
                     .whereLayer("Application").mayOnlyBeAccessedByLayers("Adapter", "InfraConfig", "InfraSecurity", "InfraObservability")
                     .whereLayer("Adapter").mayOnlyBeAccessedByLayers("InfraConfig", "InfraSecurity")
-                    // Security can be used by adapters (cross-cutting concern)
                     .whereLayer("InfraSecurity").mayOnlyBeAccessedByLayers("Adapter", "InfraConfig")
                     .whereLayer("InfraConfig").mayNotBeAccessedByAnyLayer()
                     .whereLayer("InfraObservability").mayNotBeAccessedByAnyLayer()
@@ -246,8 +227,6 @@ class HexagonalArchitectureTest {
         @Test
         @DisplayName("No circular dependencies between domain/application packages")
         void noCircularDependenciesInCore() {
-            // Check only domain and application layers (core business logic)
-            // Infrastructure <-> Adapter dependencies are allowed for Spring config
             slices()
                     .matching(BASE_PACKAGE + ".domain.(*)..")
                     .should().beFreeOfCycles()

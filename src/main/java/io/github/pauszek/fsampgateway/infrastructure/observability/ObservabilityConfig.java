@@ -8,11 +8,6 @@ import org.springframework.boot.actuate.autoconfigure.metrics.MeterRegistryCusto
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * Observability Configuration.
- * 
- * Configures metrics, tracing, and logging for production observability.
- */
 @Configuration
 public class ObservabilityConfig {
 

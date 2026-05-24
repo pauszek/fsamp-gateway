@@ -1,8 +1,5 @@
 package io.github.pauszek.fsampgateway.domain.exception;
 
-/**
- * Exception thrown when event publishing fails.
- */
 public class EventPublishException extends DomainException {
 
     public static final String ERROR_CODE = "EVENT_PUBLISH_ERROR";

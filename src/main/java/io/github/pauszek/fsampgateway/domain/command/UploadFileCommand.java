@@ -7,12 +7,6 @@ import lombok.Getter;
 import java.io.InputStream;
 import java.util.Objects;
 
-/**
- * Command object for file upload use case.
- * 
- * Immutable command following CQRS pattern.
- * Contains all data needed to execute the upload workflow.
- */
 @Getter
 @Builder
 public final class UploadFileCommand {
@@ -40,9 +34,6 @@ public final class UploadFileCommand {
         this.uploadedBy = uploadedBy;
     }
 
-    /**
-     * Get correlation ID or generate a new one if not provided.
-     */
     public CorrelationId getCorrelationIdOrGenerate() {
         return CorrelationId.of(correlationId);
     }

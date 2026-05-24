@@ -4,12 +4,6 @@ import io.github.pauszek.fsampgateway.domain.model.EncryptionMetadata;
 import io.github.pauszek.fsampgateway.domain.model.StorageLocation;
 import lombok.Getter;
 
-/**
- * Result of a file storage operation.
- * 
- * Immutable value object containing storage location and metadata
- * returned after successfully storing a file.
- */
 @Getter
 public final class StorageResult {
     

@@ -28,7 +28,6 @@ class DtoTest {
         @Test
         @DisplayName("should build error with all fields")
         void shouldBuildErrorWithAllFields() {
-            // given/when
             ApiErrorDto error = ApiErrorDto.builder()
                     .type("https://api.fsamp.io/errors/validation-error")
                     .status(400)
@@ -40,7 +39,6 @@ class DtoTest {
                     .timestamp(Instant.parse("2024-01-01T12:00:00Z"))
                     .build();
 
-            // then
             assertThat(error.type()).isEqualTo("https://api.fsamp.io/errors/validation-error");
             assertThat(error.status()).isEqualTo(400);
             assertThat(error.error()).isEqualTo("VALIDATION_ERROR");
@@ -53,7 +51,6 @@ class DtoTest {
         @Test
         @DisplayName("should serialize to JSON correctly")
         void shouldSerializeToJson() throws Exception {
-            // given
             ApiErrorDto error = ApiErrorDto.builder()
                     .type("https://api.fsamp.io/errors/not-found")
                     .status(404)
@@ -62,10 +59,8 @@ class DtoTest {
                     .path("/api/v1/files/123")
                     .build();
 
-            // when
             String json = objectMapper.writeValueAsString(error);
 
-            // then
             assertThat(json).contains("\"status\":404");
             assertThat(json).contains("\"error\":\"NOT_FOUND\"");
             assertThat(json).contains("\"message\":\"File not found\"");
@@ -74,7 +69,6 @@ class DtoTest {
         @Test
         @DisplayName("should include validation errors list")
         void shouldIncludeValidationErrorsList() {
-            // given/when
             ApiErrorDto error = ApiErrorDto.builder()
                     .status(400)
                     .error("VALIDATION_ERROR")
@@ -85,7 +79,6 @@ class DtoTest {
                     ))
                     .build();
 
-            // then
             assertThat(error.validationErrors()).hasSize(2);
             assertThat(error.validationErrors().get(0).field()).isEqualTo("file");
             assertThat(error.validationErrors().get(1).rejectedValue()).isEqualTo(-1);
@@ -94,17 +87,14 @@ class DtoTest {
         @Test
         @DisplayName("should omit null fields in JSON")
         void shouldOmitNullFieldsInJson() throws Exception {
-            // given
             ApiErrorDto error = ApiErrorDto.builder()
                     .status(500)
                     .error("INTERNAL_ERROR")
                     .message("Error")
                     .build();
 
-            // when
             String json = objectMapper.writeValueAsString(error);
 
-            // then
             assertThat(json).doesNotContain("\"detail\"");
             assertThat(json).doesNotContain("\"validationErrors\"");
         }
@@ -117,11 +107,9 @@ class DtoTest {
         @Test
         @DisplayName("should build response with all fields")
         void shouldBuildResponseWithAllFields() {
-            // given
             UUID fileId = UUID.randomUUID();
             Instant now = Instant.now();
 
-            // when
             FileUploadResponseDto response = FileUploadResponseDto.builder()
                     .fileId(fileId)
                     .correlationId("corr-123")
@@ -136,7 +124,6 @@ class DtoTest {
                     .message("File uploaded successfully")
                     .build();
 
-            // then
             assertThat(response.fileId()).isEqualTo(fileId);
             assertThat(response.correlationId()).isEqualTo("corr-123");
             assertThat(response.filename()).isEqualTo("document.pdf");
@@ -150,7 +137,6 @@ class DtoTest {
         @Test
         @DisplayName("should serialize to JSON correctly")
         void shouldSerializeToJson() throws Exception {
-            // given
             FileUploadResponseDto response = FileUploadResponseDto.builder()
                     .fileId(UUID.fromString("550e8400-e29b-41d4-a716-446655440000"))
                     .filename("test.pdf")
@@ -159,10 +145,8 @@ class DtoTest {
                     .status("UPLOADED")
                     .build();
 
-            // when
             String json = objectMapper.writeValueAsString(response);
 
-            // then
             assertThat(json).contains("\"fileId\":\"550e8400-e29b-41d4-a716-446655440000\"");
             assertThat(json).contains("\"filename\":\"test.pdf\"");
             assertThat(json).contains("\"mimeType\":\"application/pdf\"");
@@ -177,14 +161,12 @@ class DtoTest {
         @Test
         @DisplayName("should create request with all fields")
         void shouldCreateRequestWithAllFields() {
-            // when
             FileUploadRequestDto request = new FileUploadRequestDto(
                     "corr-123",
                     "Test document",
                     new String[]{"tag1", "tag2"}
             );
 
-            // then
             assertThat(request.correlationId()).isEqualTo("corr-123");
             assertThat(request.description()).isEqualTo("Test document");
             assertThat(request.tags()).containsExactly("tag1", "tag2");
@@ -193,14 +175,12 @@ class DtoTest {
         @Test
         @DisplayName("should handle null tags by converting to empty array")
         void shouldHandleNullTags() {
-            // when
             FileUploadRequestDto request = new FileUploadRequestDto(
                     "a1b2c3d4e5f67890a1b2c3d4e5f67890",
                     "Description",
                     null
             );
 
-            // then
             assertThat(request.tags()).isEmpty();
         }
     }
@@ -212,14 +192,12 @@ class DtoTest {
         @Test
         @DisplayName("should create validation error with all fields")
         void shouldCreateValidationErrorWithAllFields() {
-            // when
             var error = new ApiErrorDto.ValidationErrorDto(
                     "fileName",
                     "must not be blank",
                     ""
             );
 
-            // then
             assertThat(error.field()).isEqualTo("fileName");
             assertThat(error.message()).isEqualTo("must not be blank");
             assertThat(error.rejectedValue()).isEqualTo("");
@@ -228,17 +206,14 @@ class DtoTest {
         @Test
         @DisplayName("should serialize to JSON correctly")
         void shouldSerializeToJson() throws Exception {
-            // given
             var error = new ApiErrorDto.ValidationErrorDto(
                     "size",
                     "must be positive",
                     -100
             );
 
-            // when
             String json = objectMapper.writeValueAsString(error);
 
-            // then
             assertThat(json).contains("\"field\":\"size\"");
             assertThat(json).contains("\"rejectedValue\":-100");
         }

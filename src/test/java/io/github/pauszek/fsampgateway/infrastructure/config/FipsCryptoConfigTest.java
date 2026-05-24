@@ -16,23 +16,6 @@ import java.security.Security;
 
 import static org.assertj.core.api.Assertions.*;
 
-/**
- * FIPS 140-3 Crypto Provider Integration Test.
- * 
- * Verifies that the dual FIPS crypto stack (ACCP + BouncyCastle FIPS)
- * is properly initialized when running on Amazon Corretto JDK.
- * 
- * <p>This test requires:
- * <ul>
- *   <li>Amazon Corretto 21 JDK (not Temurin/Zulu/Eclipse)</li>
- *   <li>ACCP 2.4.1 native libraries on classpath</li>
- *   <li>BouncyCastle FIPS 2.0.0 on classpath</li>
- * </ul>
- * 
- * <p>Run with: {@code mvn test -Dgroups=fips}
- * 
- * @see FipsCryptoConfig
- */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("fips-test")
 @Tag("fips")
@@ -43,9 +26,6 @@ class FipsCryptoConfigTest {
     private static final String ACCP_PROVIDER_NAME = "AmazonCorrettoCryptoProvider";
     private static final String ACCP_CLASS = "com.amazon.corretto.crypto.provider.AmazonCorrettoCryptoProvider";
 
-    /**
-     * Condition: ACCP must be on the classpath (requires Corretto JDK or platform-specific JAR).
-     */
     static boolean isACCPAvailable() {
         try {
             Class.forName(ACCP_CLASS);
@@ -79,7 +59,6 @@ class FipsCryptoConfigTest {
                     .as("BouncyCastle FIPS provider must be registered")
                     .isNotNull();
 
-            // Verify it's at position 2 (index 1)
             Provider[] providers = Security.getProviders();
             assertThat(providers).hasSizeGreaterThanOrEqualTo(2);
             assertThat(providers[1].getName())
@@ -134,25 +113,21 @@ class FipsCryptoConfigTest {
         @Test
         @DisplayName("AES-GCM encryption/decryption roundtrip should work via FIPS provider")
         void shouldPerformAESGCMEncryption() throws Exception {
-            // Generate AES-256 key
             KeyGenerator keyGen = KeyGenerator.getInstance("AES");
             keyGen.init(256);
             SecretKey key = keyGen.generateKey();
 
-            // Encrypt
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
             cipher.init(Cipher.ENCRYPT_MODE, key);
             byte[] iv = cipher.getIV();
             byte[] plaintext = "FIPS 140-3-oriented encryption test".getBytes();
             byte[] ciphertext = cipher.doFinal(plaintext);
 
-            // Verify the cipher was provided by ACCP or BC-FIPS
             String providerName = cipher.getProvider().getName();
             assertThat(providerName)
                     .as("AES-GCM should use FIPS-validated provider")
                     .isIn(ACCP_PROVIDER_NAME, BouncyCastleFipsProvider.PROVIDER_NAME);
 
-            // Decrypt
             Cipher decryptCipher = Cipher.getInstance("AES/GCM/NoPadding");
             decryptCipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(128, iv));
             byte[] decrypted = decryptCipher.doFinal(ciphertext);
@@ -168,7 +143,6 @@ class FipsCryptoConfigTest {
 
             assertThat(hash).hasSize(32); // 256 bits = 32 bytes
 
-            // Verify the digest was provided by a FIPS provider
             String providerName = sha256.getProvider().getName();
             assertThat(providerName)
                     .as("SHA-256 should use FIPS-validated provider")

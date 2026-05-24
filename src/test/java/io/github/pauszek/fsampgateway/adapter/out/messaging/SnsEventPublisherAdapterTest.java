@@ -58,16 +58,13 @@ class SnsEventPublisherAdapterTest {
         @Test
         @DisplayName("should publish FileUploadedEvent successfully")
         void shouldPublishFileUploadedEventSuccessfully() throws Exception {
-            // given
             FileUploadedEvent event = createFileUploadedEvent();
             given(objectMapper.writeValueAsString(event)).willReturn("{\"fileId\":\"123\"}");
             given(snsClient.publish(any(PublishRequest.class)))
                     .willReturn(PublishResponse.builder().messageId(MESSAGE_ID).build());
 
-            // when
             String result = adapter.publish(event);
 
-            // then
             assertThat(result).isEqualTo(MESSAGE_ID);
             then(snsClient).should().publish(requestCaptor.capture());
             assertThat(requestCaptor.getValue().topicArn()).isEqualTo(TOPIC_ARN);
@@ -76,16 +73,13 @@ class SnsEventPublisherAdapterTest {
         @Test
         @DisplayName("should include eventType in message attributes")
         void shouldIncludeEventTypeInMessageAttributes() throws Exception {
-            // given
             FileUploadedEvent event = createFileUploadedEvent();
             given(objectMapper.writeValueAsString(event)).willReturn("{\"fileId\":\"123\"}");
             given(snsClient.publish(any(PublishRequest.class)))
                     .willReturn(PublishResponse.builder().messageId(MESSAGE_ID).build());
 
-            // when
             adapter.publish(event);
 
-            // then
             then(snsClient).should().publish(requestCaptor.capture());
             var attributes = requestCaptor.getValue().messageAttributes();
             assertThat(attributes).containsKey("eventType");
@@ -95,16 +89,13 @@ class SnsEventPublisherAdapterTest {
         @Test
         @DisplayName("should include correlationId in message attributes")
         void shouldIncludeCorrelationIdInMessageAttributes() throws Exception {
-            // given
             FileUploadedEvent event = createFileUploadedEvent();
             given(objectMapper.writeValueAsString(event)).willReturn("{\"fileId\":\"123\"}");
             given(snsClient.publish(any(PublishRequest.class)))
                     .willReturn(PublishResponse.builder().messageId(MESSAGE_ID).build());
 
-            // when
             adapter.publish(event);
 
-            // then
             then(snsClient).should().publish(requestCaptor.capture());
             var attributes = requestCaptor.getValue().messageAttributes();
             assertThat(attributes).containsKey("correlationId");
@@ -115,16 +106,13 @@ class SnsEventPublisherAdapterTest {
         @Test
         @DisplayName("should include mimeType in message attributes")
         void shouldIncludeMimeTypeInMessageAttributes() throws Exception {
-            // given
             FileUploadedEvent event = createFileUploadedEvent();
             given(objectMapper.writeValueAsString(event)).willReturn("{\"fileId\":\"123\"}");
             given(snsClient.publish(any(PublishRequest.class)))
                     .willReturn(PublishResponse.builder().messageId(MESSAGE_ID).build());
 
-            // when
             adapter.publish(event);
 
-            // then
             then(snsClient).should().publish(requestCaptor.capture());
             var attributes = requestCaptor.getValue().messageAttributes();
             assertThat(attributes).containsKey("mimeType");
@@ -134,13 +122,11 @@ class SnsEventPublisherAdapterTest {
         @Test
         @DisplayName("should throw EventPublishException on SnsException")
         void shouldThrowEventPublishExceptionOnSnsError() throws Exception {
-            // given
             FileUploadedEvent event = createFileUploadedEvent();
             given(objectMapper.writeValueAsString(event)).willReturn("{\"fileId\":\"123\"}");
             given(snsClient.publish(any(PublishRequest.class)))
                     .willThrow(SnsException.builder().message("Access Denied").build());
 
-            // when/then
             assertThatThrownBy(() -> adapter.publish(event))
                     .isInstanceOf(EventPublishException.class)
                     .hasMessageContaining("Failed to publish event to SNS");
@@ -149,12 +135,10 @@ class SnsEventPublisherAdapterTest {
         @Test
         @DisplayName("should throw EventPublishException on JSON serialization failure")
         void shouldThrowEventPublishExceptionOnJsonError() throws Exception {
-            // given
             FileUploadedEvent event = createFileUploadedEvent();
             given(objectMapper.writeValueAsString(event))
                     .willThrow(new JsonProcessingException("Serialization failed") {});
 
-            // when/then
             assertThatThrownBy(() -> adapter.publish(event))
                     .isInstanceOf(EventPublishException.class)
                     .hasMessageContaining("Failed to serialize event");
@@ -163,7 +147,6 @@ class SnsEventPublisherAdapterTest {
         @Test
         @DisplayName("should throw IllegalArgumentException for unknown event types")
         void shouldThrowIllegalArgumentExceptionForUnknownEventTypes() throws Exception {
-            // given
             DomainEvent unknownEvent = new DomainEvent() {
                 @Override
                 public String getEventType() {
@@ -176,7 +159,6 @@ class SnsEventPublisherAdapterTest {
                 }
             };
 
-            // when/then
             assertThatThrownBy(() -> adapter.publish(unknownEvent))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("Unknown event type");
@@ -185,17 +167,14 @@ class SnsEventPublisherAdapterTest {
         @Test
         @DisplayName("should serialize event to JSON message body")
         void shouldSerializeEventToJsonMessageBody() throws Exception {
-            // given
             FileUploadedEvent event = createFileUploadedEvent();
             String expectedJson = "{\"fileId\":\"file-123\",\"fileName\":\"test.pdf\"}";
             given(objectMapper.writeValueAsString(event)).willReturn(expectedJson);
             given(snsClient.publish(any(PublishRequest.class)))
                     .willReturn(PublishResponse.builder().messageId(MESSAGE_ID).build());
 
-            // when
             adapter.publish(event);
 
-            // then
             then(snsClient).should().publish(requestCaptor.capture());
             assertThat(requestCaptor.getValue().message()).isEqualTo(expectedJson);
         }
@@ -208,22 +187,18 @@ class SnsEventPublisherAdapterTest {
         @Test
         @DisplayName("should delegate to publish method")
         void shouldDelegateToPublishMethod() throws Exception {
-            // given
             FileUploadedEvent event = createFileUploadedEvent();
             given(objectMapper.writeValueAsString(event)).willReturn("{\"fileId\":\"123\"}");
             given(snsClient.publish(any(PublishRequest.class)))
                     .willReturn(PublishResponse.builder().messageId(MESSAGE_ID).build());
 
-            // when
             String result = adapter.publishWithRetry(event, 3);
 
-            // then
             assertThat(result).isEqualTo(MESSAGE_ID);
             then(snsClient).should().publish(any(PublishRequest.class));
         }
     }
 
-    // Helper methods
 
     private FileUploadedEvent createFileUploadedEvent() {
         FilePayload filePayload = FilePayload.of(

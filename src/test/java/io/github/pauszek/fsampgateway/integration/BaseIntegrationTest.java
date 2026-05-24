@@ -24,16 +24,6 @@ import software.amazon.awssdk.services.sqs.model.CreateQueueRequest;
 
 import static org.testcontainers.containers.localstack.LocalStackContainer.Service.*;
 
-/**
- * Base class for integration tests using LocalStack.
- * 
- * Provides:
- * - LocalStack container with AWS services
- * - Pre-created S3 bucket, SNS topic, SQS queue, DynamoDB table
- * - Spring Boot test context with "local" profile (reuses LocalStack config)
- * 
- * All integration tests should extend this class.
- */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles({"local", "integration-test"})
 @Tag("integration")
@@ -48,15 +38,7 @@ public abstract class BaseIntegrationTest {
     private static final DockerImageName LOCALSTACK_IMAGE = 
             DockerImageName.parse("localstack/localstack-pro:4.14.0");
 
-    /**
-     * Shared LocalStack Pro container - started once and reused across all integration tests.
-     * 
-     * Uses Pro edition for full AWS parity: KMS, IAM enforcement, CloudWatch.
-     * LOCALSTACK_AUTH_TOKEN must be set as environment variable.
-     */
     protected static final LocalStackContainer LOCALSTACK;
-
-    /** KMS key ID created during container init — available for subclass tests. */
     protected static String kmsKeyId;
 
     static {
@@ -67,13 +49,9 @@ public abstract class BaseIntegrationTest {
                 .withEnv("IAM_SOFT_MODE", "0");
         LOCALSTACK.start();
 
-        // Create KMS key once for all integration tests
         initKmsKey();
     }
 
-    /**
-     * Initialise a shared KMS key in LocalStack for SSE-KMS encryption tests.
-     */
     private static void initKmsKey() {
         KmsClient kms = KmsClient.builder()
                 .endpointOverride(LOCALSTACK.getEndpoint())
@@ -94,9 +72,6 @@ public abstract class BaseIntegrationTest {
         kms.close();
     }
 
-    /**
-     * Dynamically configure Spring properties to use LocalStack endpoints.
-     */
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
         String endpoint = LOCALSTACK.getEndpoint().toString();
@@ -138,7 +113,6 @@ public abstract class BaseIntegrationTest {
         } catch (NoSuchBucketException e) {
             s3Client.createBucket(CreateBucketRequest.builder().bucket(TEST_BUCKET).build());
 
-            // Enable SSE-KMS encryption (mirrors production / init-aws.sh)
             s3Client.putBucketEncryption(PutBucketEncryptionRequest.builder()
                     .bucket(TEST_BUCKET)
                     .serverSideEncryptionConfiguration(ServerSideEncryptionConfiguration.builder()
@@ -153,7 +127,6 @@ public abstract class BaseIntegrationTest {
                             .build())
                     .build());
 
-            // Enable versioning
             s3Client.putBucketVersioning(PutBucketVersioningRequest.builder()
                     .bucket(TEST_BUCKET)
                     .versioningConfiguration(VersioningConfiguration.builder()
@@ -164,14 +137,12 @@ public abstract class BaseIntegrationTest {
     }
 
     private String createTopicIfNotExists() {
-        // CreateTopic is idempotent - returns existing topic ARN if it exists
         return snsClient.createTopic(CreateTopicRequest.builder()
                 .name(TEST_TOPIC_NAME)
                 .build()).topicArn();
     }
 
     private String createQueueIfNotExists() {
-        // CreateQueue is idempotent
         return sqsClient.createQueue(CreateQueueRequest.builder()
                 .queueName(TEST_QUEUE_NAME)
                 .build()).queueUrl();
@@ -208,7 +179,6 @@ public abstract class BaseIntegrationTest {
                     .billingMode(BillingMode.PAY_PER_REQUEST)
                     .build());
 
-            // Wait for table to be active
             dynamoDbClient.waiter().waitUntilTableExists(
                     DescribeTableRequest.builder().tableName(TEST_IDEMPOTENCY_TABLE).build()
             );

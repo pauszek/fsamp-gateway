@@ -6,13 +6,6 @@ import io.github.pauszek.fsampgateway.domain.model.*;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * Domain Event - File Uploaded.
- * 
- * Published when a file is successfully uploaded to storage.
- * Follows the event.schema.json contract (JSON Schema Draft-07).
- * Compliant with FIPS 140-3 cryptographic requirements.
- */
 public record FileUploadedEvent(
         String schemaVersion,
         UUID fileId,
@@ -39,9 +32,6 @@ public record FileUploadedEvent(
         if (eventType == null) eventType = EVENT_TYPE;
     }
 
-    /**
-     * Create from SecureFile domain entity.
-     */
     public static FileUploadedEvent from(SecureFile file) {
         return new FileUploadedEvent(
                 SCHEMA_VERSION,
@@ -69,11 +59,6 @@ public record FileUploadedEvent(
         );
     }
     
-    /**
-     * Convert 32-character hex correlation ID to UUID format.
-     * Correlation ID format: 32 hex chars (e.g., "a1b2c3d4e5f67890a1b2c3d4e5f67890")
-     * UUID format: 8-4-4-4-12 with dashes (e.g., "a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890")
-     */
     private static UUID correlationIdToUUID(String correlationId) {
         if (correlationId.length() != 32) {
             throw new IllegalArgumentException("Correlation ID must be 32 characters, got: " + correlationId.length());
@@ -91,10 +76,6 @@ public record FileUploadedEvent(
         return eventType;
     }
 
-    /**
-     * Helper method for DomainEvent interface.
-     * Not serialized to JSON - use 'timestamp' field instead.
-     */
     @JsonIgnore
     @Override
     public Instant getOccurredAt() {

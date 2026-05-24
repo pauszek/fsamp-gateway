@@ -16,9 +16,6 @@ import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-/**
- * Tests for CurrentUserService.
- */
 @DisplayName("CurrentUserService Tests")
 @ExtendWith(MockitoExtension.class)
 class CurrentUserServiceTest {
@@ -168,7 +165,6 @@ class CurrentUserServiceTest {
         setJwtAuthentication(adminJwt);
         assertThat(currentUserService.isAdmin()).isTrue();
 
-        // Regular user
         Jwt userJwt = createJwt(Map.of(
                 "sub", "user-123",
                 "cognito:groups", List.of("users")
@@ -226,7 +222,6 @@ class CurrentUserServiceTest {
 
     private Jwt createJwt(Map<String, Object> claims) {
         Map<String, Object> allClaims = new HashMap<>(claims);
-        // Ensure subject is set
         String subject = (String) allClaims.getOrDefault("sub", "default-user");
         
         return Jwt.withTokenValue("test-token")

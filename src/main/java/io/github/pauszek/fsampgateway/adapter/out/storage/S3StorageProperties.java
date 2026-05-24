@@ -2,9 +2,6 @@ package io.github.pauszek.fsampgateway.adapter.out.storage;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-/**
- * Configuration properties for S3 storage.
- */
 @ConfigurationProperties(prefix = "aws.s3")
 public class S3StorageProperties {
 

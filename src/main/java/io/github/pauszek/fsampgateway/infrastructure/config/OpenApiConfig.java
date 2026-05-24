@@ -14,11 +14,6 @@ import org.springframework.context.annotation.Configuration;
 
 import java.util.List;
 
-/**
- * OpenAPI 3.0 Configuration.
- * 
- * Provides interactive API documentation via Swagger UI.
- */
 @Configuration
 public class OpenApiConfig {
 
@@ -43,11 +38,11 @@ public class OpenApiConfig {
                         **FSAMP (FedRAMP-aligned Secure AWS Microservices Platform)** - Gateway Service
                         
                         ### Features:
-                        - 🔐 FIPS 140-3-oriented encryption controls (AWS KMS)
-                        - 📁 Secure file upload with content validation
-                        - 🔄 Event-driven architecture (SNS/SQS)
-                        - 📊 Full observability (metrics, tracing, logging)
-                        - 🛡️ Enterprise security patterns
+                        - FIPS 140-3-oriented encryption controls (AWS KMS)
+                        - Secure file upload with content validation
+                        - Event-driven architecture (SNS/SQS)
+                        - Full observability (metrics, tracing, logging)
+                        - Enterprise security patterns
                         
                         ### Architecture:
                         - Hexagonal Architecture (Ports & Adapters)

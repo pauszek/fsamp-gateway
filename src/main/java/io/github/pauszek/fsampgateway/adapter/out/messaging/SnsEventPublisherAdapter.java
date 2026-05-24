@@ -20,15 +20,6 @@ import software.amazon.awssdk.services.sns.model.SnsException;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Adapter - SNS Event Publisher Implementation.
- * 
- * Implements EventPublisherPort using AWS SNS.
- * Features:
- * - JSON serialization
- * - Message attributes for filtering
- * - Resilience patterns
- */
 @Component
 public class SnsEventPublisherAdapter implements EventPublisherPort {
 
@@ -58,7 +49,6 @@ public class SnsEventPublisherAdapter implements EventPublisherPort {
 
     @Override
     public String publishWithRetry(DomainEvent event, int maxRetries) {
-        // Retry is handled by Resilience4j annotation
         return publish(event);
     }
 
@@ -97,8 +87,6 @@ public class SnsEventPublisherAdapter implements EventPublisherPort {
     private String publishFallback(DomainEvent event, Exception e) {
         log.error("Circuit breaker fallback for publish: type={}, error={}", 
                 event.getEventType(), e.getMessage());
-        // In production, you might want to queue this for later retry
-        // or publish to a DLQ
         throw new EventPublishException("Event publishing service unavailable", e);
     }
 

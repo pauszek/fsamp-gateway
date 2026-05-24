@@ -1,8 +1,5 @@
 package io.github.pauszek.fsampgateway.domain.exception;
 
-/**
- * Base exception for domain errors.
- */
 public abstract class DomainException extends RuntimeException {
 
     private final String errorCode;

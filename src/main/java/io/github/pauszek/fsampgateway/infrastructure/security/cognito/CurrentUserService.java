@@ -11,29 +11,6 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.util.*;
 
-/**
- * Service for extracting user principal from Security Context.
- * 
- * Provides a clean domain-oriented interface to access authenticated user info
- * without coupling domain code to Spring Security directly.
- * 
- * Usage:
- * <pre>
- * {@code
- * @Autowired
- * private CurrentUserService currentUserService;
- * 
- * public void someMethod() {
- *     UserPrincipal user = currentUserService.getCurrentUser()
- *             .orElseThrow(() -> new AuthenticationException("Not authenticated"));
- *     
- *     if (user.isAdmin()) {
- *         // admin logic
- *     }
- * }
- * }
- * </pre>
- */
 @Slf4j
 @Component
 public class CurrentUserService {
@@ -44,11 +21,6 @@ public class CurrentUserService {
     private static final String NAME_CLAIM = "name";
     private static final String TENANT_ID_CLAIM = "custom:tenant_id";
 
-    /**
-     * Gets the current authenticated user principal.
-     * 
-     * @return Optional containing UserPrincipal if authenticated, empty otherwise
-     */
     public Optional<UserPrincipal> getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         
@@ -64,43 +36,26 @@ public class CurrentUserService {
         return Optional.empty();
     }
 
-    /**
-     * Gets the current user ID (Cognito sub claim).
-     * 
-     * @return Optional containing user ID if authenticated
-     */
     public Optional<String> getCurrentUserId() {
         return getCurrentUser().map(UserPrincipal::userId);
     }
 
-    /**
-     * Checks if current user has a specific group.
-     */
     public boolean hasGroup(String group) {
         return getCurrentUser()
                 .map(user -> user.hasGroup(group))
                 .orElse(false);
     }
 
-    /**
-     * Checks if current user has a specific scope.
-     */
     public boolean hasScope(String scope) {
         return getCurrentUser()
                 .map(user -> user.hasScope(scope))
                 .orElse(false);
     }
 
-    /**
-     * Checks if current user is an admin.
-     */
     public boolean isAdmin() {
         return hasGroup("admins");
     }
 
-    /**
-     * Extracts UserPrincipal from JWT token.
-     */
     private UserPrincipal extractUserPrincipal(Jwt jwt) {
         return UserPrincipal.builder()
                 .userId(jwt.getSubject())

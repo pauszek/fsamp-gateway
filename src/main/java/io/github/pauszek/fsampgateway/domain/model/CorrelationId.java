@@ -4,12 +4,6 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
-/**
- * Value Object - Correlation ID for distributed tracing.
- * 
- * Used to trace requests across microservices.
- * Format: 32 character hexadecimal string.
- */
 public record CorrelationId(String value) {
 
     private static final Pattern VALID_PATTERN = Pattern.compile("^[a-f0-9]{32}$");
@@ -23,17 +17,10 @@ public record CorrelationId(String value) {
         value = value.toLowerCase();
     }
 
-    /**
-     * Generate a new random CorrelationId.
-     */
     public static CorrelationId generate() {
         return new CorrelationId(UUID.randomUUID().toString().replace("-", ""));
     }
 
-    /**
-     * Create CorrelationId from string.
-     * If null or blank, generates a new one.
-     */
     public static CorrelationId of(String value) {
         if (value == null || value.isBlank()) {
             return generate();

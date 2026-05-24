@@ -38,19 +38,6 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import java.io.IOException;
 import java.net.URI;
 
-/**
- * REST Adapter - File Upload Controller.
- * 
- * Primary adapter that exposes the file upload use case via REST API.
- * 
- * Security:
- * - All endpoints require OAuth2 Bearer token (Cognito JWT)
- * - Upload requires files.write scope or ROLE_USERS/ROLE_ADMINS
- * - Download requires files.read scope or ROLE_USERS/ROLE_ADMINS
- * - Delete requires ROLE_ADMINS only
- * 
- * API versioning: URL path versioning (v1)
- */
 @RestController
 @RequestMapping("/api/v1/files")
 @Tag(name = "Files", description = "File upload and management operations")
@@ -148,7 +135,6 @@ public class FileUploadRestAdapter {
             @Parameter(description = "Optional upload metadata")
             @ModelAttribute FileUploadRequestDto request
     ) throws IOException {
-        // Get authenticated user from security context
         UserPrincipal currentUser = currentUserService.getCurrentUser()
                 .orElseThrow(() -> new IllegalStateException("User not found in security context"));
         
@@ -178,10 +164,6 @@ public class FileUploadRestAdapter {
         return ResponseEntity.created(location).body(response);
     }
 
-    /**
-     * Fallback method for rate limiting and bulkhead.
-     * Returns 429 Too Many Requests or 503 Service Unavailable.
-     */
     @SuppressWarnings("unused")
     private ResponseEntity<FileUploadResponseDto> uploadFileFallback(
             MultipartFile file,

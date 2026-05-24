@@ -24,31 +24,6 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
 
-/**
- * Spring Security Configuration with OAuth2 Resource Server.
- * 
- * Security measures implemented:
- * - OAuth2 Resource Server with JWT validation (AWS Cognito)
- * - CSRF disabled (stateless REST API with Bearer tokens)
- * - Stateless session management
- * - Security headers (CSP, XSS, HSTS, etc.)
- * - CORS configuration (profile-specific origins)
- * - Role-based access control via Cognito groups
- * - Swagger/OpenAPI secured in production (FedRAMP AC-3)
- * 
- * Authorization model:
- * - Public endpoints: health checks
- * - Swagger/OpenAPI: public in local/dev, authenticated in staging/prod
- * - Authenticated endpoints: All /api/v1/** endpoints
- * - Admin endpoints: Management operations require ROLE_ADMINS
- * 
- * FIPS 140-3 Alignment:
- * - HSTS with 1-year max-age and includeSubDomains
- * - CSP restricting frame-ancestors
- * - Referrer-policy: strict-origin-when-cross-origin
- * 
- * @see io.github.pauszek.fsampgateway.infrastructure.security.cognito.CognitoJwtConfig
- */
 @Slf4j
 @Configuration
 @EnableWebSecurity
@@ -73,37 +48,26 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
-                // Disable CSRF for stateless REST API with Bearer tokens
                 .csrf(AbstractHttpConfigurer::disable)
                 
-                // Stateless session management (no server-side sessions)
                 .sessionManagement(session -> 
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 
-                // CORS configuration
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 
-                // Security headers
                 .headers(headers -> headers
-                        // Content Security Policy
                         .contentSecurityPolicy(csp -> 
                                 csp.policyDirectives("default-src 'self'; frame-ancestors 'none';"))
-                        // Prevent XSS
                         .xssProtection(xss -> 
                                 xss.headerValue(XXssProtectionHeaderWriter.HeaderValue.ENABLED_MODE_BLOCK))
-                        // Prevent clickjacking
                         .frameOptions(frame -> frame.deny())
-                        // Referrer policy
                         .referrerPolicy(referrer -> 
                                 referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
-                        // HSTS (in production with HTTPS)
                         .httpStrictTransportSecurity(hsts -> 
                                 hsts.includeSubDomains(true).maxAgeInSeconds(31536000))
-                        // Prevent MIME type sniffing
                         .contentTypeOptions(contentType -> {})
                 )
                 
-                // OAuth2 Resource Server configuration
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt
                                 .decoder(jwtDecoder)
@@ -113,12 +77,9 @@ public class SecurityConfig {
                         .accessDeniedHandler(new CognitoAccessDeniedHandler(objectMapper))
                 )
                 
-                // Authorization rules
                 .authorizeHttpRequests(auth -> {
-                        // Health endpoints - public
                         auth.requestMatchers("/actuator/health/**", "/actuator/info").permitAll();
                         
-                        // Swagger/OpenAPI - public in local/dev, authenticated in staging/prod (FedRAMP AC-3)
                         if (isDevOrLocal()) {
                             auth.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll();
                         } else {
@@ -126,43 +87,28 @@ public class SecurityConfig {
                                     .hasRole(ROLE_ADMINS);
                         }
                         
-                        // OPTIONS requests - public (CORS preflight)
                         auth.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         
-                        // File upload - requires authentication and write scope
                         .requestMatchers(HttpMethod.POST, "/api/v1/files/**")
                                 .hasAnyAuthority("SCOPE_files.write", ROLE_ADMINS_AUTHORITY, ROLE_USERS_AUTHORITY)
                         
-                        // File download - requires authentication and read scope
                         .requestMatchers(HttpMethod.GET, "/api/v1/files/**")
                                 .hasAnyAuthority("SCOPE_files.read", ROLE_ADMINS_AUTHORITY, ROLE_USERS_AUTHORITY)
                         
-                        // File deletion - admin only
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/files/**")
                                 .hasRole(ROLE_ADMINS)
                         
-                        // Admin endpoints - admin role only
                         .requestMatchers("/api/v1/admin/**")
                                 .hasRole(ROLE_ADMINS)
                         
-                        // All other API endpoints - authenticated
                         .requestMatchers("/api/v1/**").authenticated()
                         
-                        // All other requests denied
                         .anyRequest().denyAll();
                 })
                 
                 .build();
     }
 
-    /**
-     * CORS configuration — profile-aware origin restrictions (FedRAMP AC-4).
-     *
-     * <ul>
-     *   <li><b>local / dev</b> — localhost origins for development</li>
-     *   <li><b>staging / prod</b> — only the API Gateway domain via {@code cors.allowed-origins} property</li>
-     * </ul>
-     */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
@@ -173,13 +119,11 @@ public class SecurityConfig {
                     "https://localhost:*"
             ));
         } else {
-            // Production / staging — restrict to explicitly configured origins only
             if (configuredOrigins != null && !configuredOrigins.isBlank()) {
                 configuration.setAllowedOriginPatterns(
                         List.of(configuredOrigins.split(","))
                 );
             }
-            // If no origins configured, CORS will reject all cross-origin requests (safe default)
         }
 
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
@@ -204,9 +148,6 @@ public class SecurityConfig {
         return source;
     }
 
-    /**
-     * Returns {@code true} for local and dev profiles where relaxed security is acceptable.
-     */
     private boolean isDevOrLocal() {
         return "local".equalsIgnoreCase(activeProfile) 
                 || "dev".equalsIgnoreCase(activeProfile)

@@ -18,15 +18,6 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Adapter - S3 File Storage Implementation.
- * 
- * Implements FileStoragePort using AWS S3.
- * Features:
- * - Server-side encryption with KMS
- * - Resilience patterns (Circuit Breaker, Retry)
- * - Structured object keys
- */
 @Component
 public class S3StorageAdapter implements FileStoragePort {
 
@@ -36,7 +27,6 @@ public class S3StorageAdapter implements FileStoragePort {
     private final S3Client s3Client;
     private final S3StorageProperties properties;
     
-    // Fallback KMS Key ID from environment variable
     @Value("${KMS_KEY_ID:#{null}}")
     private String fallbackKmsKeyId;
 
@@ -186,10 +176,6 @@ public class S3StorageAdapter implements FileStoragePort {
         }
     }
 
-    /**
-     * Generate a structured S3 object key.
-     * Format: uploads/YYYY/MM/DD/{fileId}
-     */
     private String generateObjectKey(FileId fileId) {
         LocalDate now = LocalDate.now();
         return String.format("uploads/%d/%02d/%02d/%s",
@@ -200,12 +186,8 @@ public class S3StorageAdapter implements FileStoragePort {
         );
     }
 
-    /**
-     * Sanitize metadata value to comply with S3 requirements.
-     */
     private String sanitizeMetadataValue(String value) {
         if (value == null) return "";
-        // S3 metadata values must be ASCII printable characters
         return value.replaceAll("[^\\x20-\\x7E]", "_");
     }
 }
