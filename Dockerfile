@@ -1,4 +1,4 @@
-FROM amazoncorretto:21-al2023 AS builder
+FROM amazoncorretto:26-al2023 AS builder
 
 WORKDIR /app
 
@@ -13,7 +13,7 @@ RUN chmod +x mvnw && ./mvnw dependency:go-offline -B
 COPY src src
 RUN ./mvnw package -DskipTests -B
 
-FROM amazoncorretto:21-al2023-headless
+FROM amazoncorretto:26-al2023-headless
 
 RUN dnf update -y python3-pip-wheel && \
     dnf install -y --allowerasing curl shadow-utils && \
