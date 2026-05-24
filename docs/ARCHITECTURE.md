@@ -2,7 +2,7 @@
 
 ## Overview
 
-**FSAMP Gateway** is an enterprise-grade, FIPS 140-3-oriented file upload microservice built with Spring Boot 3.4 and Java 21. It serves as the ingress point for the FSAMP (FedRAMP Moderate-aligned Secure AWS Microservices Platform) system, handling secure file uploads, validation, encryption, and event publishing.
+**FSAMP Gateway** is an enterprise-grade, FIPS 140-3-oriented file upload microservice built with Spring Boot 3.5 and Java 21. It serves as the ingress point for the FSAMP (FedRAMP Moderate-aligned Secure AWS Microservices Platform) system, handling secure file uploads, validation, encryption, and event publishing.
 
 ---
 
@@ -194,7 +194,7 @@ SecureFile
 ├── Checksum (SHA-256)         // Integrity hash
 ├── StorageLocation            // S3 bucket + key
 ├── EncryptionMetadata         // KMS key info
-├── FileStatus                 // PENDING → UPLOADED → PROCESSING → COMPLETED
+├── FileStatus                 // PENDING -> UPLOADED -> PROCESSING -> COMPLETED
 └── AuditInfo                  // Created/updated timestamps, user
 ```
 
@@ -227,7 +227,7 @@ SecureFile
 
 ### FIPS 140-3-Oriented Security
 
-The gateway implements FIPS 140-3 Level 3 compliant cryptography:
+The gateway implements a FIPS 140-3-oriented cryptographic posture:
 
 ```
 ┌───────────────────────────────────────────────────────────────┐
@@ -253,8 +253,8 @@ The gateway implements FIPS 140-3 Level 3 compliant cryptography:
 ```yaml
 security:
   fips:
-    approved-only: true     # Enforces NIST-validated algorithms only
-    provider-position: 1    # Highest priority in provider list
+    approved-only: true
+    provider-position: 1
 ```
 
 ### Authentication & Authorization
@@ -391,9 +391,9 @@ Prevents cascading failures when downstream services are unavailable:
                    │                                 │
   Request ────────▶│  CLOSED ─▶ OPEN ─▶ HALF_OPEN  │────────▶ S3/SNS
                    │                                 │
-                   │  50% failure rate → OPEN       │
-                   │  30s wait → HALF_OPEN          │
-                   │  3 success → CLOSED            │
+                   │  50% failure rate -> OPEN       │
+                   │  30s wait -> HALF_OPEN          │
+                   │  3 success -> CLOSED            │
                    └─────────────────────────────────┘
 ```
 
@@ -607,7 +607,7 @@ Structured logging with correlation ID:
 
 ## References
 
-- [Spring Boot 3.4 Documentation](https://docs.spring.io/spring-boot/docs/3.4.x/reference/html/)
+- [Spring Boot Documentation](https://docs.spring.io/spring-boot/)
 - [FIPS 140-3 Standard](https://csrc.nist.gov/publications/detail/fips/140/3/final)
 - [BouncyCastle FIPS](https://www.bouncycastle.org/fips-java/)
 - [Resilience4j](https://resilience4j.readme.io/)

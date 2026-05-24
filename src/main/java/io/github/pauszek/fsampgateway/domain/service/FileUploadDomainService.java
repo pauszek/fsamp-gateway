@@ -21,18 +21,6 @@ import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Set;
 
-/**
- * Domain Service - File Upload Orchestrator.
- * 
- * Coordinates the file upload workflow:
- * 1. Validate content
- * 2. Create domain entity
- * 3. Store file
- * 4. Persist metadata and enqueue event via transactional outbox when available
- * 5. Publish event directly only as an explicit local fallback
- * 
- * This is a pure domain service - no framework dependencies.
- */
 public class FileUploadDomainService implements UploadFileUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(FileUploadDomainService.class);
@@ -84,11 +72,7 @@ public class FileUploadDomainService implements UploadFileUseCase {
         try {
             log.info("Starting file upload: fileName={}, size={}, correlationId={}",
                     command.getFileName(), command.getSize(), correlationId);
-
-            // 1. Buffer content to temp file (avoids holding entire file in heap)
             tempFile = bufferToTempFile(command);
-
-            // 2. Validate content
             FileName fileName = FileName.of(command.getFileName());
             MimeType declaredType = MimeType.of(command.getContentType());
 
@@ -106,14 +90,10 @@ public class FileUploadDomainService implements UploadFileUseCase {
                 throw new FileValidationException(
                         "File type '" + validatedType + "' is not allowed");
             }
-
-            // 3. Compute checksum (streamed — no full byte[] in memory)
             Checksum checksum;
             try (InputStream is = Files.newInputStream(tempFile)) {
                 checksum = contentValidator.computeChecksum(is);
             }
-
-            // 4. Create domain entity
             SecureFile file = SecureFile.createPending(
                     fileName,
                     validatedType,
@@ -123,8 +103,6 @@ public class FileUploadDomainService implements UploadFileUseCase {
             );
 
             log.debug("Created pending file entity: fileId={}", file.getId());
-
-            // 5. Store file (streamed from temp file)
             StorageResult storageResult;
             try (InputStream is = Files.newInputStream(tempFile)) {
                 storageResult = fileStorage.store(
@@ -141,15 +119,11 @@ public class FileUploadDomainService implements UploadFileUseCase {
             }
 
             log.debug("File stored: location={}", storageResult.getLocation());
-
-            // 6. Update entity with storage info
             file = file.markAsUploaded(
                     storageResult.getLocation(),
                     storageResult.getEncryptionMetadata(),
                     checksum
             );
-
-            // 7. Persist metadata and publish/enqueue domain event
             FileUploadedEvent event = FileUploadedEvent.from(file);
             if (fileRepository.supportsTransactionalOutbox()) {
                 file = fileRepository.saveWithOutbox(file, event);

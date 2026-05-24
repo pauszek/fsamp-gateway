@@ -22,12 +22,6 @@ import software.amazon.awssdk.services.sns.model.SnsException;
 
 import java.util.List;
 
-/**
- * Global Exception Handler.
- * 
- * Converts domain exceptions to standardized API error responses.
- * Follows RFC 7807 Problem Details format.
- */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -150,11 +144,6 @@ public class GlobalExceptionHandler {
                         "Messaging service error", request)
         );
     }
-
-    // ========================================================================
-    // Resilience4j Exception Handlers
-    // ========================================================================
-
     @ExceptionHandler(RequestNotPermitted.class)
     public ResponseEntity<ApiErrorDto> handleRateLimitExceeded(
             RequestNotPermitted ex, WebRequest request) {
@@ -229,11 +218,6 @@ public class GlobalExceptionHandler {
                 .body(buildError(HttpStatus.SERVICE_UNAVAILABLE, "SERVICE_UNAVAILABLE",
                         ex.getMessage(), request));
     }
-
-    // ========================================================================
-    // Idempotency Exception Handlers
-    // ========================================================================
-
     @ExceptionHandler(IdempotencyConflictException.class)
     public ResponseEntity<ApiErrorDto> handleIdempotencyConflict(
             IdempotencyConflictException ex, WebRequest request) {

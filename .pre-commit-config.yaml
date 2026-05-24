@@ -1,14 +1,4 @@
-# =============================================================================
-# Pre-commit Configuration - fsamp-gateway
-# =============================================================================
-# Install: pip install pre-commit && pre-commit install
-# Run manually: pre-commit run --all-files
-# =============================================================================
-
 repos:
-  # ============================================================
-  # General Hooks
-  # ============================================================
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
     hooks:
@@ -25,10 +15,6 @@ repos:
       - id: detect-private-key
       - id: mixed-line-ending
         args: [--fix=lf]
-
-  # ============================================================
-  # Java / Maven Hooks
-  # ============================================================
   - repo: local
     hooks:
       - id: maven-checkstyle
@@ -53,36 +39,20 @@ repos:
         files: \.java$
         pass_filenames: false
         stages: [pre-push]
-
-  # ============================================================
-  # Secrets Detection
-  # ============================================================
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.18.1
     hooks:
       - id: gitleaks
-
-  # ============================================================
-  # Commit Message Format (Conventional Commits)
-  # ============================================================
   - repo: https://github.com/commitizen-tools/commitizen
     rev: v3.13.0
     hooks:
       - id: commitizen
         stages: [commit-msg]
-
-  # ============================================================
-  # Markdown Linting
-  # ============================================================
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.38.0
     hooks:
       - id: markdownlint
         args: [--fix]
-
-# =============================================================================
-# CI Configuration
-# =============================================================================
 ci:
   autofix_prs: true
   autoupdate_schedule: weekly

@@ -1,9 +1,6 @@
-# Dependabot configuration — fsamp-gateway
-# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
 version: 2
 
 updates:
-  # Maven dependencies (pom.xml)
   - package-ecosystem: "maven"
     directory: "/"
     schedule:
@@ -33,7 +30,6 @@ updates:
           - "org.assertj*"
           - "net.javacrumbs*"
 
-  # Dockerfile base images
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
@@ -46,7 +42,6 @@ updates:
     commit-message:
       prefix: "chore(docker)"
 
-  # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

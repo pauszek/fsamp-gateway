@@ -21,14 +21,6 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-/**
- * Integration tests for OAuth2 security configuration.
- * 
- * Tests verify:
- * - Unauthenticated requests are rejected
- * - Valid JWT tokens are accepted
- * - Role-based access control works correctly
- */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(TestSecurityConfig.class)
@@ -69,11 +61,9 @@ class SecurityIntegrationTest {
     @Test
     @DisplayName("should allow authenticated user with files.read scope")
     void shouldAllowAuthenticatedUserWithReadScope() throws Exception {
-        // Given
         Jwt jwt = createJwt("user-123", List.of("users"), "openid files.read");
         when(jwtDecoder.decode(anyString())).thenReturn(jwt);
 
-        // When/Then
         mockMvc.perform(get("/api/v1/files/" + java.util.UUID.randomUUID())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN))
                 .andExpect(status().isNotFound()); // File doesn't exist, but auth passed
@@ -82,11 +72,9 @@ class SecurityIntegrationTest {
     @Test
     @DisplayName("should allow user with ROLE_USERS to access files")
     void shouldAllowUserWithRoleUsers() throws Exception {
-        // Given
         Jwt jwt = createJwt("user-123", List.of("users"), "openid");
         when(jwtDecoder.decode(anyString())).thenReturn(jwt);
 
-        // When/Then
         mockMvc.perform(get("/api/v1/files/" + java.util.UUID.randomUUID())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN))
                 .andExpect(status().isNotFound()); // File doesn't exist, but auth passed
@@ -95,11 +83,9 @@ class SecurityIntegrationTest {
     @Test
     @DisplayName("should deny delete operation for non-admin user")
     void shouldDenyDeleteForNonAdmin() throws Exception {
-        // Given - user with "users" group but not "admins"
         Jwt jwt = createJwt("user-123", List.of("users"), "openid files.write");
         when(jwtDecoder.decode(anyString())).thenReturn(jwt);
 
-        // When/Then
         mockMvc.perform(delete("/api/v1/files/123")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN))
                 .andExpect(status().isForbidden());
@@ -108,11 +94,9 @@ class SecurityIntegrationTest {
     @Test
     @DisplayName("should allow delete operation for admin user")
     void shouldAllowDeleteForAdmin() throws Exception {
-        // Given - user with "admins" group
         Jwt jwt = createJwt("admin-123", List.of("admins"), "openid");
         when(jwtDecoder.decode(anyString())).thenReturn(jwt);
 
-        // When/Then
         mockMvc.perform(delete("/api/v1/files/" + java.util.UUID.randomUUID())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN))
                 .andExpect(status().isNotFound()); // File doesn't exist, but auth passed
@@ -121,7 +105,6 @@ class SecurityIntegrationTest {
     @Test
     @DisplayName("should reject expired token")
     void shouldRejectExpiredToken() throws Exception {
-        // Given - expired token
         Jwt jwt = Jwt.withTokenValue("expired-token")
                 .header("alg", "RS256")
                 .subject("user-123")
@@ -133,8 +116,6 @@ class SecurityIntegrationTest {
         
         when(jwtDecoder.decode(anyString())).thenReturn(jwt);
 
-        // Expired token with no valid scopes/groups should be forbidden
-        // The mock bypasses expiration check but token lacks required permissions
         mockMvc.perform(get("/api/v1/files/123")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer expired-token"))
                 .andExpect(status().isForbidden());
@@ -143,11 +124,9 @@ class SecurityIntegrationTest {
     @Test
     @DisplayName("should deny access without required scope or role")
     void shouldDenyAccessWithoutRequiredPermissions() throws Exception {
-        // Given - user without files.read scope or users group
         Jwt jwt = createJwt("user-123", List.of(), "openid email");
         when(jwtDecoder.decode(anyString())).thenReturn(jwt);
 
-        // When/Then
         mockMvc.perform(get("/api/v1/files/123")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN))
                 .andExpect(status().isForbidden());
@@ -165,9 +144,6 @@ class SecurityIntegrationTest {
                 .andExpect(header().exists(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS));
     }
 
-    /**
-     * Helper to create a test JWT with specified claims.
-     */
     private Jwt createJwt(String subject, List<String> groups, String scope) {
         return Jwt.withTokenValue(VALID_TOKEN)
                 .header("alg", "RS256")

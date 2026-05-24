@@ -24,11 +24,6 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.*;
 import static org.awaitility.Awaitility.await;
 
-/**
- * Integration tests for SnsEventPublisherAdapter with real LocalStack SNS/SQS.
- * 
- * Uses SNS→SQS subscription to verify messages are published correctly.
- */
 @DisplayName("SnsEventPublisherAdapter Integration Tests")
 class SnsEventPublisherAdapterIntegrationTest extends BaseIntegrationTest {
 
@@ -40,13 +35,11 @@ class SnsEventPublisherAdapterIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        // Configure properties for LocalStack
         snsProperties = new SnsPublisherProperties();
         snsProperties.setFileEventsTopicArn(topicArn);
         
         snsEventPublisherAdapter = new SnsEventPublisherAdapter(snsClient, objectMapper, snsProperties);
 
-        // Get SQS queue ARN (needed for SNS subscription)
         String queueArn = sqsClient.getQueueAttributes(GetQueueAttributesRequest.builder()
                 .queueUrl(queueUrl)
                 .attributeNames(QueueAttributeName.QUEUE_ARN)
@@ -54,7 +47,6 @@ class SnsEventPublisherAdapterIntegrationTest extends BaseIntegrationTest {
                 .attributes()
                 .get(QueueAttributeName.QUEUE_ARN);
 
-        // Allow SNS to send messages to SQS (required when ENFORCE_IAM=1)
         String queuePolicy = "{\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"sns.amazonaws.com\"},"
                 + "\"Action\":\"sqs:SendMessage\",\"Resource\":\"" + queueArn + "\","
                 + "\"Condition\":{\"ArnEquals\":{\"aws:SourceArn\":\"" + topicArn + "\"}}}]}";
@@ -62,19 +54,16 @@ class SnsEventPublisherAdapterIntegrationTest extends BaseIntegrationTest {
                 .queueUrl(queueUrl)
                 .attributes(java.util.Map.of(QueueAttributeName.POLICY, queuePolicy)));
 
-        // Subscribe SQS queue to SNS topic for message verification
         snsClient.subscribe(SubscribeRequest.builder()
                 .topicArn(topicArn)
                 .protocol("sqs")
                 .endpoint(queueArn)
                 .build());
 
-        // Purge queue before each test to avoid stale messages from previous tests
         purgeQueue();
     }
 
     private void purgeQueue() {
-        // Drain all existing messages from the queue
         ReceiveMessageResponse response;
         do {
             response = sqsClient.receiveMessage(ReceiveMessageRequest.builder()
@@ -97,26 +86,20 @@ class SnsEventPublisherAdapterIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("should publish FileUploadedEvent to SNS topic")
         void shouldPublishFileUploadedEventToSnsTopic() {
-            // given
             FileUploadedEvent event = createTestFileUploadedEvent();
 
-            // when
             String messageId = snsEventPublisherAdapter.publish(event);
 
-            // then
             assertThat(messageId).isNotNull().isNotBlank();
         }
 
         @Test
         @DisplayName("should receive published event in subscribed SQS queue")
         void shouldReceivePublishedEventInSubscribedSqsQueue() {
-            // given
             FileUploadedEvent event = createTestFileUploadedEvent();
 
-            // when
             snsEventPublisherAdapter.publish(event);
 
-            // then - message should arrive in SQS queue
             await().atMost(10, TimeUnit.SECONDS).untilAsserted(() -> {
                 ReceiveMessageResponse response = sqsClient.receiveMessage(ReceiveMessageRequest.builder()
                         .queueUrl(queueUrl)
@@ -127,7 +110,6 @@ class SnsEventPublisherAdapterIntegrationTest extends BaseIntegrationTest {
                 List<Message> messages = response.messages();
                 assertThat(messages).isNotEmpty();
                 
-                // SNS wraps the message in its own envelope
                 String snsEnvelope = messages.get(0).body();
                 assertThat(snsEnvelope).contains("FILE_UPLOADED");
             });
@@ -136,13 +118,10 @@ class SnsEventPublisherAdapterIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("should include event type in published message")
         void shouldIncludeEventTypeInPublishedMessage() {
-            // given
             FileUploadedEvent event = createTestFileUploadedEvent();
 
-            // when
             snsEventPublisherAdapter.publish(event);
 
-            // then
             await().atMost(10, TimeUnit.SECONDS).untilAsserted(() -> {
                 ReceiveMessageResponse response = sqsClient.receiveMessage(ReceiveMessageRequest.builder()
                         .queueUrl(queueUrl)
@@ -159,7 +138,6 @@ class SnsEventPublisherAdapterIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("should include file metadata in published message")
         void shouldIncludeFileMetadataInPublishedMessage() {
-            // given
             String uniqueFilename = "unique-test-file-" + UUID.randomUUID() + ".pdf";
             FileUploadedEvent event = new FileUploadedEvent(
                     FileUploadedEvent.SCHEMA_VERSION,
@@ -174,10 +152,8 @@ class SnsEventPublisherAdapterIntegrationTest extends BaseIntegrationTest {
                     SecurityPayload.of(true, "AES-256-GCM", "arn:aws:kms:us-west-2:000000000000:key/test")
             );
 
-            // when
             snsEventPublisherAdapter.publish(event);
 
-            // then
             await().atMost(10, TimeUnit.SECONDS).untilAsserted(() -> {
                 ReceiveMessageResponse response = sqsClient.receiveMessage(ReceiveMessageRequest.builder()
                         .queueUrl(queueUrl)
@@ -199,13 +175,10 @@ class SnsEventPublisherAdapterIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("should publish event using retry mechanism")
         void shouldPublishEventUsingRetryMechanism() {
-            // given
             FileUploadedEvent event = createTestFileUploadedEvent();
 
-            // when
             String messageId = snsEventPublisherAdapter.publishWithRetry(event, 3);
 
-            // then
             assertThat(messageId).isNotNull().isNotBlank();
         }
     }

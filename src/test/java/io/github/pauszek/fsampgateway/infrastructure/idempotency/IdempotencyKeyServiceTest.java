@@ -45,16 +45,13 @@ class IdempotencyKeyServiceTest {
         @Test
         @DisplayName("should acquire new key and return empty Optional")
         void shouldAcquireNewKeyAndReturnEmpty() {
-            // given
             mockNoExistingKey();
             given(dynamoDbClient.putItem(any(PutItemRequest.class)))
                     .willReturn(PutItemResponse.builder().build());
 
-            // when
             Optional<IdempotencyKeyService.IdempotencyRecord> result = 
                     service.acquireKey(IDEM_KEY, USER_ID);
 
-            // then
             assertThat(result).isEmpty();
             then(dynamoDbClient).should().putItem(putRequestCaptor.capture());
             assertThat(putRequestCaptor.getValue().item().get("idempotencyKey").s())
@@ -66,14 +63,11 @@ class IdempotencyKeyServiceTest {
         @Test
         @DisplayName("should return existing record for completed key")
         void shouldReturnExistingRecordForCompletedKey() {
-            // given
             mockExistingCompletedKey();
 
-            // when
             Optional<IdempotencyKeyService.IdempotencyRecord> result = 
                     service.acquireKey(IDEM_KEY, USER_ID);
 
-            // then
             assertThat(result).isPresent();
             assertThat(result.get().status())
                     .isEqualTo(IdempotencyKeyService.KeyStatus.COMPLETED);
@@ -84,10 +78,8 @@ class IdempotencyKeyServiceTest {
         @Test
         @DisplayName("should throw IdempotencyConflictException for IN_PROGRESS key")
         void shouldThrowIdempotencyConflictExceptionForInProgressKey() {
-            // given
             mockExistingInProgressKey(Instant.now()); // recent, not stale
 
-            // when/then
             assertThatThrownBy(() -> service.acquireKey(IDEM_KEY, USER_ID))
                     .isInstanceOf(IdempotencyConflictException.class)
                     .hasMessageContaining("already being processed");
@@ -96,7 +88,6 @@ class IdempotencyKeyServiceTest {
         @Test
         @DisplayName("should allow retry for stale IN_PROGRESS keys (>5 min)")
         void shouldAllowRetryForStaleInProgressKeys() {
-            // given - key created 10 minutes ago
             Instant staleTime = Instant.now().minus(10, ChronoUnit.MINUTES);
             mockExistingInProgressKey(staleTime);
             given(dynamoDbClient.deleteItem(any(DeleteItemRequest.class)))
@@ -104,11 +95,9 @@ class IdempotencyKeyServiceTest {
             given(dynamoDbClient.putItem(any(PutItemRequest.class)))
                     .willReturn(PutItemResponse.builder().build());
 
-            // when
             Optional<IdempotencyKeyService.IdempotencyRecord> result = 
                     service.acquireKey(IDEM_KEY, USER_ID);
 
-            // then
             assertThat(result).isEmpty(); // key acquired
             then(dynamoDbClient).should().deleteItem(any(DeleteItemRequest.class));
             then(dynamoDbClient).should().putItem(any(PutItemRequest.class));
@@ -117,8 +106,6 @@ class IdempotencyKeyServiceTest {
         @Test
         @DisplayName("should handle race condition (ConditionalCheckFailedException)")
         void shouldHandleRaceCondition() {
-            // given - no existing key on first check, but conditional write fails
-            // First call returns empty, second call after race condition returns completed
             given(dynamoDbClient.getItem(any(GetItemRequest.class)))
                     .willReturn(GetItemResponse.builder().item(Map.of()).build())
                     .willReturn(createCompletedItemResponse());
@@ -126,22 +113,18 @@ class IdempotencyKeyServiceTest {
                     .willThrow(ConditionalCheckFailedException.builder()
                             .message("Condition check failed").build());
 
-            // when
             Optional<IdempotencyKeyService.IdempotencyRecord> result = 
                     service.acquireKey(IDEM_KEY, USER_ID);
 
-            // then
             assertThat(result).isPresent();
         }
 
         @Test
         @DisplayName("should return empty for null idempotency key")
         void shouldReturnEmptyForNullKey() {
-            // when
             Optional<IdempotencyKeyService.IdempotencyRecord> result = 
                     service.acquireKey(null, USER_ID);
 
-            // then
             assertThat(result).isEmpty();
             then(dynamoDbClient).shouldHaveNoInteractions();
         }
@@ -149,11 +132,9 @@ class IdempotencyKeyServiceTest {
         @Test
         @DisplayName("should return empty for blank idempotency key")
         void shouldReturnEmptyForBlankKey() {
-            // when
             Optional<IdempotencyKeyService.IdempotencyRecord> result = 
                     service.acquireKey("   ", USER_ID);
 
-            // then
             assertThat(result).isEmpty();
             then(dynamoDbClient).shouldHaveNoInteractions();
         }
@@ -166,15 +147,12 @@ class IdempotencyKeyServiceTest {
         @Test
         @DisplayName("should complete key with serialized response")
         void shouldCompleteKeyWithSerializedResponse() {
-            // given
             String response = "{\"fileId\":\"123\",\"status\":\"uploaded\"}";
             given(dynamoDbClient.updateItem(any(UpdateItemRequest.class)))
                     .willReturn(UpdateItemResponse.builder().build());
 
-            // when
             service.completeKey(IDEM_KEY, USER_ID, response);
 
-            // then
             then(dynamoDbClient).should().updateItem(updateRequestCaptor.capture());
             UpdateItemRequest request = updateRequestCaptor.getValue();
             assertThat(request.expressionAttributeValues())
@@ -185,20 +163,16 @@ class IdempotencyKeyServiceTest {
         @Test
         @DisplayName("should do nothing for null key")
         void shouldDoNothingForNullKey() {
-            // when
             service.completeKey(null, USER_ID, "response");
 
-            // then
             then(dynamoDbClient).shouldHaveNoInteractions();
         }
 
         @Test
         @DisplayName("should do nothing for blank key")
         void shouldDoNothingForBlankKey() {
-            // when
             service.completeKey("  ", USER_ID, "response");
 
-            // then
             then(dynamoDbClient).shouldHaveNoInteractions();
         }
     }
@@ -210,14 +184,11 @@ class IdempotencyKeyServiceTest {
         @Test
         @DisplayName("should delete key on failure")
         void shouldDeleteKeyOnFailure() {
-            // given
             given(dynamoDbClient.deleteItem(any(DeleteItemRequest.class)))
                     .willReturn(DeleteItemResponse.builder().build());
 
-            // when
             service.failKey(IDEM_KEY, USER_ID);
 
-            // then
             then(dynamoDbClient).should().deleteItem(deleteRequestCaptor.capture());
             assertThat(deleteRequestCaptor.getValue().key().get("idempotencyKey").s())
                     .isEqualTo(IDEM_KEY);
@@ -226,15 +197,12 @@ class IdempotencyKeyServiceTest {
         @Test
         @DisplayName("should do nothing for null key")
         void shouldDoNothingForNullKey() {
-            // when
             service.failKey(null, USER_ID);
 
-            // then
             then(dynamoDbClient).shouldHaveNoInteractions();
         }
     }
 
-    // Helper methods
 
     private void mockNoExistingKey() {
         given(dynamoDbClient.getItem(any(GetItemRequest.class)))

@@ -16,14 +16,6 @@ import java.security.MessageDigest;
 import java.security.Security;
 import java.util.HexFormat;
 
-/**
- * Adapter - Content Validator using Apache Tika and BouncyCastle FIPS.
- * 
- * Features:
- * - MIME type detection using Tika
- * - SHA-256 checksum with FIPS provider (production) or default provider (local)
- * - Content-type spoofing detection
- */
 @Component
 @Slf4j
 public class TikaContentValidatorAdapter implements ContentValidatorPort {
@@ -44,14 +36,12 @@ public class TikaContentValidatorAdapter implements ContentValidatorPort {
             return;
         }
 
-        // Skip FIPS provider for local development (LocalStack doesn't support FIPS)
         if ("local".equals(activeProfile) || "test".equals(activeProfile) || "e2e".equals(activeProfile)) {
             log.info("Skipping FIPS provider for profile: {}", activeProfile);
             return;
         }
         
         try {
-            // Dynamically load BouncyCastle FIPS only in production
             Class<?> providerClass = Class.forName("org.bouncycastle.jcajce.provider.BouncyCastleFipsProvider");
             String providerName = (String) providerClass.getField("PROVIDER_NAME").get(null);
             
@@ -82,24 +72,20 @@ public class TikaContentValidatorAdapter implements ContentValidatorPort {
     @Override
     public ValidationResult validate(InputStream content, MimeType declaredType, String fileName) {
         try {
-            // Detect actual MIME type
             String detected = tika.detect(content, fileName);
             MimeType detectedType = MimeType.of(detected);
 
             log.debug("Validating content: declared={}, detected={}, file={}", 
                     declaredType, detectedType, fileName);
 
-            // Check if detected type is allowed
             if (!detectedType.isAllowed()) {
                 return ValidationResult.invalid(detectedType, 
                         "File type '" + detectedType + "' is not allowed");
             }
 
-            // Warn about type mismatch (potential spoofing attempt)
             if (declaredType != null && !declaredType.value().equals(detectedType.value())) {
                 log.warn("MIME type mismatch detected: declared={}, actual={}, file={}", 
                         declaredType, detectedType, fileName);
-                // We use the detected type, not the declared one
             }
 
             return ValidationResult.valid(detectedType);

@@ -7,9 +7,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
 
-/**
- * Standard API error response following RFC 7807 Problem Details.
- */
 @Schema(description = "API error response")
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ApiErrorDto(

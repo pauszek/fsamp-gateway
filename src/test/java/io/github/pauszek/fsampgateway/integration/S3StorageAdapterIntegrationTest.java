@@ -20,9 +20,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 
-/**
- * Integration tests for S3StorageAdapter with real LocalStack S3.
- */
 @DisplayName("S3StorageAdapter Integration Tests")
 class S3StorageAdapterIntegrationTest extends BaseIntegrationTest {
 
@@ -33,7 +30,6 @@ class S3StorageAdapterIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        // Override bucket name for tests
         s3Properties.setBucketName(TEST_BUCKET);
         s3StorageAdapter = new S3StorageAdapter(s3Client, s3Properties);
     }
@@ -45,7 +41,6 @@ class S3StorageAdapterIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("should store file in S3 bucket")
         void shouldStoreFileInS3Bucket() {
-            // given
             String content = "Test file content for S3 integration test";
             byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
             FileId fileId = FileId.generate();
@@ -58,10 +53,8 @@ class S3StorageAdapterIntegrationTest extends BaseIntegrationTest {
                     "abc123def456"
             );
 
-            // when
             StorageResult result = s3StorageAdapter.store(fileId, inputStream, fileSize, mimeType, metadata);
 
-            // then
             assertThat(result).isNotNull();
             assertThat(result.getLocation()).isNotNull();
             assertThat(result.getLocation().bucketName()).isEqualTo(TEST_BUCKET);
@@ -71,7 +64,6 @@ class S3StorageAdapterIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("should store and retrieve file content")
         void shouldStoreAndRetrieveFileContent() throws IOException {
-            // given
             String content = "Hello, S3 Integration Test!";
             byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
             FileId fileId = FileId.generate();
@@ -84,10 +76,8 @@ class S3StorageAdapterIntegrationTest extends BaseIntegrationTest {
                     null
             );
 
-            // when
             StorageResult result = s3StorageAdapter.store(fileId, inputStream, fileSize, mimeType, metadata);
 
-            // then - verify content can be retrieved from S3
             GetObjectRequest getRequest = GetObjectRequest.builder()
                     .bucket(result.getLocation().bucketName())
                     .key(result.getLocation().objectKey())
@@ -102,7 +92,6 @@ class S3StorageAdapterIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("should set correct content type on S3 object")
         void shouldSetCorrectContentType() {
-            // given
             String content = "{\"key\": \"value\"}";
             byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
             FileId fileId = FileId.generate();
@@ -115,10 +104,8 @@ class S3StorageAdapterIntegrationTest extends BaseIntegrationTest {
                     null
             );
 
-            // when
             StorageResult result = s3StorageAdapter.store(fileId, inputStream, fileSize, mimeType, metadata);
 
-            // then
             HeadObjectRequest headRequest = HeadObjectRequest.builder()
                     .bucket(result.getLocation().bucketName())
                     .key(result.getLocation().objectKey())
@@ -127,7 +114,6 @@ class S3StorageAdapterIntegrationTest extends BaseIntegrationTest {
             HeadObjectResponse headResponse = s3Client.headObject(headRequest);
             assertThat(headResponse.contentType()).isEqualTo("application/json");
 
-            // Verify SSE-KMS encryption is applied (FedRAMP SC-28)
             assertThat(headResponse.serverSideEncryption())
                     .as("Uploaded objects must be encrypted with SSE-KMS")
                     .isEqualTo(ServerSideEncryption.AWS_KMS);
@@ -136,7 +122,6 @@ class S3StorageAdapterIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("should store custom metadata on S3 object")
         void shouldStoreCustomMetadata() {
-            // given
             String content = "File with metadata";
             byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
             FileId fileId = FileId.generate();
@@ -151,10 +136,8 @@ class S3StorageAdapterIntegrationTest extends BaseIntegrationTest {
                     "sha256checksum"
             );
 
-            // when
             StorageResult result = s3StorageAdapter.store(fileId, inputStream, fileSize, mimeType, metadata);
 
-            // then
             HeadObjectRequest headRequest = HeadObjectRequest.builder()
                     .bucket(result.getLocation().bucketName())
                     .key(result.getLocation().objectKey())
@@ -173,7 +156,6 @@ class S3StorageAdapterIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("should download existing file from S3")
         void shouldDownloadExistingFile() throws IOException {
-            // given - first upload a file
             String content = "Content to download";
             byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
             String objectKey = "downloads/" + UUID.randomUUID() + "/test-download.txt";
@@ -187,13 +169,11 @@ class S3StorageAdapterIntegrationTest extends BaseIntegrationTest {
                     software.amazon.awssdk.core.sync.RequestBody.fromBytes(contentBytes)
             );
 
-            // when
             GetObjectRequest getRequest = GetObjectRequest.builder()
                     .bucket(TEST_BUCKET)
                     .key(objectKey)
                     .build();
 
-            // then
             try (ResponseInputStream<GetObjectResponse> response = s3Client.getObject(getRequest)) {
                 String retrievedContent = new String(response.readAllBytes(), StandardCharsets.UTF_8);
                 assertThat(retrievedContent).isEqualTo(content);
@@ -203,10 +183,8 @@ class S3StorageAdapterIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("should throw exception for non-existent file")
         void shouldThrowExceptionForNonExistentFile() {
-            // given
             String nonExistentKey = "non-existent/" + UUID.randomUUID() + "/file.txt";
 
-            // when & then
             assertThatThrownBy(() -> {
                 s3Client.getObject(GetObjectRequest.builder()
                         .bucket(TEST_BUCKET)

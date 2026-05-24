@@ -13,14 +13,6 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 
-/**
- * Custom access denied handler for OAuth2 resource server.
- * 
- * Returns standardized JSON error responses when authenticated user
- * lacks required authorities (roles/scopes) to access a resource.
- * 
- * Response format follows RFC 7807 Problem Details.
- */
 @Slf4j
 public class CognitoAccessDeniedHandler implements AccessDeniedHandler {
 
@@ -42,7 +34,6 @@ public class CognitoAccessDeniedHandler implements AccessDeniedHandler {
         response.setStatus(HttpStatus.FORBIDDEN.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         
-        // Build RFC 7807 compliant error response
         Map<String, Object> errorResponse = Map.of(
                 "type", "https://datatracker.ietf.org/doc/html/rfc7231#section-6.5.3",
                 "title", "Forbidden",
@@ -53,7 +44,6 @@ public class CognitoAccessDeniedHandler implements AccessDeniedHandler {
                 "timestamp", Instant.now().toString()
         );
         
-        // Add WWW-Authenticate header with insufficient_scope error
         response.setHeader("WWW-Authenticate", 
                 "Bearer error=\"insufficient_scope\", " +
                 "error_description=\"The access token lacks required scope\"");

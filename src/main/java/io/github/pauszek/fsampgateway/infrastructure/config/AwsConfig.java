@@ -21,19 +21,6 @@ import software.amazon.awssdk.services.cloudwatch.CloudWatchClient;
 
 import java.net.URI;
 
-/**
- * AWS SDK Configuration.
- * 
- * Configures AWS clients for S3, SNS, SQS, KMS, DynamoDB, STS.
- * Supports LocalStack for local development.
- * 
- * FIPS 140-3-oriented posture:
- * - Production clients use FIPS endpoints (.fipsEnabled(true))
- * - FIPS endpoints route traffic to FIPS-validated TLS termination points
- * - Combined with ACCP FIPS provider for a FIPS-oriented communication path
- * 
- * @see <a href="https://aws.amazon.com/compliance/fips/">AWS FIPS Endpoints</a>
- */
 @Configuration
 public class AwsConfig {
 
@@ -42,10 +29,6 @@ public class AwsConfig {
     @Value("${aws.region:us-west-2}")
     private String region;
 
-    /**
-     * Production AWS configuration using default credentials chain.
-     * All clients use FIPS endpoints for the FIPS 140-3-oriented posture.
-     */
     @Configuration
     @Profile("!local")
     static class ProductionAwsConfig {
@@ -137,9 +120,6 @@ public class AwsConfig {
         }
     }
 
-    /**
-     * LocalStack configuration for local development.
-     */
     @Configuration
     @Profile("local")
     static class LocalStackAwsConfig {

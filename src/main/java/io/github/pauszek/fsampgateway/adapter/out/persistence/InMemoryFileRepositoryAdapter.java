@@ -12,12 +12,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Adapter - In-Memory File Repository.
- * 
- * Test/fallback implementation using a ConcurrentHashMap.
- * Production uses {@link DynamoDbFileRepositoryAdapter}.
- */
 @Repository
 @Profile("test")
 public class InMemoryFileRepositoryAdapter implements FileRepositoryPort {

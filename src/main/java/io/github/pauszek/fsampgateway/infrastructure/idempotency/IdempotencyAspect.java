@@ -15,21 +15,6 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.Optional;
 
-/**
- * Idempotency Aspect.
- * 
- * AOP aspect that automatically handles idempotency for annotated methods.
- * 
- * Features:
- * - Extracts X-Idempotency-Key header from request
- * - Checks for duplicate requests
- * - Returns cached response for duplicates
- * - Stores response after successful processing
- * - Cleans up on failure
- * 
- * Usage:
- * Annotate controller methods with @Idempotent
- */
 @Aspect
 @Component
 @Slf4j
@@ -44,11 +29,9 @@ public class IdempotencyAspect {
 
     @Around("@annotation(idempotent)")
     public Object handleIdempotency(ProceedingJoinPoint joinPoint, Idempotent idempotent) throws Throwable {
-        // Get the idempotency key from request header
         String idempotencyKey = getIdempotencyKeyFromRequest();
         
         if (idempotencyKey == null) {
-            // No idempotency key provided, proceed normally
             log.debug("No idempotency key provided, proceeding without idempotency check");
             return joinPoint.proceed();
         }
@@ -58,7 +41,6 @@ public class IdempotencyAspect {
         log.info("Processing idempotent request: key={}, userId={}, method={}", 
                 idempotencyKey, userId, joinPoint.getSignature().getName());
 
-        // Try to acquire the key
         Optional<IdempotencyKeyService.IdempotencyRecord> existingRecord = 
                 idempotencyKeyService.acquireKey(idempotencyKey, userId);
 
@@ -66,21 +48,17 @@ public class IdempotencyAspect {
             IdempotencyKeyService.IdempotencyRecord record = existingRecord.get();
             
             if (record.status() == IdempotencyKeyService.KeyStatus.COMPLETED && record.response() != null) {
-                // Return cached response
                 log.info("Returning cached response for idempotency key: key={}", idempotencyKey);
                 return deserializeResponse(record.response(), idempotent.responseType());
             }
             
-            // Key exists but no response cached (shouldn't happen normally)
             log.warn("Idempotency key exists without cached response: key={}", idempotencyKey);
         }
 
-        // Process the request
         Object result;
         try {
             result = joinPoint.proceed();
             
-            // Store the successful response
             if (result instanceof ResponseEntity<?> responseEntity) {
                 String serializedResponse = serializeResponse(responseEntity);
                 idempotencyKeyService.completeKey(idempotencyKey, userId, serializedResponse);
@@ -89,7 +67,6 @@ public class IdempotencyAspect {
             return result;
             
         } catch (Exception e) {
-            // Clean up on failure so request can be retried
             idempotencyKeyService.failKey(idempotencyKey, userId);
             throw e;
         }
@@ -132,8 +109,5 @@ public class IdempotencyAspect {
         }
     }
 
-    /**
-     * Internal record for serializing cached responses.
-     */
     private record IdempotentResponse(int statusCode, String body) {}
 }

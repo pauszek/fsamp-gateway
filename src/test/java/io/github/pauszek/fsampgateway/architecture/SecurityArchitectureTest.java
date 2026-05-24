@@ -10,16 +10,6 @@ import org.junit.jupiter.api.Test;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.*;
 
-/**
- * Security-focused Architecture Tests.
- * 
- * Ensures security best practices are enforced at compile time:
- * - No direct logging of sensitive data
- * - Proper exception handling
- * - FIPS compliance patterns
- * 
- * Enterprise Pattern: Security as Code
- */
 @DisplayName("Security Architecture Tests")
 class SecurityArchitectureTest {
 
@@ -41,8 +31,6 @@ class SecurityArchitectureTest {
         @Test
         @DisplayName("Only FIPS-approved crypto providers should be used")
         void onlyFipsApprovedCryptoProviders() {
-            // Direct javax.crypto.Cipher usage should be avoided in favor of FIPS providers
-            // Note: BouncyCastle FIPS and AWS SDK are allowed
             noClasses()
                     .that().resideInAnyPackage(BASE_PACKAGE + "..")
                     .and().doNotHaveSimpleName("FipsCryptoConfig") // Allow config class
@@ -52,9 +40,6 @@ class SecurityArchitectureTest {
                     .check(classes);
         }
 
-        // Note: MessageDigest is allowed for non-cryptographic purposes like checksums
-        // FIPS requires using approved algorithms (SHA-256, SHA-384, SHA-512)
-        // The TikaContentValidatorAdapter uses SHA-256 which is FIPS approved
     }
 
     @Nested
@@ -90,7 +75,6 @@ class SecurityArchitectureTest {
         @Test
         @DisplayName("Controllers should use validation annotations")
         void controllersShouldUseValidation() {
-            // Controllers in adapter.in.web package should use validation
             classes()
                     .that().resideInAPackage("..adapter.in.web..")
                     .and().areAnnotatedWith("org.springframework.web.bind.annotation.RestController")
@@ -125,7 +109,6 @@ class SecurityArchitectureTest {
         @Test
         @DisplayName("Services should use constructor injection")
         void servicesUseConstructorInjection() {
-            // Verify no @Autowired on fields
             noFields()
                     .that().areDeclaredInClassesThat().resideInAnyPackage(
                             "..adapter..",

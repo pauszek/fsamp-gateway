@@ -1,4 +1,3 @@
-# Test profile configuration
 spring:
   config:
     activate:
@@ -6,7 +5,6 @@ spring:
   main:
     lazy-initialization: true
 
-# Test Cognito configuration (for mock JwtDecoder)
 cognito:
   region: us-west-2
   user-pool-id: test-pool-id
@@ -14,7 +12,6 @@ cognito:
   jwks-endpoint: http://localhost:9999/.well-known/jwks.json
   issuer-uri: https://cognito-idp.us-west-2.amazonaws.com/test-pool
 
-# Disable AWS connections for unit tests
 storage:
   s3:
     bucket: test-bucket
@@ -26,7 +23,6 @@ events:
     topic-arn: arn:aws:sns:us-west-2:000000000000:test-topic
     source: test
 
-# Mock AWS endpoints
 aws:
   region: us-west-2
   endpoint: http://localhost:4566

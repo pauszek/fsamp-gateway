@@ -9,11 +9,6 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.*;
 
-/**
- * Additional Domain Model Tests.
- * 
- * Comprehensive tests for Value Objects not fully covered by DomainModelTest.
- */
 @DisplayName("Value Objects Tests")
 class ValueObjectsTest {
 
@@ -87,7 +82,6 @@ class ValueObjectsTest {
         void shouldHandleFileStartingWithDot() {
             FileName fileName = FileName.of(".gitignore");
             
-            // Dot at position 0 means no extension
             assertThat(fileName.getExtension()).isEmpty();
             assertThat(fileName.getBaseName()).isEqualTo(".gitignore");
         }
@@ -154,7 +148,6 @@ class ValueObjectsTest {
         @Test
         @DisplayName("should format megabytes correctly")
         void shouldFormatMegabytesCorrectly() {
-            // 10MB
             assertThat(FileSize.of(10 * 1024 * 1024).toHumanReadable()).isEqualTo("10.00 MB");
         }
 

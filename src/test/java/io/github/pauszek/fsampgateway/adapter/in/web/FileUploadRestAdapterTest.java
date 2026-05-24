@@ -77,7 +77,6 @@ class FileUploadRestAdapterTest {
         @Test
         @DisplayName("should upload file successfully with valid data")
         void shouldUploadFileSuccessfully() throws Exception {
-            // given
             MockMultipartFile file = new MockMultipartFile(
                     "file",
                     "test-document.pdf",
@@ -90,10 +89,8 @@ class FileUploadRestAdapterTest {
             given(uploadFileUseCase.execute(any())).willReturn(createUploadedFile());
             given(fileMapper.toResponseDto(any())).willReturn(createResponseDto());
 
-            // when
             ResponseEntity<FileUploadResponseDto> response = adapter.uploadFile(file, null);
 
-            // then
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
             assertThat(response.getBody()).isNotNull();
             assertThat(response.getBody().fileId()).isNotNull();
@@ -102,7 +99,6 @@ class FileUploadRestAdapterTest {
         @Test
         @DisplayName("should create command with correct parameters")
         void shouldCreateCommandWithCorrectParameters() throws Exception {
-            // given
             MockMultipartFile file = new MockMultipartFile(
                     "file",
                     "report.pdf",
@@ -115,10 +111,8 @@ class FileUploadRestAdapterTest {
             given(uploadFileUseCase.execute(any())).willReturn(createUploadedFile());
             given(fileMapper.toResponseDto(any())).willReturn(createResponseDto());
 
-            // when
             adapter.uploadFile(file, null);
 
-            // then
             then(uploadFileUseCase).should().execute(commandCaptor.capture());
             UploadFileCommand command = commandCaptor.getValue();
             assertThat(command.getFileName()).isEqualTo("report.pdf");
@@ -130,7 +124,6 @@ class FileUploadRestAdapterTest {
         @Test
         @DisplayName("should throw when user not found in security context")
         void shouldThrowWhenUserNotFound() {
-            // given
             MockMultipartFile file = new MockMultipartFile(
                     "file",
                     "test.pdf",
@@ -140,7 +133,6 @@ class FileUploadRestAdapterTest {
 
             given(currentUserService.getCurrentUser()).willReturn(Optional.empty());
 
-            // when/then
             assertThatThrownBy(() -> adapter.uploadFile(file, null))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("User not found");
@@ -149,7 +141,6 @@ class FileUploadRestAdapterTest {
         @Test
         @DisplayName("should pass correlationId from request")
         void shouldPassCorrelationIdFromRequest() throws Exception {
-            // given
             MockMultipartFile file = new MockMultipartFile(
                     "file",
                     "test.pdf",
@@ -165,10 +156,8 @@ class FileUploadRestAdapterTest {
             given(uploadFileUseCase.execute(any())).willReturn(createUploadedFile());
             given(fileMapper.toResponseDto(any())).willReturn(createResponseDto());
 
-            // when
             adapter.uploadFile(file, request);
 
-            // then
             then(uploadFileUseCase).should().execute(commandCaptor.capture());
             assertThat(commandCaptor.getValue().getCorrelationId()).isEqualTo("custom-corr-id");
         }
@@ -181,17 +170,14 @@ class FileUploadRestAdapterTest {
         @Test
         @DisplayName("should return 200 OK with file data")
         void shouldReturnFileSuccessfully() {
-            // given
             SecureFile file = createUploadedFile();
             String fileId = file.getId().toString();
             given(currentUserService.getCurrentUserId()).willReturn(Optional.of(USER_ID));
             given(getFileUseCase.getByIdOrThrow(any(FileId.class))).willReturn(file);
             given(fileMapper.toResponseDto(file)).willReturn(createResponseDto());
 
-            // when
             ResponseEntity<FileUploadResponseDto> response = adapter.getFile(fileId);
 
-            // then
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             assertThat(response.getBody()).isNotNull();
         }
@@ -204,21 +190,17 @@ class FileUploadRestAdapterTest {
         @Test
         @DisplayName("should return 204 NO_CONTENT on successful delete")
         void shouldDeleteFileSuccessfully() {
-            // given
             FileId fileId = FileId.generate();
             given(currentUserService.getCurrentUserId()).willReturn(Optional.of(USER_ID));
             willDoNothing().given(deleteFileUseCase).execute(any(FileId.class));
 
-            // when
             ResponseEntity<Void> response = adapter.deleteFile(fileId.toString());
 
-            // then
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
             then(deleteFileUseCase).should().execute(any(FileId.class));
         }
     }
 
-    // Helper methods
 
     private SecureFile createUploadedFile() {
         return SecureFile.createPending(

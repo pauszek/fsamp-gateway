@@ -15,16 +15,6 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 
-/**
- * Correlation ID Filter.
- * 
- * Ensures every request has a correlation ID for distributed tracing.
- * The correlation ID is:
- * 1. Extracted from X-Correlation-ID header (if provided by client)
- * 2. Generated if not present (32-char hex via {@link CorrelationId#generate()})
- * 3. Added to MDC for structured logging
- * 4. Propagated back in the response header
- */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class CorrelationIdFilter implements Filter {
@@ -52,12 +42,10 @@ public class CorrelationIdFilter implements Filter {
         if (correlationId == null || correlationId.isBlank()) {
             return CorrelationId.generate().value();
         }
-        // Normalize: strip dashes from UUID-formatted correlation IDs
         String normalized = correlationId.replace("-", "").toLowerCase();
         if (normalized.matches("[a-f0-9]{32}")) {
             return normalized;
         }
-        // If incoming value doesn't match expected format, generate a new one
         return CorrelationId.generate().value();
     }
 }

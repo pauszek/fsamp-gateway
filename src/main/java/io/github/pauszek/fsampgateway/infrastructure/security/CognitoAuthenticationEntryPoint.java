@@ -15,17 +15,6 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 
-/**
- * Custom authentication entry point for OAuth2 resource server.
- * 
- * Returns standardized JSON error responses for authentication failures:
- * - Missing or invalid Authorization header
- * - Expired JWT tokens
- * - Invalid JWT signature
- * - Unknown issuer
- * 
- * Response format follows RFC 7807 Problem Details with OAuth2 extensions.
- */
 @Slf4j
 public class CognitoAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
@@ -47,10 +36,8 @@ public class CognitoAuthenticationEntryPoint implements AuthenticationEntryPoint
         response.setStatus(HttpStatus.UNAUTHORIZED.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         
-        // Build RFC 7807 compliant error response
         Map<String, Object> errorResponse = buildErrorResponse(authException, request);
         
-        // Add WWW-Authenticate header as per OAuth2 spec
         String wwwAuthenticate = buildWwwAuthenticateHeader(authException);
         response.setHeader("WWW-Authenticate", wwwAuthenticate);
         

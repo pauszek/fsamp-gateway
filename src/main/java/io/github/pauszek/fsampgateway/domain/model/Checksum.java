@@ -3,11 +3,6 @@ package io.github.pauszek.fsampgateway.domain.model;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
-/**
- * Value Object - File Checksum (SHA-256).
- * 
- * Represents a SHA-256 hash for file integrity verification.
- */
 public record Checksum(String value, Algorithm algorithm) {
 
     private static final Pattern SHA256_PATTERN = Pattern.compile("^[a-f0-9]{64}$");
@@ -38,16 +33,10 @@ public record Checksum(String value, Algorithm algorithm) {
         }
     }
 
-    /**
-     * Create SHA-256 checksum.
-     */
     public static Checksum sha256(String value) {
         return new Checksum(value, Algorithm.SHA256);
     }
 
-    /**
-     * Verify this checksum matches another.
-     */
     public boolean matches(Checksum other) {
         if (other == null) return false;
         return this.algorithm == other.algorithm && 

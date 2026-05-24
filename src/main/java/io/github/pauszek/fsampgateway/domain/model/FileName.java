@@ -3,11 +3,6 @@ package io.github.pauszek.fsampgateway.domain.model;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
-/**
- * Value Object - File Name.
- * 
- * Validates and sanitizes file names to prevent security issues.
- */
 public record FileName(String value) {
 
     private static final int MAX_LENGTH = 255;
@@ -26,30 +21,21 @@ public record FileName(String value) {
                     "File name exceeds maximum length of " + MAX_LENGTH + " characters");
         }
         
-        // Security: Check for path traversal
         if (PATH_TRAVERSAL.matcher(value).find()) {
             throw new IllegalArgumentException("File name contains path traversal pattern");
         }
         
-        // Security: Check for invalid characters
         if (INVALID_CHARS.matcher(value).find()) {
             throw new IllegalArgumentException("File name contains invalid characters");
         }
         
-        // Trim whitespace
         value = value.trim();
     }
 
-    /**
-     * Create FileName from raw input.
-     */
     public static FileName of(String value) {
         return new FileName(value);
     }
 
-    /**
-     * Get file extension (without dot).
-     */
     public String getExtension() {
         int lastDot = value.lastIndexOf('.');
         if (lastDot > 0 && lastDot < value.length() - 1) {
@@ -58,9 +44,6 @@ public record FileName(String value) {
         return "";
     }
 
-    /**
-     * Get base name (without extension).
-     */
     public String getBaseName() {
         int lastDot = value.lastIndexOf('.');
         if (lastDot > 0) {

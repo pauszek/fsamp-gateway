@@ -18,10 +18,8 @@ class UploadFileCommandTest {
         @Test
         @DisplayName("should build command with all fields")
         void shouldBuildCommandWithAllFields() {
-            // given
             InputStream content = new ByteArrayInputStream("content".getBytes());
 
-            // when
             UploadFileCommand command = UploadFileCommand.builder()
                     .fileName("document.pdf")
                     .contentType("application/pdf")
@@ -31,7 +29,6 @@ class UploadFileCommandTest {
                     .uploadedBy("user-456")
                     .build();
 
-            // then
             assertThat(command.getFileName()).isEqualTo("document.pdf");
             assertThat(command.getContentType()).isEqualTo("application/pdf");
             assertThat(command.getSize()).isEqualTo(1024L);
@@ -43,10 +40,8 @@ class UploadFileCommandTest {
         @Test
         @DisplayName("should throw NullPointerException for null fileName")
         void shouldThrowForNullFileName() {
-            // given
             InputStream content = new ByteArrayInputStream("content".getBytes());
 
-            // when/then
             assertThatThrownBy(() ->
                     UploadFileCommand.builder()
                             .fileName(null)
@@ -59,7 +54,6 @@ class UploadFileCommandTest {
         @Test
         @DisplayName("should throw NullPointerException for null content")
         void shouldThrowForNullContent() {
-            // when/then
             assertThatThrownBy(() ->
                     UploadFileCommand.builder()
                             .fileName("test.pdf")
@@ -77,51 +71,41 @@ class UploadFileCommandTest {
         @Test
         @DisplayName("should use provided correlationId when present")
         void shouldUseProvidedCorrelationId() {
-            // given
             UploadFileCommand command = UploadFileCommand.builder()
                     .fileName("test.pdf")
                     .content(new ByteArrayInputStream("content".getBytes()))
                     .correlationId("b1c2d3e4f5a67890b1c2d3e4f5a67890")
                     .build();
 
-            // when
             CorrelationId result = command.getCorrelationIdOrGenerate();
 
-            // then
             assertThat(result.value()).isEqualTo("b1c2d3e4f5a67890b1c2d3e4f5a67890");
         }
 
         @Test
         @DisplayName("should generate correlationId when not provided")
         void shouldGenerateCorrelationIdWhenNotProvided() {
-            // given
             UploadFileCommand command = UploadFileCommand.builder()
                     .fileName("test.pdf")
                     .content(new ByteArrayInputStream("content".getBytes()))
                     .build();
 
-            // when
             CorrelationId result = command.getCorrelationIdOrGenerate();
 
-            // then
             assertThat(result.value()).isNotNull().isNotBlank();
         }
 
         @Test
         @DisplayName("should generate correlationId for blank value")
         void shouldGenerateCorrelationIdForBlankValue() {
-            // given
             UploadFileCommand command = UploadFileCommand.builder()
                     .fileName("test.pdf")
                     .content(new ByteArrayInputStream("content".getBytes()))
                     .correlationId("   ")
                     .build();
 
-            // when
             CorrelationId result = command.getCorrelationIdOrGenerate();
 
-            // then
-            // Should generate new one since CorrelationId.of handles blank
             assertThat(result.value()).isNotBlank();
         }
     }

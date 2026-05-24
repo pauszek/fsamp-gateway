@@ -8,12 +8,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.*;
 
-/**
- * Domain Model Unit Tests.
- * 
- * Tests for Value Objects and Aggregate Root behavior.
- * Following DDD testing practices.
- */
 @DisplayName("Domain Model Tests")
 class DomainModelTest {
 
@@ -157,7 +151,6 @@ class DomainModelTest {
                     "test-bucket", "uploads/test.pdf"
             );
             EncryptionMetadata encryption = EncryptionMetadata.kmsEncrypted("alias/test-key");
-            // Valid SHA-256 hash (64 hex characters)
             Checksum checksum = Checksum.sha256("a".repeat(64));
             
             SecureFile uploadedFile = file.markAsUploaded(location, encryption, checksum);
@@ -171,7 +164,6 @@ class DomainModelTest {
         void shouldNotAllowInvalidStateTransitions() {
             SecureFile file = createTestFile();
             
-            // Cannot go from PENDING to COMPLETED directly
             assertThatThrownBy(file::markAsCompleted)
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("Cannot complete");

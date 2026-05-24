@@ -3,14 +3,13 @@ package io.github.pauszek.fsampgateway.application.mapper;
 import io.github.pauszek.fsampgateway.application.dto.FileUploadResponseDto;
 import io.github.pauszek.fsampgateway.domain.model.*;
 import org.junit.jupiter.api.*;
-import org.mapstruct.factory.Mappers;
 
 import static org.assertj.core.api.Assertions.*;
 
 @DisplayName("FileMapper")
 class FileMapperTest {
 
-    private final FileMapper mapper = Mappers.getMapper(FileMapper.class);
+    private final FileMapper mapper = new FileMapper();
 
     @Nested
     @DisplayName("toResponseDto")
@@ -19,7 +18,6 @@ class FileMapperTest {
         @Test
         @DisplayName("should map SecureFile to FileUploadResponseDto")
         void shouldMapSecureFileToResponseDto() {
-            // given
             SecureFile file = SecureFile.createPending(
                     FileName.of("document.pdf"),
                     MimeType.of("application/pdf"),
@@ -32,10 +30,8 @@ class FileMapperTest {
                     Checksum.sha256("a".repeat(64))
             );
 
-            // when
             FileUploadResponseDto result = mapper.toResponseDto(file);
 
-            // then
             assertThat(result).isNotNull();
             assertThat(result.fileId()).isEqualTo(file.getId().value());
             assertThat(result.correlationId()).isEqualTo(file.getCorrelationId().value());
@@ -49,7 +45,6 @@ class FileMapperTest {
         @Test
         @DisplayName("should map file size to human readable format")
         void shouldMapFileSizeToHumanReadable() {
-            // given
             SecureFile file = SecureFile.createPending(
                     FileName.of("large-file.pdf"),
                     MimeType.of("application/pdf"),
@@ -62,17 +57,14 @@ class FileMapperTest {
                     Checksum.sha256("b".repeat(64))
             );
 
-            // when
             FileUploadResponseDto result = mapper.toResponseDto(file);
 
-            // then
             assertThat(result.sizeHuman()).isEqualTo("5.00 MB");
         }
 
         @Test
         @DisplayName("should handle pending file without checksum")
         void shouldHandlePendingFileWithoutChecksum() {
-            // given
             SecureFile file = SecureFile.createPending(
                     FileName.of("pending.pdf"),
                     MimeType.of("application/pdf"),
@@ -81,10 +73,8 @@ class FileMapperTest {
                     "user-123"
             );
 
-            // when
             FileUploadResponseDto result = mapper.toResponseDto(file);
 
-            // then
             assertThat(result).isNotNull();
             assertThat(result.checksum()).isNull();
             assertThat(result.status()).isEqualTo("PENDING");
@@ -93,7 +83,6 @@ class FileMapperTest {
         @Test
         @DisplayName("should include status description")
         void shouldIncludeStatusDescription() {
-            // given
             SecureFile file = SecureFile.createPending(
                     FileName.of("test.pdf"),
                     MimeType.of("application/pdf"),
@@ -106,17 +95,14 @@ class FileMapperTest {
                     Checksum.sha256("c".repeat(64))
             );
 
-            // when
             FileUploadResponseDto result = mapper.toResponseDto(file);
 
-            // then
             assertThat(result.statusDescription()).isNotBlank();
         }
 
         @Test
         @DisplayName("should include checksum for uploaded file")
         void shouldIncludeChecksumForUploadedFile() {
-            // given
             String expectedChecksum = "d".repeat(64);
             SecureFile file = SecureFile.createPending(
                     FileName.of("test.pdf"),
@@ -130,17 +116,14 @@ class FileMapperTest {
                     Checksum.sha256(expectedChecksum)
             );
 
-            // when
             FileUploadResponseDto result = mapper.toResponseDto(file);
 
-            // then
             assertThat(result.checksum()).isEqualTo(expectedChecksum);
         }
 
         @Test
         @DisplayName("should include upload timestamp")
         void shouldIncludeUploadTimestamp() {
-            // given
             SecureFile file = SecureFile.createPending(
                     FileName.of("test.pdf"),
                     MimeType.of("application/pdf"),
@@ -153,10 +136,8 @@ class FileMapperTest {
                     Checksum.sha256("e".repeat(64))
             );
 
-            // when
             FileUploadResponseDto result = mapper.toResponseDto(file);
 
-            // then
             assertThat(result.uploadedAt()).isNotNull();
         }
     }

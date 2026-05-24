@@ -3,9 +3,6 @@ package io.github.pauszek.fsampgateway.application.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Size;
 
-/**
- * Request DTO for file upload.
- */
 @Schema(description = "File upload request metadata")
 public record FileUploadRequestDto(
         

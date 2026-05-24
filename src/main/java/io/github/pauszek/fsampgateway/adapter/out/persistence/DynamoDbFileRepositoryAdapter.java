@@ -23,21 +23,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * Adapter - DynamoDB File Repository.
- * 
- * Production implementation of {@link FileRepositoryPort} using AWS DynamoDB.
- * Replaces InMemoryFileRepositoryAdapter for durable persistence.
- * 
- * Table schema (matches Terraform {@code storage} module):
- * <ul>
- *   <li>PK: {@code FILE#<fileId>} - stable file aggregate key</li>
- *   <li>SK: {@code TS#<timestamp>} - ISO-8601 metadata version key</li>
- *   <li>GSI1: {@code STATUS#<status>} → {@code <timestamp>} for status-based queries</li>
- * </ul>
- * 
- * FedRAMP AU-3: All persistence operations are logged with correlation context.
- */
 @Repository
 @Primary
 @Profile("!test")
@@ -45,7 +30,6 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
 
     private static final Logger log = LoggerFactory.getLogger(DynamoDbFileRepositoryAdapter.class);
 
-    // Attribute names matching Terraform table definition
     private static final String PK = "PK";
     private static final String SK = "SK";
     private static final String GSI1_PK = "GSI1PK";
@@ -149,7 +133,6 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
     public Optional<SecureFile> findById(FileId fileId) {
         log.debug("Finding file in DynamoDB: fileId={}", fileId);
 
-        // Query by PK (FILE#fileId), get the most recent entry
         QueryRequest queryRequest = QueryRequest.builder()
                 .tableName(tableName)
                 .keyConditionExpression("#pk = :pkVal")
@@ -179,7 +162,6 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
     public void delete(FileId fileId) {
         log.debug("Deleting file from DynamoDB: fileId={}", fileId);
 
-        // First find the item to get the SK
         Optional<SecureFile> existing = findById(fileId);
         if (existing.isEmpty()) {
             log.debug("File not found for deletion: fileId={}", fileId);
@@ -215,19 +197,12 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
         QueryResponse response = dynamoDbClient.query(queryRequest);
         return response.count() > 0;
     }
-
-    // ========================================================================
-    // Serialization: SecureFile → DynamoDB Item
-    // ========================================================================
-
     private Map<String, AttributeValue> toItem(SecureFile file) {
         Map<String, AttributeValue> item = new HashMap<>();
 
-        // Keys
         item.put(PK, s(filePk(file.getId())));
         item.put(SK, s(timestampSk(file.getAuditInfo().createdAt().toString())));
 
-        // Core metadata
         item.put(ATTR_FILE_ID, s(file.getId().toString()));
         item.put(ATTR_CORRELATION_ID, s(file.getCorrelationId().value()));
         item.put(ATTR_FILE_NAME, s(file.getFileName().value()));
@@ -237,26 +212,22 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
         item.put(GSI1_PK, s("STATUS#" + file.getStatus().name()));
         item.put(GSI1_SK, s(file.getAuditInfo().createdAt().toString()));
 
-        // Checksum (may be null for PENDING files)
         if (file.getChecksum() != null) {
             item.put(ATTR_CHECKSUM, s(file.getChecksum().value()));
             item.put(ATTR_CHECKSUM_ALGORITHM, s(file.getChecksum().algorithm().name()));
         }
 
-        // Storage location (may be null for PENDING files)
         if (file.getStorageLocation() != null) {
             item.put(ATTR_BUCKET_NAME, s(file.getStorageLocation().bucketName()));
             item.put(ATTR_OBJECT_KEY, s(file.getStorageLocation().objectKey()));
         }
 
-        // Encryption metadata (may be null for PENDING files)
         if (file.getEncryptionMetadata() != null) {
             item.put(ATTR_KMS_KEY_ID, s(file.getEncryptionMetadata().kmsKeyId()));
             item.put(ATTR_ENCRYPTION_ALGORITHM, s(file.getEncryptionMetadata().algorithm().name()));
             item.put(ATTR_IS_ENCRYPTED, bool(file.getEncryptionMetadata().encrypted()));
         }
 
-        // Audit info
         item.put(ATTR_CREATED_BY, s(file.getAuditInfo().createdBy()));
         item.put(ATTR_CREATED_AT, s(file.getAuditInfo().createdAt().toString()));
         item.put(ATTR_UPDATED_AT, s(file.getAuditInfo().updatedAt().toString()));
@@ -292,11 +263,6 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
             throw new EventPublishException("Failed to serialize event for outbox", e);
         }
     }
-
-    // ========================================================================
-    // Deserialization: DynamoDB Item → SecureFile
-    // ========================================================================
-
     private SecureFile fromItem(Map<String, AttributeValue> item) {
         SecureFile.Builder builder = SecureFile.builder()
                 .id(FileId.of(readFileId(item)))
@@ -311,7 +277,6 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
                         Instant.parse(item.get(ATTR_UPDATED_AT).s())
                 ));
 
-        // Optional fields
         if (item.containsKey(ATTR_CHECKSUM) && item.get(ATTR_CHECKSUM).s() != null) {
             Checksum.Algorithm algo = item.containsKey(ATTR_CHECKSUM_ALGORITHM)
                     ? Checksum.Algorithm.valueOf(item.get(ATTR_CHECKSUM_ALGORITHM).s())
@@ -339,11 +304,6 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
 
         return builder.build();
     }
-
-    // ========================================================================
-    // DynamoDB AttributeValue helpers
-    // ========================================================================
-
     private static AttributeValue s(String value) {
         return AttributeValue.builder().s(value).build();
     }
