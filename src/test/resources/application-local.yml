@@ -1,4 +1,3 @@
-# Test configuration for LocalStack
 spring:
   application:
     name: fsamp-gateway-test

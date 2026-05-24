@@ -1,5 +1,3 @@
-# Integration Test Profile Configuration
-# Used with LocalStack Testcontainers
 spring:
   config:
     activate:
@@ -8,7 +6,6 @@ spring:
     lazy-initialization: false
     allow-bean-definition-overriding: true
 
-# Cognito disabled for integration tests (use mock)
 cognito:
   region: us-west-2
   user-pool-id: test-pool-id
@@ -16,20 +13,17 @@ cognito:
   jwks-endpoint: http://localhost:9999/.well-known/jwks.json
   issuer-uri: https://cognito-idp.us-west-2.amazonaws.com/test-pool
 
-# S3 Storage Configuration (overridden by LocalStack)
 storage:
   s3:
     bucket: fsamp-files-integration
     kms-key-id: alias/test-key
     prefix: integration/
 
-# SNS Events Configuration (overridden by LocalStack)
 events:
   sns:
     topic-arn: arn:aws:sns:us-west-2:000000000000:fsamp-file-events-integration
     source: integration-test
 
-# AWS Configuration - endpoints overridden by LocalStackTestConfiguration
 aws:
   region: us-west-2
   s3:
@@ -41,7 +35,6 @@ aws:
   dynamodb:
     table-name: fsamp-idempotency-keys
 
-# FSAMP Security
 fsamp:
   security:
     fips-mode: false
@@ -54,7 +47,6 @@ fsamp:
       - application/octet-stream
     max-file-size-bytes: 104857600  # 100MB
 
-# Resilience4j - relaxed for tests
 resilience4j:
   circuitbreaker:
     instances:
@@ -79,7 +71,6 @@ resilience4j:
         max-attempts: 2
         wait-duration: 100ms
 
-# Logging for debugging
 logging:
   level:
     root: WARN

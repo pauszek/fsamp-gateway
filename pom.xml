@@ -32,10 +32,7 @@
         <springdoc.version>2.8.17</springdoc.version>
         <swagger-ui.version>5.32.5</swagger-ui.version>
         <tomcat.version>10.1.55</tomcat.version>
-        <mapstruct.version>1.6.3</mapstruct.version>
         <dependency-check.nvd.delay>12000</dependency-check.nvd.delay>
-
-        <!-- SonarQube configuration -->
         <sonar.coverage.exclusions>
             **/infrastructure/config/**,
             **/FsampGatewayApplication.java,
@@ -78,7 +75,6 @@
     </dependencyManagement>
 
     <dependencies>
-        <!-- Spring Boot Starters -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
@@ -99,21 +95,15 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-aop</artifactId>
         </dependency>
-
-        <!-- OAuth2 Resource Server (Cognito JWT validation) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
         </dependency>
-
-        <!-- nimbus-jose-jwt for JWT processing -->
         <dependency>
             <groupId>com.nimbusds</groupId>
             <artifactId>nimbus-jose-jwt</artifactId>
             <version>9.47</version>
         </dependency>
-
-        <!-- Resilience4j - Circuit Breaker, Retry, Rate Limiter -->
         <dependency>
             <groupId>io.github.resilience4j</groupId>
             <artifactId>resilience4j-spring-boot3</artifactId>
@@ -124,16 +114,11 @@
             <artifactId>resilience4j-micrometer</artifactId>
             <version>${resilience4j.version}</version>
         </dependency>
-
-        <!-- OpenAPI Documentation -->
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>${springdoc.version}</version>
         </dependency>
-
-        <!-- AWS SDK v2 -->
-        <!-- Gateway uses synchronous AWS SDK clients; keep the Apache HTTP transport and exclude the unused async Netty transport. -->
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>s3</artifactId>
@@ -204,8 +189,6 @@
                 </exclusion>
             </exclusions>
         </dependency>
-
-        <!-- FIPS 140-3 Compliant Cryptography -->
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bc-fips</artifactId>
@@ -216,18 +199,12 @@
             <artifactId>bcpkix-fips</artifactId>
             <version>2.0.7</version>
         </dependency>
-
-        <!-- Amazon Corretto Crypto Provider (ACCP) - FIPS 140-3 Level 1 validated -->
-        <!-- Provides FIPS-compliant TLS stack and high-performance crypto operations -->
-        <!-- Requires platform-specific native binary (os-maven-plugin detects classifier) -->
         <dependency>
             <groupId>software.amazon.cryptools</groupId>
             <artifactId>AmazonCorrettoCryptoProvider</artifactId>
             <version>2.4.1</version>
             <classifier>${os.detected.classifier}</classifier>
         </dependency>
-
-        <!-- JSON Processing -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
@@ -236,30 +213,17 @@
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jsr310</artifactId>
         </dependency>
-
-        <!-- MapStruct for DTO mapping -->
-        <dependency>
-            <groupId>org.mapstruct</groupId>
-            <artifactId>mapstruct</artifactId>
-            <version>${mapstruct.version}</version>
-        </dependency>
-
-        <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <version>${lombok.version}</version>
             <scope>provided</scope>
         </dependency>
-
-        <!-- Utilities -->
         <dependency>
             <groupId>org.apache.tika</groupId>
             <artifactId>tika-core</artifactId>
             <version>3.2.2</version>
         </dependency>
-
-        <!-- Observability -->
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-cloudwatch2</artifactId>
@@ -283,8 +247,6 @@
             <artifactId>logstash-logback-encoder</artifactId>
             <version>8.0</version>
         </dependency>
-
-        <!-- Testing -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -318,14 +280,12 @@
             <artifactId>awaitility</artifactId>
             <scope>test</scope>
         </dependency>
-        <!-- ArchUnit for architecture tests -->
         <dependency>
             <groupId>com.tngtech.archunit</groupId>
             <artifactId>archunit-junit5</artifactId>
             <version>${archunit.version}</version>
             <scope>test</scope>
         </dependency>
-        <!-- JSON Schema validation for contract tests -->
         <dependency>
             <groupId>com.networknt</groupId>
             <artifactId>json-schema-validator</artifactId>
@@ -336,7 +296,6 @@
 
     <build>
         <extensions>
-            <!-- OS detection for platform-specific ACCP native libraries -->
             <extension>
                 <groupId>kr.motd.maven</groupId>
                 <artifactId>os-maven-plugin</artifactId>
@@ -352,27 +311,14 @@
                     <target>${java.version}</target>
                     <release>${java.version}</release>
                     <useIncrementalCompilation>false</useIncrementalCompilation>
+                    <forceJavacCompilerUse>true</forceJavacCompilerUse>
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
                             <version>${lombok.version}</version>
                         </path>
-                        <path>
-                            <groupId>org.mapstruct</groupId>
-                            <artifactId>mapstruct-processor</artifactId>
-                            <version>${mapstruct.version}</version>
-                        </path>
-                        <path>
-                            <groupId>org.projectlombok</groupId>
-                            <artifactId>lombok-mapstruct-binding</artifactId>
-                            <version>0.2.0</version>
-                        </path>
                     </annotationProcessorPaths>
-                    <compilerArgs>
-                        <arg>-Amapstruct.defaultComponentModel=spring</arg>
-                        <arg>-Amapstruct.suppressGeneratorTimestamp=true</arg>
-                    </compilerArgs>
                 </configuration>
             </plugin>
             <plugin>
@@ -392,17 +338,14 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                     <argLine>@{argLine} -Dorg.bouncycastle.fips.approved_only=true</argLine>
-                    <!-- Exclude integration and FIPS tests from unit test phase -->
                     <excludedGroups>integration,fips</excludedGroups>
                 </configuration>
             </plugin>
-            <!-- Failsafe for Integration Tests -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <configuration>
                     <argLine>-Dorg.bouncycastle.fips.approved_only=true</argLine>
-                    <!-- Only run integration tests -->
                     <groups>integration</groups>
                     <includes>
                         <include>**/*IntegrationTest.java</include>
@@ -418,21 +361,16 @@
                     </execution>
                 </executions>
             </plugin>
-            <!-- JaCoCo for Code Coverage (Open Source - Apache 2.0) -->
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.12</version>
                 <configuration>
                     <excludes>
-                        <!-- Exclude Spring Configuration classes - infrastructure concerns -->
                         <exclude>**/infrastructure/config/**</exclude>
-                        <!-- Exclude Security Configuration and Filters -->
                         <exclude>**/infrastructure/security/CorrelationIdFilter.class</exclude>
                         <exclude>**/infrastructure/security/SecurityConfig.class</exclude>
-                        <!-- Exclude Repository Adapter if tests are flaking/missing -->
                         <exclude>**/adapter/out/persistence/DynamoDbFileRepositoryAdapter.class</exclude>
-                        <!-- Exclude main Application class -->
                         <exclude>**/FsampGatewayApplication.class</exclude>
                     </excludes>
                 </configuration>
@@ -452,7 +390,6 @@
                     </execution>
                 </executions>
             </plugin>
-            <!-- CI-Friendly Versions Support -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>flatten-maven-plugin</artifactId>
@@ -478,7 +415,6 @@
                     </execution>
                 </executions>
             </plugin>
-            <!-- CycloneDX SBOM Generation (FedRAMP SC-7 / Supply Chain Security) -->
             <plugin>
                 <groupId>org.cyclonedx</groupId>
                 <artifactId>cyclonedx-maven-plugin</artifactId>
@@ -507,10 +443,7 @@
             </plugin>
         </plugins>
     </build>
-
-    <!-- Security Analysis Profiles -->
     <profiles>
-        <!-- OWASP Dependency-Check (CI: mvn verify -Psecurity) -->
         <profile>
             <id>security</id>
             <build>

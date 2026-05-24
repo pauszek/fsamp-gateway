@@ -9,13 +9,11 @@ spring:
       max-request-size: 100MB
       enabled: true
 
-# AWS Cognito Configuration
 cognito:
   region: ${COGNITO_REGION:us-west-2}
   user-pool-id: ${COGNITO_USER_POOL_ID:}
   client-id: ${COGNITO_CLIENT_ID:}
   client-secret: ${COGNITO_CLIENT_SECRET:}
-  # For LocalStack: override these with custom endpoints
   jwks-endpoint: ${COGNITO_JWKS_ENDPOINT:}
   issuer-uri: ${COGNITO_ISSUER_URI:}
 
@@ -62,7 +60,6 @@ logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{correlationId}] %-5level %logger{36} - %msg%n"
 
-# Resilience4j Configuration
 resilience4j:
   circuitbreaker:
     instances:
@@ -140,23 +137,13 @@ resilience4j:
       fileUpload:
         max-concurrent-calls: 25
         max-wait-duration: 0ms
-
-# =============================================================================
-# Security Configuration
-# =============================================================================
 security:
   fips:
-    # FIPS 140-3 approved-only mode (enforces NIST-validated algorithms)
     approved-only: ${FIPS_APPROVED_ONLY:true}
-    # Position of FIPS provider in security provider list (1 = highest priority)
     provider-position: 1
   cors:
-    # Comma-separated allowed origin patterns for CORS (FedRAMP AC-4).
-    # In local/dev: localhost origins are used automatically.
-    # In staging/prod: set this to the API Gateway / frontend domain.
     allowed-origins: ${SECURITY_CORS_ALLOWED_ORIGINS:}
 
-# OpenAPI / Swagger
 springdoc:
   api-docs:
     path: /v3/api-docs
@@ -169,7 +156,6 @@ springdoc:
     display-request-duration: true
   show-actuator: false
 
-# Storage configuration
 storage:
   s3:
     bucket: ${S3_BUCKET_NAME:fsamp-files-local}
@@ -177,25 +163,21 @@ storage:
     prefix: uploads/
     presigned-url-expiration: 3600
 
-# Event publishing configuration
 events:
   sns:
     topic-arn: ${SNS_TOPIC_ARN:arn:aws:sns:us-west-2:000000000000:fsamp-local-file-events}
     source: fsamp-gateway
 
 ---
-# Local profile (LocalStack)
 spring:
   config:
     activate:
       on-profile: local
 
-# LocalStack Cognito - uses env vars set by entrypoint
 cognito:
   region: ${AWS_REGION:us-west-2}
   user-pool-id: ${COGNITO_USER_POOL_ID:local_test_pool}
   client-id: ${COGNITO_CLIENT_ID:local_test_client}
-  # Entrypoint sets these dynamically based on discovered Cognito
   jwks-endpoint: ${COGNITO_JWKS_ENDPOINT:http://localstack:4566/.well-known/jwks.json}
   issuer-uri: ${COGNITO_ISSUER_URI:http://localstack:4566}
 
@@ -233,7 +215,6 @@ fsamp:
     temp-dir: /tmp/fsamp-uploads
 
 ---
-# Development profile (AWS)
 spring:
   config:
     activate:
@@ -246,18 +227,18 @@ cognito:
 
 aws:
   region: ${AWS_REGION:us-west-2}
-  fips-endpoints: true
+  fips-endpoints: ${AWS_USE_FIPS_ENDPOINT:true}
   s3:
-    bucket-name: fsamp-dev-files
+    bucket-name: ${S3_BUCKET_NAME:fsamp-dev-files}
   sns:
     file-events-topic-arn: ${SNS_FILE_EVENTS_TOPIC_ARN}
   kms:
     key-id: ${KMS_KEY_ID}
   dynamodb:
-    table-name: fsamp-dev-file-metadata
+    table-name: ${DYNAMODB_TABLE_NAME:fsamp-dev-file-metadata}
     outbox-table-name: ${OUTBOX_TABLE_NAME:fsamp-dev-outbox}
     direct-publish-after-outbox: ${DIRECT_PUBLISH_AFTER_OUTBOX:false}
-    idempotency-table-name: fsamp-dev-idempotency-keys
+    idempotency-table-name: ${DYNAMODB_IDEMPOTENCY_TABLE_NAME:fsamp-dev-idempotency-keys}
 
 fsamp:
   security:
@@ -280,7 +261,6 @@ management:
         step: 1m
 
 ---
-# Staging profile (AWS)
 spring:
   config:
     activate:
@@ -293,18 +273,18 @@ cognito:
 
 aws:
   region: ${AWS_REGION:us-west-2}
-  fips-endpoints: true
+  fips-endpoints: ${AWS_USE_FIPS_ENDPOINT:true}
   s3:
-    bucket-name: fsamp-staging-files
+    bucket-name: ${S3_BUCKET_NAME:fsamp-staging-files}
   sns:
     file-events-topic-arn: ${SNS_FILE_EVENTS_TOPIC_ARN}
   kms:
     key-id: ${KMS_KEY_ID}
   dynamodb:
-    table-name: fsamp-staging-file-metadata
+    table-name: ${DYNAMODB_TABLE_NAME:fsamp-staging-file-metadata}
     outbox-table-name: ${OUTBOX_TABLE_NAME:fsamp-staging-outbox}
     direct-publish-after-outbox: ${DIRECT_PUBLISH_AFTER_OUTBOX:false}
-    idempotency-table-name: fsamp-staging-idempotency-keys
+    idempotency-table-name: ${DYNAMODB_IDEMPOTENCY_TABLE_NAME:fsamp-staging-idempotency-keys}
 
 security:
   cors:
@@ -331,7 +311,6 @@ management:
         step: 1m
 
 ---
-# Production profile
 spring:
   config:
     activate:
@@ -344,24 +323,23 @@ cognito:
 
 aws:
   region: ${AWS_REGION:us-west-2}
-  fips-endpoints: true
+  fips-endpoints: ${AWS_USE_FIPS_ENDPOINT:true}
   s3:
-    bucket-name: fsamp-prod-files
+    bucket-name: ${S3_BUCKET_NAME:fsamp-prod-files}
   sns:
     file-events-topic-arn: ${SNS_FILE_EVENTS_TOPIC_ARN}
   kms:
     key-id: ${KMS_KEY_ID}
   dynamodb:
-    table-name: fsamp-prod-file-metadata
+    table-name: ${DYNAMODB_TABLE_NAME:fsamp-prod-file-metadata}
     outbox-table-name: ${OUTBOX_TABLE_NAME:fsamp-prod-outbox}
     direct-publish-after-outbox: ${DIRECT_PUBLISH_AFTER_OUTBOX:false}
-    idempotency-table-name: fsamp-prod-idempotency-keys
+    idempotency-table-name: ${DYNAMODB_IDEMPOTENCY_TABLE_NAME:fsamp-prod-idempotency-keys}
 
 security:
   cors:
     allowed-origins: ${SECURITY_CORS_ALLOWED_ORIGINS:https://*.execute-api.us-west-2.amazonaws.com}
 
-# FedRAMP SI-11: Do not expose error details in production
 server:
   error:
     include-message: never

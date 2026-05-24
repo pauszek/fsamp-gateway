@@ -1,6 +1,6 @@
 # FSAMP Gateway
 
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4-green?logo=springboot)](https://spring.io/projects/spring-boot)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5-green?logo=springboot)](https://spring.io/projects/spring-boot)
 [![Java](https://img.shields.io/badge/Java-21-orange?logo=openjdk)](https://openjdk.org/)
 [![FIPS 140-3](https://img.shields.io/badge/FIPS-140--3-blue)](https://csrc.nist.gov/publications/detail/fips/140/3/final)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -9,25 +9,21 @@
 
 **FSAMP Gateway** is the secure ingress point for the FedRAMP Moderate-aligned Secure AWS Microservices Platform. It handles file uploads with AWS KMS-backed encryption, content validation, and event-driven architecture for downstream processing.
 
-📚 **[Full Architecture Documentation](docs/ARCHITECTURE.md)**
+**[Full Architecture Documentation](docs/ARCHITECTURE.md)**
 
----
-
-## ✨ Key Features
+## Key Features
 
 | Feature | Description |
 |---------|-------------|
-| 🔐 **FIPS 140-3-oriented security** | BouncyCastle FIPS provider with NIST-validated algorithms |
-| 🛡️ **KMS Encryption** | Server-side AES-256-GCM encryption via AWS KMS |
-| 🔍 **Content Validation** | Apache Tika-based MIME detection (anti-spoofing) |
-| ⚡ **Resilience Patterns** | Circuit breaker, retry, rate limiting (Resilience4j) |
-| 🎫 **Idempotency** | DynamoDB-backed duplicate prevention |
-| 🔑 **OAuth2 Security** | AWS Cognito JWT validation |
-| 📊 **Observability** | Metrics, structured logging, distributed tracing |
+| **FIPS 140-3-oriented security** | ACCP and BC-FIPS providers with approved algorithm policy |
+| **KMS Encryption** | Server-side AES-256-GCM encryption via AWS KMS |
+| **Content Validation** | Apache Tika-based MIME detection (anti-spoofing) |
+| **Resilience Patterns** | Circuit breaker, retry, rate limiting (Resilience4j) |
+| **Idempotency** | DynamoDB-backed duplicate prevention |
+| **OAuth2 Security** | AWS Cognito JWT validation |
+| **Observability** | Metrics, structured logging, distributed tracing |
 
----
-
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -39,13 +35,8 @@
 ### Run Locally
 
 ```bash
-# 1. Start LocalStack (from fsamp-infra)
 cd ../fsamp-infra && make up && make apply-local
-
-# 2. Run the gateway
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
-
-# 3. Access Swagger UI
 open http://localhost:8080/swagger-ui.html
 ```
 
@@ -62,9 +53,7 @@ open http://localhost:8080/swagger-ui.html
 docker build -t fsamp-gateway .
 ```
 
----
-
-## 📡 API Reference
+## API Reference
 
 ### Upload File
 
@@ -100,9 +89,7 @@ curl -X POST http://localhost:8080/api/v1/files/upload \
 | `GET` | `/actuator/health` | Health check |
 | `GET` | `/swagger-ui.html` | API documentation |
 
----
-
-## 🏗️ Architecture
+## Architecture
 
 The gateway follows **Hexagonal Architecture** (Ports & Adapters):
 
@@ -135,11 +122,9 @@ src/main/java/io/github/pauszek/fsampgateway/
 └── infrastructure/    # Spring configs, security, observability
 ```
 
-📚 **[Detailed Architecture Docs](docs/ARCHITECTURE.md)**
+**[Detailed Architecture Docs](docs/ARCHITECTURE.md)**
 
----
-
-## ⚙️ Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -163,7 +148,7 @@ src/main/java/io/github/pauszek/fsampgateway/
 
 ---
 
-## 🧪 Testing
+## Testing
 
 ```bash
 # Unit tests
@@ -177,9 +162,7 @@ src/main/java/io/github/pauszek/fsampgateway/
 open target/site/jacoco/index.html
 ```
 
----
-
-## 🐳 Docker
+## Docker
 
 ```bash
 # Build
@@ -192,22 +175,18 @@ docker run -p 8080:8080 \
   fsamp-gateway
 ```
 
----
-
-## 📖 Documentation
+## Documentation
 
 - **[Architecture Guide](docs/ARCHITECTURE.md)** - Deep dive into system design
 - **[API Docs](http://localhost:8080/swagger-ui.html)** - OpenAPI/Swagger (when running)
 - **[Event Schema](schema/event.schema.json)** - JSON Schema for domain events
 
----
-
-## 🔒 Security
+## Security
 
 ### Enterprise Controls (FedRAMP-aligned)
 
-- **FedRAMP Moderate aligned** baseline (not FedRAMP authorized).
-- **FIPS 140-3 cryptography** via ACCP + BC-FIPS and AWS KMS for data protection.
+- **FedRAMP Moderate-aligned** baseline (not FedRAMP authorized).
+- **FIPS 140-3-oriented cryptography** via ACCP + BC-FIPS and AWS KMS for data protection.
 - **Audit & monitoring** with structured logging, CloudWatch metrics/alarms, and platform-level CloudTrail.
 - **Edge + app security** using WAF, rate limiting, OAuth2/JWT validation, and least-privilege IAM.
 - **Network hardening** via private subnets and VPC endpoints for AWS service access.
@@ -220,11 +199,11 @@ Please report security vulnerabilities to [security@fsamp.io](mailto:security@fs
 
 - FIPS 140-3 (cryptography)
 - OWASP Top 10 (secure coding)
-- SOC 2 ready (audit logging)
+- SOC 2-oriented (audit logging)
 
 ---
 
-## 🔗 Related Repositories
+## Related Repositories
 
 | Repository | Description |
 |---|---|
@@ -237,8 +216,8 @@ Please report security vulnerabilities to [security@fsamp.io](mailto:security@fs
 
 | Document | Path |
 |---|---|
-| FedRAMP-aligned SSP | `docs/compliance/FEDRAMP_SSP.md` |
-| NIST 800-53 Control Matrix | `docs/compliance/NIST_800_53_CONTROLS.md` |
-| Security Audit Report | `docs/compliance/SECURITY_AUDIT_REPORT.md` |
-| TLS Architecture | `docs/TLS_ARCHITECTURE.md` |
-| Architecture Decision Records | `docs/adr/` |
+| FedRAMP-aligned SSP | `fsamp-infra/docs/compliance/FEDRAMP_SSP.md` |
+| NIST 800-53 Control Matrix | `fsamp-infra/docs/compliance/NIST_800_53_CONTROLS.md` |
+| Security Review Notes | `fsamp-infra/docs/compliance/SECURITY_AUDIT_REPORT.md` |
+| TLS Architecture | `fsamp-infra/docs/TLS_ARCHITECTURE.md` |
+| Architecture Decision Records | `fsamp-infra/docs/adr/` |
