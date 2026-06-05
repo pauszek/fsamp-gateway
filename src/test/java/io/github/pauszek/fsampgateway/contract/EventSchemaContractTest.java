@@ -64,7 +64,7 @@ class EventSchemaContractTest {
     class FileUploadedEventContract {
 
         @Test
-        @DisplayName("should produce valid JSON according to schema v1.1.0")
+        @DisplayName("should produce valid JSON according to schema v1.1.1")
         void shouldProduceValidJson() throws Exception {
             FileUploadedEvent event = createSampleEvent();
 
@@ -78,7 +78,7 @@ class EventSchemaContractTest {
         }
 
         @Test
-        @DisplayName("should include all required fields per schema v1.1.0")
+        @DisplayName("should include all required fields per schema v1.1.1")
         void shouldIncludeAllRequiredFields() throws Exception {
             FileUploadedEvent event = createSampleEvent();
 
@@ -98,14 +98,14 @@ class EventSchemaContractTest {
         }
 
         @Test
-        @DisplayName("should use schema version 1.1.0")
+        @DisplayName("should use schema version 1.1.1")
         void shouldUseSchemaVersion() throws Exception {
             FileUploadedEvent event = createSampleEvent();
 
             String json = OBJECT_MAPPER.writeValueAsString(event);
             JsonNode jsonNode = OBJECT_MAPPER.readTree(json);
 
-            assertThat(jsonNode.get("schemaVersion").asText()).isEqualTo("1.1.0");
+            assertThat(jsonNode.get("schemaVersion").asText()).isEqualTo("1.1.1");
         }
 
         @Test
@@ -275,7 +275,7 @@ class EventSchemaContractTest {
         void shouldRejectInvalidEventType() throws Exception {
             String invalidJson = """
                 {
-                    "schemaVersion": "1.1.0",
+                    "schemaVersion": "1.1.1",
                     "fileId": "550e8400-e29b-41d4-a716-446655440002",
                     "eventId": "550e8400-e29b-41d4-a716-446655440000",
                     "correlationId": "550e8400-e29b-41d4-a716-446655440001",
@@ -311,7 +311,7 @@ class EventSchemaContractTest {
         void shouldRejectMissingRequiredFields() throws Exception {
             String invalidJson = """
                 {
-                    "schemaVersion": "1.1.0",
+                    "schemaVersion": "1.1.1",
                     "fileId": "550e8400-e29b-41d4-a716-446655440002",
                     "eventId": "550e8400-e29b-41d4-a716-446655440000",
                     "correlationId": "550e8400-e29b-41d4-a716-446655440001",
@@ -359,7 +359,7 @@ class EventSchemaContractTest {
         void shouldRejectAesCbc() throws Exception {
             String invalidJson = """
                 {
-                    "schemaVersion": "1.1.0",
+                    "schemaVersion": "1.1.1",
                     "fileId": "550e8400-e29b-41d4-a716-446655440002",
                     "eventId": "550e8400-e29b-41d4-a716-446655440000",
                     "correlationId": "550e8400-e29b-41d4-a716-446655440001",
@@ -395,7 +395,7 @@ class EventSchemaContractTest {
         void shouldRejectUnencryptedFiles() throws Exception {
             String invalidJson = """
                 {
-                    "schemaVersion": "1.1.0",
+                    "schemaVersion": "1.1.1",
                     "fileId": "550e8400-e29b-41d4-a716-446655440002",
                     "eventId": "550e8400-e29b-41d4-a716-446655440000",
                     "correlationId": "550e8400-e29b-41d4-a716-446655440001",
@@ -431,7 +431,7 @@ class EventSchemaContractTest {
         void shouldRejectOversizedFiles() throws Exception {
             String invalidJson = """
                 {
-                    "schemaVersion": "1.1.0",
+                    "schemaVersion": "1.1.1",
                     "fileId": "550e8400-e29b-41d4-a716-446655440002",
                     "eventId": "550e8400-e29b-41d4-a716-446655440000",
                     "correlationId": "550e8400-e29b-41d4-a716-446655440001",

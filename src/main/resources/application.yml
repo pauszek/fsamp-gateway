@@ -99,14 +99,35 @@ resilience4j:
         max-attempts: 3
         wait-duration: 1s
         exponential-backoff-multiplier: 2
+        # FedRAMP SI-4: retrying on every Throwable masks programming
+        # errors (NullPointerException, IllegalArgumentException, etc.)
+        # behind transient-looking failures. Restrict retries to AWS SDK
+        # service exceptions and IO errors and fail fast on the rest.
+        retry-exceptions:
+          - software.amazon.awssdk.services.s3.model.S3Exception
+          - java.io.IOException
+        ignore-exceptions:
+          - java.lang.IllegalArgumentException
+          - io.github.pauszek.fsampgateway.domain.exception.FileValidationException
       snsPublisher:
         max-attempts: 5
         wait-duration: 200ms
         exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - software.amazon.awssdk.services.sns.model.SnsException
+          - java.io.IOException
+        ignore-exceptions:
+          - java.lang.IllegalArgumentException
       dynamoDb:
         max-attempts: 3
         wait-duration: 500ms
         exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - software.amazon.awssdk.services.dynamodb.model.DynamoDbException
+          - java.io.IOException
+        ignore-exceptions:
+          - software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException
+          - java.lang.IllegalArgumentException
   ratelimiter:
     instances:
       fileUpload:

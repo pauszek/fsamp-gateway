@@ -40,6 +40,37 @@ class SecurityArchitectureTest {
                     .check(classes);
         }
 
+        @Test
+        @DisplayName("No legacy hash algorithms (MD5, SHA-1) should be referenced")
+        void noLegacyHashAlgorithms() {
+            // Detects the easy footguns where someone calls
+            // MessageDigest.getInstance("MD5") or "SHA-1" by string literal.
+            // ArchUnit cannot inspect the argument value, so we approximate
+            // by forbidding direct use of the unqualified MessageDigest
+            // class outside the dedicated FIPS configuration. This keeps
+            // hashing centralised on the configured FIPS provider.
+            noClasses()
+                    .that().resideInAnyPackage(BASE_PACKAGE + "..")
+                    .and().doNotHaveSimpleName("FipsCryptoConfig")
+                    .and().doNotHaveSimpleName("Checksum")
+                    .and().doNotHaveSimpleName("TikaContentValidatorAdapter")
+                    .should().dependOnClassesThat()
+                    .haveFullyQualifiedName("java.security.MessageDigest")
+                    .because("MessageDigest must only be used through the FIPS-approved provider configured at startup; legacy algorithms (MD5, SHA-1) violate FedRAMP SC-13")
+                    .check(classes);
+        }
+
+        @Test
+        @DisplayName("Random sources must be derived from FIPS provider")
+        void onlyFipsApprovedRandomSources() {
+            noClasses()
+                    .that().resideInAnyPackage(BASE_PACKAGE + "..")
+                    .and().doNotHaveSimpleName("FipsCryptoConfig")
+                    .should().callMethod(java.security.SecureRandom.class, "getInstance", String.class)
+                    .because("SecureRandom.getInstance(\"SHA1PRNG\") and similar named instances bypass the FIPS provider; use the no-arg SecureRandom which delegates to the registered FIPS provider")
+                    .check(classes);
+        }
+
     }
 
     @Nested

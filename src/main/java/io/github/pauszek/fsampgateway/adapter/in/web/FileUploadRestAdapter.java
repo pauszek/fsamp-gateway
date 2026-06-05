@@ -6,6 +6,7 @@ import io.github.pauszek.fsampgateway.application.dto.FileUploadResponseDto;
 import io.github.pauszek.fsampgateway.application.mapper.FileMapper;
 import io.github.pauszek.fsampgateway.domain.command.UploadFileCommand;
 import io.github.pauszek.fsampgateway.domain.model.FileId;
+import io.github.pauszek.fsampgateway.domain.model.FileName;
 import io.github.pauszek.fsampgateway.domain.model.SecureFile;
 import io.github.pauszek.fsampgateway.domain.model.UserPrincipal;
 import io.github.pauszek.fsampgateway.domain.port.in.DeleteFileUseCase;
@@ -137,9 +138,12 @@ public class FileUploadRestAdapter {
     ) throws IOException {
         UserPrincipal currentUser = currentUserService.getCurrentUser()
                 .orElseThrow(() -> new IllegalStateException("User not found in security context"));
-        
+
         log.info("Received upload request: filename={}, size={}, contentType={}, userId={}",
-                file.getOriginalFilename(), file.getSize(), file.getContentType(), currentUser.userId());
+                FileName.redactedForLogs(file.getOriginalFilename()),
+                file.getSize(),
+                file.getContentType(),
+                currentUser.userId());
 
         UploadFileCommand command = UploadFileCommand.builder()
                 .fileName(file.getOriginalFilename())
@@ -271,4 +275,5 @@ public class FileUploadRestAdapter {
         log.info("File deleted successfully: fileId={}, userId={}", fileId, userId);
         return ResponseEntity.noContent().build();
     }
+
 }

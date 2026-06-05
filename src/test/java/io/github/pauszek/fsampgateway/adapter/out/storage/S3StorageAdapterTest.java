@@ -74,7 +74,7 @@ class S3StorageAdapterTest {
         }
 
         @Test
-        @DisplayName("should include metadata in request")
+        @DisplayName("should include privacy-safe metadata in request")
         void shouldIncludeMetadataInRequest() {
             FileId fileId = FileId.generate();
             InputStream content = new ByteArrayInputStream(TEST_CONTENT);
@@ -91,7 +91,7 @@ class S3StorageAdapterTest {
             var s3Metadata = requestCaptor.getValue().metadata();
 
             assertThat(s3Metadata).containsEntry("correlation-id", "a1b2c3d4e5f67890a1b2c3d4e5f67890");
-            assertThat(s3Metadata).containsEntry("original-filename", "test-file.pdf");
+            assertThat(s3Metadata).containsEntry("original-filename", "<redacted len=13 ext=.pdf>");
             assertThat(s3Metadata).containsEntry("checksum-sha256", "sha256hash");
         }
 
@@ -112,7 +112,7 @@ class S3StorageAdapterTest {
             then(s3Client).should().putObject(requestCaptor.capture(), any(RequestBody.class));
             String key = requestCaptor.getValue().key();
 
-            LocalDate today = LocalDate.now();
+            LocalDate today = LocalDate.now(java.time.ZoneOffset.UTC);
             String expectedPrefix = String.format("uploads/%d/%02d/%02d/",
                     today.getYear(), today.getMonthValue(), today.getDayOfMonth());
             assertThat(key).startsWith(expectedPrefix);
@@ -156,8 +156,8 @@ class S3StorageAdapterTest {
         }
 
         @Test
-        @DisplayName("should sanitize non-ASCII metadata values")
-        void shouldSanitizeNonAsciiMetadataValues() {
+        @DisplayName("should not store raw non-ASCII filename in metadata")
+        void shouldNotStoreRawNonAsciiFilenameInMetadata() {
             FileId fileId = FileId.generate();
             InputStream content = new ByteArrayInputStream(TEST_CONTENT);
             FileSize size = FileSize.of(TEST_CONTENT.length);
@@ -172,7 +172,7 @@ class S3StorageAdapterTest {
             then(s3Client).should().putObject(requestCaptor.capture(), any(RequestBody.class));
             String originalFilename = requestCaptor.getValue().metadata().get("original-filename");
             assertThat(originalFilename).doesNotContain("ż", "ó", "ł", "ć");
-            assertThat(originalFilename).contains("plik-", ".pdf");
+            assertThat(originalFilename).isEqualTo("<redacted len=13 ext=.pdf>");
         }
 
         @Test
@@ -191,7 +191,26 @@ class S3StorageAdapterTest {
 
             then(s3Client).should().putObject(requestCaptor.capture(), any(RequestBody.class));
             String originalFilename = requestCaptor.getValue().metadata().get("original-filename");
-            assertThat(originalFilename).isEqualTo("");
+            assertThat(originalFilename).isEqualTo("<unknown>");
+        }
+
+        @Test
+        @DisplayName("should fail fast when no KMS key is configured")
+        void shouldFailFastWhenNoKmsKeyConfigured() {
+            S3StorageProperties noKeyProps = new S3StorageProperties();
+            noKeyProps.setBucketName(BUCKET_NAME);
+
+            S3StorageAdapter adapterWithoutKey = new S3StorageAdapter(s3Client, noKeyProps);
+
+            FileId fileId = FileId.generate();
+            InputStream content = new ByteArrayInputStream(TEST_CONTENT);
+            FileSize size = FileSize.of(TEST_CONTENT.length);
+            MimeType mimeType = MimeType.of("application/pdf");
+            StorageMetadata metadata = StorageMetadata.of("a1b2c3d4e5f67890a1b2c3d4e5f67890", "test.pdf", null);
+
+            assertThatThrownBy(() -> adapterWithoutKey.store(fileId, content, size, mimeType, metadata))
+                    .isInstanceOf(StorageException.class)
+                    .hasMessageContaining("KMS key id is required");
         }
 
         @Test

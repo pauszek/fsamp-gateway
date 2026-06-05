@@ -127,6 +127,15 @@ class ValueObjectsTest {
             FileName fileName = FileName.of("test.pdf");
             assertThat(fileName.toString()).isEqualTo("test.pdf");
         }
+
+        @Test
+        @DisplayName("should provide privacy-safe filename for logs")
+        void shouldProvidePrivacySafeFilenameForLogs() {
+            FileName fileName = FileName.of("Jane_Doe_tax_return.pdf");
+
+            assertThat(fileName.redactedForLogs()).isEqualTo("<redacted len=23 ext=.pdf>");
+            assertThat(FileName.redactedForLogs(null)).isEqualTo("<unknown>");
+        }
     }
 
     @Nested
@@ -921,4 +930,3 @@ class ValueObjectsTest {
         }
     }
 }
-

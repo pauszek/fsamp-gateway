@@ -19,7 +19,7 @@ public record FileUploadedEvent(
         SecurityPayload securityContext
 ) implements DomainEvent {
 
-    public static final String SCHEMA_VERSION = "1.1.0";
+    public static final String SCHEMA_VERSION = "1.1.1";
     public static final String EVENT_TYPE = "FILE_UPLOADED";
     public static final String SOURCE = "fsamp-gateway";
 

@@ -52,6 +52,22 @@ public record FileName(String value) {
         return value;
     }
 
+    public String redactedForLogs() {
+        return redactedForLogs(value);
+    }
+
+    public static String redactedForLogs(String original) {
+        if (original == null || original.isBlank()) {
+            return "<unknown>";
+        }
+
+        int dot = original.lastIndexOf('.');
+        String extension = (dot > 0 && dot < original.length() - 1)
+                ? original.substring(dot)
+                : "";
+        return "<redacted len=" + original.length() + " ext=" + extension + ">";
+    }
+
     @Override
     public String toString() {
         return value;
