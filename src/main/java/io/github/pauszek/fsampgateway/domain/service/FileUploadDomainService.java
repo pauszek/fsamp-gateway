@@ -72,7 +72,7 @@ public class FileUploadDomainService implements UploadFileUseCase {
         try {
             if (log.isInfoEnabled()) {
                 log.info("Starting file upload: fileName={}, size={}, correlationId={}",
-                        FileName.redactedForLogs(command.getFileName()), command.getSize(), correlationId);
+                        FileName.safeForLogs(command.getFileName()), command.getSize(), correlationId);
             }
             tempFile = bufferToTempFile(command);
             FileName fileName = FileName.of(command.getFileName());

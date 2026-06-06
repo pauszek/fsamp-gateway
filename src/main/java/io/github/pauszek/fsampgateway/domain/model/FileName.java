@@ -1,6 +1,5 @@
 package io.github.pauszek.fsampgateway.domain.model;
 
-import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
@@ -9,7 +8,7 @@ public record FileName(String value) {
     private static final int MAX_LENGTH = 255;
     private static final Pattern INVALID_CHARS = Pattern.compile("[\\\\/:*?\"<>|\\x00-\\x1F]");
     private static final Pattern PATH_TRAVERSAL = Pattern.compile("\\.\\.[\\\\/]");
-    private static final Pattern SAFE_LOG_EXTENSION = Pattern.compile("\\.[A-Za-z0-9]{1,16}");
+    private static final Pattern UNSAFE_LOG_CHARS = Pattern.compile("[\\r\\n\\t\\x00-\\x1F\\x7F]");
 
     public FileName {
         Objects.requireNonNull(value, "File name cannot be null");
@@ -54,27 +53,16 @@ public record FileName(String value) {
         return value;
     }
 
-    public String redactedForLogs() {
-        return redactedForLogs(value);
+    public String safeForLogs() {
+        return safeForLogs(value);
     }
 
-    public static String redactedForLogs(String original) {
+    public static String safeForLogs(String original) {
         if (original == null || original.isBlank()) {
             return "<unknown>";
         }
 
-        int dot = original.lastIndexOf('.');
-        String extension = (dot > 0 && dot < original.length() - 1)
-                ? sanitizeExtensionForLogs(original.substring(dot))
-                : "";
-        return "<redacted len=" + original.length() + " ext=" + extension + ">";
-    }
-
-    private static String sanitizeExtensionForLogs(String extension) {
-        if (SAFE_LOG_EXTENSION.matcher(extension).matches()) {
-            return extension.toLowerCase(Locale.ROOT);
-        }
-        return "";
+        return UNSAFE_LOG_CHARS.matcher(original.trim()).replaceAll("_");
     }
 
     @Override
