@@ -22,6 +22,7 @@ docker:
   enabled: true
   image-name: fsamp-gateway
   registry: ghcr.io
+  platforms: linux/amd64
 
 sonar:
   enabled: true
