@@ -26,6 +26,7 @@ class EventSchemaContractTest {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+    private static final Instant EVENT_TIMESTAMP = Instant.parse("2026-01-15T10:00:00Z");
 
     private static JsonSchema schema;
     private static boolean schemaAvailable = false;
@@ -139,7 +140,7 @@ class EventSchemaContractTest {
                     UUID.randomUUID(),
                     UUID.randomUUID(),
                     UUID.randomUUID(),
-                    Instant.now(),
+                    EVENT_TIMESTAMP,
                     FileUploadedEvent.SOURCE,
                     eventType,
                     FilePayload.of("test.pdf", 1024L, "application/pdf", 
@@ -194,7 +195,7 @@ class EventSchemaContractTest {
                     UUID.randomUUID(),
                     UUID.randomUUID(),
                     UUID.randomUUID(),
-                    Instant.now(),
+                    EVENT_TIMESTAMP,
                     FileUploadedEvent.SOURCE,
                     FileUploadedEvent.EVENT_TYPE,
                     FilePayload.of("large.pdf", 104857600L, "application/pdf",
@@ -469,7 +470,7 @@ class EventSchemaContractTest {
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 UUID.randomUUID(),
-                Instant.now(),
+                EVENT_TIMESTAMP,
                 FileUploadedEvent.SOURCE,
                 FileUploadedEvent.EVENT_TYPE,
                 FilePayload.of(

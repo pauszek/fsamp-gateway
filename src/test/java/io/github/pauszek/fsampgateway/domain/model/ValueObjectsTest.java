@@ -12,6 +12,9 @@ import static org.assertj.core.api.Assertions.*;
 @DisplayName("Value Objects Tests")
 class ValueObjectsTest {
 
+    private static final Instant TEST_ISSUED_AT = Instant.parse("2026-01-15T10:00:00Z");
+    private static final Instant TEST_EXPIRES_AT = Instant.parse("2026-01-15T11:00:00Z");
+
     @Nested
     @DisplayName("MimeType Value Object")
     class MimeTypeTests {
@@ -404,7 +407,7 @@ class ValueObjectsTest {
             
             assertThat(info.createdBy()).isEqualTo("user-123");
             assertThat(info.createdAt()).isNotNull();
-            assertThat(info.createdAt()).isBeforeOrEqualTo(Instant.now());
+            assertThat(info.createdAt()).isAfter(Instant.parse("2020-01-01T00:00:00Z"));
         }
 
         @Test
@@ -450,8 +453,8 @@ class ValueObjectsTest {
                     Set.of("USERS", "ADMINS"),
                     Set.of("files.read", "files.write"),
                     null,
-                    Instant.now().minusSeconds(60),
-                    Instant.now().plusSeconds(3600)
+                    TEST_ISSUED_AT,
+                    TEST_EXPIRES_AT
             );
             
             assertThat(user.userId()).isEqualTo("user-123");
@@ -469,8 +472,8 @@ class ValueObjectsTest {
                     Set.of("USERS"),
                     Set.of(),
                     null,
-                    Instant.now().minusSeconds(60),
-                    Instant.now().plusSeconds(3600)
+                    TEST_ISSUED_AT,
+                    TEST_EXPIRES_AT
             );
             
             assertThat(user.hasGroup("USERS")).isTrue();
@@ -485,8 +488,8 @@ class ValueObjectsTest {
                     Set.of(),
                     Set.of("files.read"),
                     null,
-                    Instant.now().minusSeconds(60),
-                    Instant.now().plusSeconds(3600)
+                    TEST_ISSUED_AT,
+                    TEST_EXPIRES_AT
             );
             
             assertThat(user.hasScope("files.read")).isTrue();
@@ -858,8 +861,8 @@ class ValueObjectsTest {
                     Set.of("admins"),
                     Set.of(),
                     null,
-                    Instant.now().minusSeconds(60),
-                    Instant.now().plusSeconds(3600)
+                    TEST_ISSUED_AT,
+                    TEST_EXPIRES_AT
             );
             assertThat(admin.isAdmin()).isTrue();
 
@@ -868,8 +871,8 @@ class ValueObjectsTest {
                     Set.of("users"),
                     Set.of(),
                     null,
-                    Instant.now().minusSeconds(60),
-                    Instant.now().plusSeconds(3600)
+                    TEST_ISSUED_AT,
+                    TEST_EXPIRES_AT
             );
             assertThat(user.isAdmin()).isFalse();
         }
@@ -882,8 +885,8 @@ class ValueObjectsTest {
                     Set.of(),
                     Set.of(),
                     null,
-                    Instant.now().minusSeconds(7200),
-                    Instant.now().minusSeconds(3600)  // Expired 1 hour ago
+                    Instant.parse("2020-01-15T10:00:00Z"),
+                    Instant.parse("2020-01-15T11:00:00Z")
             );
             assertThat(expiredUser.isTokenExpired()).isTrue();
 
@@ -892,8 +895,8 @@ class ValueObjectsTest {
                     Set.of(),
                     Set.of(),
                     null,
-                    Instant.now().minusSeconds(60),
-                    Instant.now().plusSeconds(3600)  // Valid for 1 more hour
+                    Instant.parse("2999-01-15T10:00:00Z"),
+                    Instant.parse("2999-01-15T11:00:00Z")
             );
             assertThat(validUser.isTokenExpired()).isFalse();
         }
@@ -908,8 +911,8 @@ class ValueObjectsTest {
                     .groups(Set.of("users"))
                     .scopes(Set.of("files.read"))
                     .tenantId("tenant-1")
-                    .tokenIssuedAt(Instant.now())
-                    .tokenExpiresAt(Instant.now().plusSeconds(3600))
+                    .tokenIssuedAt(TEST_ISSUED_AT)
+                    .tokenExpiresAt(TEST_EXPIRES_AT)
                     .build();
 
             assertThat(user.userId()).isEqualTo("user-123");

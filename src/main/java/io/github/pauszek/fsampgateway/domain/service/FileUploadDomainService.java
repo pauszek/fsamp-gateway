@@ -70,8 +70,10 @@ public class FileUploadDomainService implements UploadFileUseCase {
 
         Path tempFile = null;
         try {
-            log.info("Starting file upload: fileName={}, size={}, correlationId={}",
-                    FileName.redactedForLogs(command.getFileName()), command.getSize(), correlationId);
+            if (log.isInfoEnabled()) {
+                log.info("Starting file upload: fileName={}, size={}, correlationId={}",
+                        FileName.redactedForLogs(command.getFileName()), command.getSize(), correlationId);
+            }
             tempFile = bufferToTempFile(command);
             FileName fileName = FileName.of(command.getFileName());
             MimeType declaredType = MimeType.of(command.getContentType());

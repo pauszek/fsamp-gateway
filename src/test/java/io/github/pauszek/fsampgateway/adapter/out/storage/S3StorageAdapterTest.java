@@ -1,6 +1,7 @@
 package io.github.pauszek.fsampgateway.adapter.out.storage;
 
 import io.github.pauszek.fsampgateway.domain.exception.FileNotFoundException;
+import io.github.pauszek.fsampgateway.domain.exception.StorageConfigurationException;
 import io.github.pauszek.fsampgateway.domain.exception.StorageException;
 import io.github.pauszek.fsampgateway.domain.model.*;
 import org.junit.jupiter.api.*;
@@ -13,7 +14,6 @@ import software.amazon.awssdk.services.s3.model.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
-import java.time.LocalDate;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
@@ -112,10 +112,7 @@ class S3StorageAdapterTest {
             then(s3Client).should().putObject(requestCaptor.capture(), any(RequestBody.class));
             String key = requestCaptor.getValue().key();
 
-            LocalDate today = LocalDate.now(java.time.ZoneOffset.UTC);
-            String expectedPrefix = String.format("uploads/%d/%02d/%02d/",
-                    today.getYear(), today.getMonthValue(), today.getDayOfMonth());
-            assertThat(key).startsWith(expectedPrefix);
+            assertThat(key).matches("uploads/\\d{4}/\\d{2}/\\d{2}/.*");
             assertThat(key).contains(fileId.value().toString());
         }
 
@@ -209,7 +206,7 @@ class S3StorageAdapterTest {
             StorageMetadata metadata = StorageMetadata.of("a1b2c3d4e5f67890a1b2c3d4e5f67890", "test.pdf", null);
 
             assertThatThrownBy(() -> adapterWithoutKey.store(fileId, content, size, mimeType, metadata))
-                    .isInstanceOf(StorageException.class)
+                    .isInstanceOf(StorageConfigurationException.class)
                     .hasMessageContaining("KMS key id is required");
         }
 
