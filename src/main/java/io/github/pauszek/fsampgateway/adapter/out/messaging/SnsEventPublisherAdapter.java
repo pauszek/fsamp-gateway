@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.pauszek.fsampgateway.domain.event.DomainEvent;
 import io.github.pauszek.fsampgateway.domain.event.FileUploadedEvent;
 import io.github.pauszek.fsampgateway.domain.exception.EventPublishException;
+import io.github.pauszek.fsampgateway.domain.exception.EventSerializationException;
 import io.github.pauszek.fsampgateway.domain.port.out.EventPublisherPort;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
@@ -76,7 +77,7 @@ public class SnsEventPublisherAdapter implements EventPublisherPort {
 
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize event: {}", e.getMessage(), e);
-            throw new EventPublishException("Failed to serialize event", e);
+            throw new EventSerializationException("Failed to serialize event", e);
         } catch (SnsException e) {
             log.error("Failed to publish event to SNS: {}", e.getMessage(), e);
             throw new EventPublishException("Failed to publish event to SNS", e);

@@ -350,7 +350,7 @@ Events follow a standardized JSON schema for interoperability:
 
 ```json
 {
-  "schemaVersion": "1.1.0",
+  "schemaVersion": "1.1.2",
   "fileId": "550e8400-e29b-41d4-a716-446655440000",
   "eventId": "123e4567-e89b-42d3-a456-426614174000",
   "correlationId": "123e4567-e89b-12d3-a456-426614174000",

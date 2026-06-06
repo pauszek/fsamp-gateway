@@ -1,5 +1,6 @@
 package io.github.pauszek.fsampgateway.domain.model;
 
+import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
@@ -8,6 +9,7 @@ public record FileName(String value) {
     private static final int MAX_LENGTH = 255;
     private static final Pattern INVALID_CHARS = Pattern.compile("[\\\\/:*?\"<>|\\x00-\\x1F]");
     private static final Pattern PATH_TRAVERSAL = Pattern.compile("\\.\\.[\\\\/]");
+    private static final Pattern SAFE_LOG_EXTENSION = Pattern.compile("\\.[A-Za-z0-9]{1,16}");
 
     public FileName {
         Objects.requireNonNull(value, "File name cannot be null");
@@ -63,9 +65,16 @@ public record FileName(String value) {
 
         int dot = original.lastIndexOf('.');
         String extension = (dot > 0 && dot < original.length() - 1)
-                ? original.substring(dot)
+                ? sanitizeExtensionForLogs(original.substring(dot))
                 : "";
         return "<redacted len=" + original.length() + " ext=" + extension + ">";
+    }
+
+    private static String sanitizeExtensionForLogs(String extension) {
+        if (SAFE_LOG_EXTENSION.matcher(extension).matches()) {
+            return extension.toLowerCase(Locale.ROOT);
+        }
+        return "";
     }
 
     @Override

@@ -136,6 +136,13 @@ class ValueObjectsTest {
             assertThat(fileName.redactedForLogs()).isEqualTo("<redacted len=23 ext=.pdf>");
             assertThat(FileName.redactedForLogs(null)).isEqualTo("<unknown>");
         }
+
+        @Test
+        @DisplayName("should sanitize unsafe extension when redacting raw filename")
+        void shouldSanitizeUnsafeExtensionWhenRedactingRawFilename() {
+            assertThat(FileName.redactedForLogs("invoice.\nINFO")).isEqualTo("<redacted len=13 ext=>");
+            assertThat(FileName.redactedForLogs("report.PDF")).isEqualTo("<redacted len=10 ext=.pdf>");
+        }
     }
 
     @Nested

@@ -446,6 +446,18 @@
     </build>
     <profiles>
         <profile>
+            <id>linux-aarch64</id>
+            <activation>
+                <os>
+                    <name>Linux</name>
+                    <arch>aarch64</arch>
+                </os>
+            </activation>
+            <properties>
+                <accp.fips.classifier>linux-aarch_64</accp.fips.classifier>
+            </properties>
+        </profile>
+        <profile>
             <id>security</id>
             <build>
                 <plugins>

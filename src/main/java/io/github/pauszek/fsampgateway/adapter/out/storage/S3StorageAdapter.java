@@ -1,5 +1,6 @@
 package io.github.pauszek.fsampgateway.adapter.out.storage;
 
+import io.github.pauszek.fsampgateway.domain.exception.StorageConfigurationException;
 import io.github.pauszek.fsampgateway.domain.exception.StorageException;
 import io.github.pauszek.fsampgateway.domain.model.*;
 import io.github.pauszek.fsampgateway.domain.port.out.FileStoragePort;
@@ -45,7 +46,7 @@ public class S3StorageAdapter implements FileStoragePort {
             log.debug("Using fallback KMS Key ID: {}", keyId);
         }
         if (keyId == null || keyId.isBlank()) {
-            throw new StorageException("KMS key id is required for S3 SSE-KMS encryption");
+            throw new StorageConfigurationException("KMS key id is required for S3 SSE-KMS encryption");
         }
         return keyId;
     }
