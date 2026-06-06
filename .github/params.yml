@@ -22,6 +22,8 @@ docker:
   enabled: true
   image-name: fsamp-gateway
   registry: ghcr.io
+  platforms: linux/arm64
+  runner: ubuntu-24.04-arm
 
 sonar:
   enabled: true
