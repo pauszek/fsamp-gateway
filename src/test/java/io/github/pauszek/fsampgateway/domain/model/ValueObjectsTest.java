@@ -132,19 +132,19 @@ class ValueObjectsTest {
         }
 
         @Test
-        @DisplayName("should provide privacy-safe filename for logs")
-        void shouldProvidePrivacySafeFilenameForLogs() {
+        @DisplayName("should provide log-safe filename")
+        void shouldProvideLogSafeFilename() {
             FileName fileName = FileName.of("Jane_Doe_tax_return.pdf");
 
-            assertThat(fileName.redactedForLogs()).isEqualTo("<redacted len=23 ext=.pdf>");
-            assertThat(FileName.redactedForLogs(null)).isEqualTo("<unknown>");
+            assertThat(fileName.safeForLogs()).isEqualTo("Jane_Doe_tax_return.pdf");
+            assertThat(FileName.safeForLogs(null)).isEqualTo("<unknown>");
         }
 
         @Test
-        @DisplayName("should sanitize unsafe extension when redacting raw filename")
-        void shouldSanitizeUnsafeExtensionWhenRedactingRawFilename() {
-            assertThat(FileName.redactedForLogs("invoice.\nINFO")).isEqualTo("<redacted len=13 ext=>");
-            assertThat(FileName.redactedForLogs("report.PDF")).isEqualTo("<redacted len=10 ext=.pdf>");
+        @DisplayName("should sanitize unsafe raw filename for logs")
+        void shouldSanitizeUnsafeRawFilenameForLogs() {
+            assertThat(FileName.safeForLogs("invoice.\nINFO")).isEqualTo("invoice._INFO");
+            assertThat(FileName.safeForLogs("report.PDF")).isEqualTo("report.PDF");
         }
     }
 

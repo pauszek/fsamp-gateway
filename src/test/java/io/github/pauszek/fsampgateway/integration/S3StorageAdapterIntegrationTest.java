@@ -148,7 +148,7 @@ class S3StorageAdapterIntegrationTest extends BaseIntegrationTest {
             assertThat(headResponse.metadata()).containsEntry("correlation-id", correlationId);
             assertThat(headResponse.metadata()).containsEntry(
                     "original-filename",
-                    FileName.redactedForLogs(originalFilename));
+                    FileName.safeForLogs(originalFilename));
         }
     }
 

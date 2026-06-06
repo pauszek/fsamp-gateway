@@ -140,7 +140,7 @@ public class FileUploadRestAdapter {
                 .orElseThrow(() -> new IllegalStateException("User not found in security context"));
 
         log.info("Received upload request: filename={}, size={}, contentType={}, userId={}",
-                FileName.redactedForLogs(file.getOriginalFilename()),
+                FileName.safeForLogs(file.getOriginalFilename()),
                 file.getSize(),
                 file.getContentType(),
                 currentUser.userId());

@@ -62,10 +62,10 @@ public class TikaContentValidatorAdapter implements ContentValidatorPort {
     public MimeType detectMimeType(InputStream content, String fileName) {
         try {
             String detected = tika.detect(content, fileName);
-            log.debug("Detected MIME type: {} for file: {}", detected, FileName.redactedForLogs(fileName));
+            log.debug("Detected MIME type: {} for file: {}", detected, FileName.safeForLogs(fileName));
             return MimeType.of(detected);
         } catch (IOException e) {
-            log.warn("Failed to detect MIME type for {}: {}", FileName.redactedForLogs(fileName), e.getMessage());
+            log.warn("Failed to detect MIME type for {}: {}", FileName.safeForLogs(fileName), e.getMessage());
             return MimeType.of("application/octet-stream");
         }
     }
@@ -77,7 +77,7 @@ public class TikaContentValidatorAdapter implements ContentValidatorPort {
             MimeType detectedType = MimeType.of(detected);
 
             log.debug("Validating content: declared={}, detected={}, file={}", 
-                    declaredType, detectedType, FileName.redactedForLogs(fileName));
+                    declaredType, detectedType, FileName.safeForLogs(fileName));
 
             if (!detectedType.isAllowed()) {
                 return ValidationResult.invalid(detectedType, 
@@ -86,13 +86,13 @@ public class TikaContentValidatorAdapter implements ContentValidatorPort {
 
             if (declaredType != null && !declaredType.value().equals(detectedType.value())) {
                 log.warn("MIME type mismatch detected: declared={}, actual={}, file={}", 
-                        declaredType, detectedType, FileName.redactedForLogs(fileName));
+                        declaredType, detectedType, FileName.safeForLogs(fileName));
             }
 
             return ValidationResult.valid(detectedType);
 
         } catch (IOException e) {
-            log.error("Content validation failed for {}: {}", FileName.redactedForLogs(fileName), e.getMessage(), e);
+            log.error("Content validation failed for {}: {}", FileName.safeForLogs(fileName), e.getMessage(), e);
             return ValidationResult.invalid(declaredType, "Failed to validate content: " + e.getMessage());
         }
     }

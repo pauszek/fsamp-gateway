@@ -71,7 +71,7 @@ public class S3StorageAdapter implements FileStoragePort {
             Map<String, String> s3Metadata = new HashMap<>();
             s3Metadata.put("correlation-id", metadata.getCorrelationId());
             s3Metadata.put("original-filename", sanitizeMetadataValue(
-                    FileName.redactedForLogs(metadata.getOriginalFilename())));
+                    FileName.safeForLogs(metadata.getOriginalFilename())));
             if (metadata.getChecksum() != null) {
                 s3Metadata.put("checksum-sha256", metadata.getChecksum());
             }

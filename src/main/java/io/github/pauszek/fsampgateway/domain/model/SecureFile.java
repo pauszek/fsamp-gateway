@@ -170,7 +170,7 @@ public final class SecureFile {
     public String toString() {
         return "SecureFile{" +
                 "id=" + id +
-                ", fileName=" + fileName.redactedForLogs() +
+                ", fileName=" + fileName.safeForLogs() +
                 ", status=" + status +
                 '}';
     }

@@ -74,7 +74,7 @@ class S3StorageAdapterTest {
         }
 
         @Test
-        @DisplayName("should include privacy-safe metadata in request")
+        @DisplayName("should include original filename metadata in request")
         void shouldIncludeMetadataInRequest() {
             FileId fileId = FileId.generate();
             InputStream content = new ByteArrayInputStream(TEST_CONTENT);
@@ -91,7 +91,7 @@ class S3StorageAdapterTest {
             var s3Metadata = requestCaptor.getValue().metadata();
 
             assertThat(s3Metadata).containsEntry("correlation-id", "a1b2c3d4e5f67890a1b2c3d4e5f67890");
-            assertThat(s3Metadata).containsEntry("original-filename", "<redacted len=13 ext=.pdf>");
+            assertThat(s3Metadata).containsEntry("original-filename", "test-file.pdf");
             assertThat(s3Metadata).containsEntry("checksum-sha256", "sha256hash");
         }
 
@@ -153,8 +153,8 @@ class S3StorageAdapterTest {
         }
 
         @Test
-        @DisplayName("should not store raw non-ASCII filename in metadata")
-        void shouldNotStoreRawNonAsciiFilenameInMetadata() {
+        @DisplayName("should sanitize non-ASCII filename in metadata")
+        void shouldSanitizeNonAsciiFilenameInMetadata() {
             FileId fileId = FileId.generate();
             InputStream content = new ByteArrayInputStream(TEST_CONTENT);
             FileSize size = FileSize.of(TEST_CONTENT.length);
@@ -169,7 +169,7 @@ class S3StorageAdapterTest {
             then(s3Client).should().putObject(requestCaptor.capture(), any(RequestBody.class));
             String originalFilename = requestCaptor.getValue().metadata().get("original-filename");
             assertThat(originalFilename).doesNotContain("ż", "ó", "ł", "ć");
-            assertThat(originalFilename).isEqualTo("<redacted len=13 ext=.pdf>");
+            assertThat(originalFilename).isEqualTo("plik-____.pdf");
         }
 
         @Test
