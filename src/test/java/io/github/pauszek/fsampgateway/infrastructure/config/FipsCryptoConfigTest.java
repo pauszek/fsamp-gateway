@@ -147,8 +147,7 @@ class FipsCryptoConfigTest {
             assertThat(providerName)
                     .as("SHA-256 should use FIPS-validated provider")
                     .isIn(ACCP_PROVIDER_NAME,
-                          BouncyCastleFipsProvider.PROVIDER_NAME,
-                          "SUN"); // SUN is acceptable for MessageDigest
+                          BouncyCastleFipsProvider.PROVIDER_NAME);
         }
 
         @Test

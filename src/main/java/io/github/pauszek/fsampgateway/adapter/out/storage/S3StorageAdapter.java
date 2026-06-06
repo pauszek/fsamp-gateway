@@ -1,5 +1,6 @@
 package io.github.pauszek.fsampgateway.adapter.out.storage;
 
+import io.github.pauszek.fsampgateway.domain.exception.StorageConfigurationException;
 import io.github.pauszek.fsampgateway.domain.exception.StorageException;
 import io.github.pauszek.fsampgateway.domain.model.*;
 import io.github.pauszek.fsampgateway.domain.port.out.FileStoragePort;
@@ -15,6 +16,7 @@ import org.springframework.beans.factory.annotation.Value;
 
 import java.io.InputStream;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -43,6 +45,9 @@ public class S3StorageAdapter implements FileStoragePort {
             keyId = fallbackKmsKeyId;
             log.debug("Using fallback KMS Key ID: {}", keyId);
         }
+        if (keyId == null || keyId.isBlank()) {
+            throw new StorageConfigurationException("KMS key id is required for S3 SSE-KMS encryption");
+        }
         return keyId;
     }
 
@@ -58,13 +63,15 @@ public class S3StorageAdapter implements FileStoragePort {
     ) {
         String objectKey = generateObjectKey(fileId);
         String bucketName = properties.getBucketName();
+        String kmsKeyId = getKmsKeyId();
 
         log.info("Storing file: fileId={}, bucket={}, key={}", fileId, bucketName, objectKey);
 
         try {
             Map<String, String> s3Metadata = new HashMap<>();
             s3Metadata.put("correlation-id", metadata.getCorrelationId());
-            s3Metadata.put("original-filename", sanitizeMetadataValue(metadata.getOriginalFilename()));
+            s3Metadata.put("original-filename", sanitizeMetadataValue(
+                    FileName.redactedForLogs(metadata.getOriginalFilename())));
             if (metadata.getChecksum() != null) {
                 s3Metadata.put("checksum-sha256", metadata.getChecksum());
             }
@@ -75,7 +82,7 @@ public class S3StorageAdapter implements FileStoragePort {
                     .contentType(mimeType.value())
                     .contentLength(size.bytes())
                     .serverSideEncryption(ServerSideEncryption.AWS_KMS)
-                    .ssekmsKeyId(getKmsKeyId())
+                    .ssekmsKeyId(kmsKeyId)
                     .metadata(s3Metadata)
                     .build();
 
@@ -88,7 +95,7 @@ public class S3StorageAdapter implements FileStoragePort {
 
             return StorageResult.of(
                     StorageLocation.of(bucketName, objectKey),
-                    EncryptionMetadata.kmsEncrypted(getKmsKeyId()),
+                    EncryptionMetadata.kmsEncrypted(kmsKeyId),
                     response.eTag()
             );
 
@@ -177,7 +184,11 @@ public class S3StorageAdapter implements FileStoragePort {
     }
 
     private String generateObjectKey(FileId fileId) {
-        LocalDate now = LocalDate.now();
+        // Always derive the key from UTC so the partition is identical
+        // regardless of the JVM default timezone. Mismatched zones would
+        // otherwise cause the gateway and the processor to disagree about
+        // which prefix the object lives under.
+        LocalDate now = LocalDate.now(ZoneOffset.UTC);
         return String.format("uploads/%d/%02d/%02d/%s",
                 now.getYear(),
                 now.getMonthValue(),

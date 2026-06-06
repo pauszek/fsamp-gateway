@@ -3,6 +3,7 @@ package io.github.pauszek.fsampgateway.integration;
 import io.github.pauszek.fsampgateway.adapter.out.storage.S3StorageAdapter;
 import io.github.pauszek.fsampgateway.adapter.out.storage.S3StorageProperties;
 import io.github.pauszek.fsampgateway.domain.model.FileId;
+import io.github.pauszek.fsampgateway.domain.model.FileName;
 import io.github.pauszek.fsampgateway.domain.model.FileSize;
 import io.github.pauszek.fsampgateway.domain.model.MimeType;
 import io.github.pauszek.fsampgateway.domain.model.StorageMetadata;
@@ -145,7 +146,9 @@ class S3StorageAdapterIntegrationTest extends BaseIntegrationTest {
 
             HeadObjectResponse headResponse = s3Client.headObject(headRequest);
             assertThat(headResponse.metadata()).containsEntry("correlation-id", correlationId);
-            assertThat(headResponse.metadata()).containsEntry("original-filename", originalFilename);
+            assertThat(headResponse.metadata()).containsEntry(
+                    "original-filename",
+                    FileName.redactedForLogs(originalFilename));
         }
     }
 

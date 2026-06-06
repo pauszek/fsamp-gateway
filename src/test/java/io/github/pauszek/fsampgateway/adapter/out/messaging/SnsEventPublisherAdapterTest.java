@@ -8,6 +8,7 @@ import io.github.pauszek.fsampgateway.domain.event.FileUploadedEvent;
 import io.github.pauszek.fsampgateway.domain.event.SecurityPayload;
 import io.github.pauszek.fsampgateway.domain.event.StoragePayload;
 import io.github.pauszek.fsampgateway.domain.exception.EventPublishException;
+import io.github.pauszek.fsampgateway.domain.exception.EventSerializationException;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
@@ -133,14 +134,14 @@ class SnsEventPublisherAdapterTest {
         }
 
         @Test
-        @DisplayName("should throw EventPublishException on JSON serialization failure")
-        void shouldThrowEventPublishExceptionOnJsonError() throws Exception {
+        @DisplayName("should throw EventSerializationException on JSON serialization failure")
+        void shouldThrowEventSerializationExceptionOnJsonError() throws Exception {
             FileUploadedEvent event = createFileUploadedEvent();
             given(objectMapper.writeValueAsString(event))
                     .willThrow(new JsonProcessingException("Serialization failed") {});
 
             assertThatThrownBy(() -> adapter.publish(event))
-                    .isInstanceOf(EventPublishException.class)
+                    .isInstanceOf(EventSerializationException.class)
                     .hasMessageContaining("Failed to serialize event");
         }
 
