@@ -42,7 +42,7 @@ class SnsEventPublisherAdapterTest {
     @Captor
     private ArgumentCaptor<PublishRequest> requestCaptor;
 
-    private static final String TOPIC_ARN = "arn:aws:sns:eu-west-1:123456789:file-events";
+    private static final String TOPIC_ARN = "arn:aws:sns:us-west-2:123456789:file-events";
     private static final String MESSAGE_ID = "msg-123";
 
     @BeforeEach

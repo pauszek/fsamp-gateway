@@ -42,9 +42,9 @@ public class AwsConfig {
                 @Value("${aws.region:us-west-2}") String region,
                 @Value("${aws.fips-endpoints:true}") boolean useFipsEndpoints) {
             this.region = region;
-            if (useFipsEndpoints && !isFipsEndpointRegion(region)) {
+            if (!isFipsEndpointRegion(region)) {
                 throw new IllegalArgumentException(
-                        "AWS FIPS endpoints requested but region does not support the FSAMP FIPS endpoint baseline: "
+                        "FSAMP active AWS deployments are pinned to the us-west-2 FIPS endpoint baseline: "
                                 + region);
             }
             this.useFipsEndpoints = useFipsEndpoints;

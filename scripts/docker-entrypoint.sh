@@ -80,6 +80,19 @@ discover_cognito() {
     log "OK Cognito configuration discovered"
     return 0
 }
+use_configured_cognito() {
+    if [ -n "${COGNITO_USER_POOL_ID:-}" ] && [ -n "${COGNITO_CLIENT_ID:-}" ]; then
+        export COGNITO_JWKS_ENDPOINT="${COGNITO_JWKS_ENDPOINT:-$AWS_ENDPOINT/$COGNITO_USER_POOL_ID/.well-known/jwks.json}"
+        export COGNITO_ISSUER_URI="${COGNITO_ISSUER_URI:-$AWS_ENDPOINT/$COGNITO_USER_POOL_ID}"
+
+        log "Using Cognito configuration from environment"
+        log "  OK User Pool ID: $COGNITO_USER_POOL_ID"
+        log "  OK Client ID: $COGNITO_CLIENT_ID"
+        return 0
+    fi
+
+    return 1
+}
 load_config_file() {
     if [ -f "$CONFIG_FILE" ]; then
         log "Loading configuration from $CONFIG_FILE"
@@ -113,7 +126,7 @@ main() {
     if [ "$SPRING_PROFILES_ACTIVE" = "local" ] || [ "$SPRING_PROFILES_ACTIVE" = "e2e" ]; then
         if ! load_config_file; then
             wait_for_localstack
-            discover_cognito
+            use_configured_cognito || discover_cognito
         fi
     fi
     

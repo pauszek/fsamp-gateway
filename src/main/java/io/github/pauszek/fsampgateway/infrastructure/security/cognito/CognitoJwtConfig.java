@@ -15,7 +15,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
@@ -60,13 +62,29 @@ public class CognitoJwtConfig {
                 
                 new JwtIssuerValidator(cognitoProperties.getIssuerUri()),
                 
-                new JwtClaimValidator<>("client_id", 
-                        clientId -> cognitoProperties.clientId().equals(clientId) ||
-                                    (clientId instanceof List<?> list && list.contains(cognitoProperties.clientId()))),
+                cognitoClientValidator(),
                 
                 new JwtClaimValidator<>("token_use", 
                         tokenUse -> "access".equals(tokenUse) || "id".equals(tokenUse))
         );
+    }
+
+    OAuth2TokenValidator<Jwt> cognitoClientValidator() {
+        return jwt -> {
+            String expectedClientId = cognitoProperties.clientId();
+            String accessTokenClientId = jwt.getClaimAsString("client_id");
+            List<String> audience = jwt.getAudience();
+
+            if (expectedClientId.equals(accessTokenClientId) || audience.contains(expectedClientId)) {
+                return OAuth2TokenValidatorResult.success();
+            }
+
+            return OAuth2TokenValidatorResult.failure(new OAuth2Error(
+                    "invalid_token",
+                    "JWT client_id or audience does not match the configured Cognito client",
+                    null
+            ));
+        };
     }
 
     @Bean
