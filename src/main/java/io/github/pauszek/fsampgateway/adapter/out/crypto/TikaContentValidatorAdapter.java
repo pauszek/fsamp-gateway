@@ -8,6 +8,7 @@ import io.github.pauszek.fsampgateway.domain.port.out.ContentValidatorPort;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.tika.Tika;
+import org.bouncycastle.jcajce.provider.BouncyCastleFipsProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -15,6 +16,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.security.MessageDigest;
 import java.security.Security;
+import java.util.Arrays;
 import java.util.HexFormat;
 
 @Component
@@ -37,25 +39,27 @@ public class TikaContentValidatorAdapter implements ContentValidatorPort {
             return;
         }
 
-        if ("local".equals(activeProfile) || "test".equals(activeProfile) || "e2e".equals(activeProfile)) {
+        if (isRelaxedProfileActive()) {
             log.info("Skipping FIPS provider for profile: {}", activeProfile);
             return;
         }
         
         try {
-            Class<?> providerClass = Class.forName("org.bouncycastle.jcajce.provider.BouncyCastleFipsProvider");
-            String providerName = (String) providerClass.getField("PROVIDER_NAME").get(null);
-            
-            if (Security.getProvider(providerName) == null) {
-                Security.addProvider((java.security.Provider) providerClass.getDeclaredConstructor().newInstance());
-                fipsEnabled = true;
+            if (Security.getProvider(BouncyCastleFipsProvider.PROVIDER_NAME) == null) {
+                Security.addProvider(new BouncyCastleFipsProvider());
                 log.info("BouncyCastle FIPS provider registered for content validation");
-            } else {
-                fipsEnabled = true;
             }
+            fipsEnabled = true;
         } catch (Exception e) {
-            log.warn("FIPS provider not available, using default: {}", e.getMessage());
+            throw new IllegalStateException(
+                    "FIPS mode is enabled but BouncyCastle FIPS provider is not available", e);
         }
+    }
+
+    private boolean isRelaxedProfileActive() {
+        return Arrays.stream(activeProfile.split(","))
+                .map(String::trim)
+                .anyMatch(profile -> "local".equals(profile) || "test".equals(profile) || "e2e".equals(profile));
     }
 
     @Override
@@ -97,7 +101,7 @@ public class TikaContentValidatorAdapter implements ContentValidatorPort {
         }
     }
     
-    private static final String FIPS_PROVIDER_NAME = "BCFIPS";
+    private static final String FIPS_PROVIDER_NAME = BouncyCastleFipsProvider.PROVIDER_NAME;
 
     @Override
     public Checksum computeChecksum(InputStream content) {

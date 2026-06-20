@@ -33,6 +33,8 @@ public class AwsConfig {
     @Profile("!local")
     static class ProductionAwsConfig {
 
+        private static final String SUPPORTED_FIPS_ENDPOINT_REGION = "us-west-2";
+
         private final String region;
         private final boolean useFipsEndpoints;
 
@@ -40,7 +42,16 @@ public class AwsConfig {
                 @Value("${aws.region:us-west-2}") String region,
                 @Value("${aws.fips-endpoints:true}") boolean useFipsEndpoints) {
             this.region = region;
-            this.useFipsEndpoints = useFipsEndpoints && region.startsWith("us-");
+            if (!isFipsEndpointRegion(region)) {
+                throw new IllegalArgumentException(
+                        "FSAMP active AWS deployments are pinned to the us-west-2 FIPS endpoint baseline: "
+                                + region);
+            }
+            this.useFipsEndpoints = useFipsEndpoints;
+        }
+
+        private static boolean isFipsEndpointRegion(String region) {
+            return SUPPORTED_FIPS_ENDPOINT_REGION.equals(region);
         }
 
         @Bean

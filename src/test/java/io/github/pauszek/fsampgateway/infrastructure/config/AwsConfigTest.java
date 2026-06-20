@@ -15,6 +15,7 @@ import software.amazon.awssdk.services.sts.StsClient;
 import software.amazon.awssdk.services.cloudwatch.CloudWatchClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DisplayName("AwsConfig")
 class AwsConfigTest {
@@ -145,12 +146,23 @@ class AwsConfigTest {
         }
 
         @Test
-        @DisplayName("should disable FIPS endpoints for non-US regions")
-        void shouldDisableFipsEndpointsForNonUsRegions() {
-            var euConfig = new AwsConfig.ProductionAwsConfig("eu-west-1", true);
+        @DisplayName("should fail closed for unsupported deployment regions")
+        void shouldFailClosedForUnsupportedDeploymentRegions() {
+            assertThatThrownBy(() -> new AwsConfig.ProductionAwsConfig("eu-west-1", true))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("us-west-2 FIPS endpoint baseline");
+            assertThatThrownBy(() -> new AwsConfig.ProductionAwsConfig("us-east-1", true))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("us-west-2 FIPS endpoint baseline");
+        }
+
+        @Test
+        @DisplayName("should keep us-west-2 pinned even when FIPS endpoint flag is disabled")
+        void shouldKeepUsWest2PinnedWhenFipsEndpointFlagIsDisabled() {
+            var usWest2Config = new AwsConfig.ProductionAwsConfig("us-west-2", false);
             var provider = testCredentials();
 
-            S3Client client = euConfig.s3Client(provider);
+            S3Client client = usWest2Config.s3Client(provider);
 
             assertThat(client).isNotNull();
             client.close();
