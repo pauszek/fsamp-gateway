@@ -1,0 +1,4 @@
+# Historical false positive from an old annotation example. The current file no
+# longer contains a curl Authorization header; keep this scoped to the exact
+# Gitleaks fingerprint instead of disabling the rule.
+3291f5563c85c8c00854f5c06ad1ddc5d7e30464:src/main/java/io/github/pauszek/fsampgateway/infrastructure/idempotency/Idempotent.java:curl-auth-header:30
