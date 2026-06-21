@@ -44,7 +44,7 @@ jobs:
           echo "auto_deploy_dev=${auto_deploy_dev}" >> "$GITHUB_OUTPUT"
 
   call-java:
-    uses: pauszek/fsamp-code-ci/.github/workflows/build-java.yml@v0.0.68
+    uses: pauszek/fsamp-code-ci/.github/workflows/build-java.yml@v0.0.69
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       GABRBA_SECRET: ${{ secrets.GABRBA_SECRET }}
