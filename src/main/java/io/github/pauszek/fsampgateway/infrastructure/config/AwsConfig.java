@@ -33,6 +33,8 @@ public class AwsConfig {
     @Profile("!local")
     static class ProductionAwsConfig {
 
+        private static final String SUPPORTED_FIPS_ENDPOINT_REGION = "us-west-2";
+
         private final String region;
         private final boolean useFipsEndpoints;
 
@@ -40,7 +42,16 @@ public class AwsConfig {
                 @Value("${aws.region:us-west-2}") String region,
                 @Value("${aws.fips-endpoints:true}") boolean useFipsEndpoints) {
             this.region = region;
-            this.useFipsEndpoints = useFipsEndpoints && region.startsWith("us-");
+            if (useFipsEndpoints && !isFipsEndpointRegion(region)) {
+                throw new IllegalArgumentException(
+                        "AWS FIPS endpoints requested but region does not support the FSAMP FIPS endpoint baseline: "
+                                + region);
+            }
+            this.useFipsEndpoints = useFipsEndpoints;
+        }
+
+        private static boolean isFipsEndpointRegion(String region) {
+            return SUPPORTED_FIPS_ENDPOINT_REGION.equals(region);
         }
 
         @Bean
@@ -88,7 +99,7 @@ public class AwsConfig {
                     .fipsEnabled(useFipsEndpoints)
                     .build();
         }
-        
+
         @Bean
         public DynamoDbClient dynamoDbClient(AwsCredentialsProvider credentialsProvider) {
             log.info("Creating DynamoDB client for region: {} (FIPS: {})", region, useFipsEndpoints);

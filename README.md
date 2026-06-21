@@ -35,7 +35,7 @@
 ### Run Locally
 
 ```bash
-cd ../fsamp-infra && make up && make apply-local
+cd ../fsamp-infra && make local-all
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 open http://localhost:8080/swagger-ui.html
 ```
