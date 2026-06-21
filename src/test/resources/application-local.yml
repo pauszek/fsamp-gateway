@@ -3,7 +3,7 @@ spring:
     name: fsamp-gateway-test
 
 aws:
-  region: us-east-1
+  region: us-west-2
   endpoint: http://localhost:4566
   credentials:
     access-key: test
@@ -11,7 +11,7 @@ aws:
   s3:
     bucket-name: test-bucket
   sns:
-    file-events-topic-arn: arn:aws:sns:us-east-1:000000000000:test-file-events
+    file-events-topic-arn: arn:aws:sns:us-west-2:000000000000:test-file-events
   kms:
     key-id: alias/test-key
   dynamodb:

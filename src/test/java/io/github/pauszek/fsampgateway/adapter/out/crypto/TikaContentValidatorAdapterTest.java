@@ -3,12 +3,15 @@ package io.github.pauszek.fsampgateway.adapter.out.crypto;
 import io.github.pauszek.fsampgateway.domain.model.Checksum;
 import io.github.pauszek.fsampgateway.domain.model.MimeType;
 import io.github.pauszek.fsampgateway.domain.model.ValidationResult;
+import org.bouncycastle.jcajce.provider.BouncyCastleFipsProvider;
 import org.junit.jupiter.api.*;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.security.Security;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -21,6 +24,38 @@ class TikaContentValidatorAdapterTest {
     void setUp() {
         adapter = new TikaContentValidatorAdapter();
         adapter.init();
+    }
+
+    @Nested
+    @DisplayName("init")
+    class Init {
+
+        @Test
+        @DisplayName("should skip FIPS provider for relaxed profile list")
+        void shouldSkipFipsProviderForRelaxedProfileList() {
+            TikaContentValidatorAdapter relaxedAdapter = new TikaContentValidatorAdapter();
+            ReflectionTestUtils.setField(relaxedAdapter, "fipsModeEnabled", true);
+            ReflectionTestUtils.setField(relaxedAdapter, "activeProfile", "dev, local");
+
+            relaxedAdapter.init();
+
+            assertThat(ReflectionTestUtils.getField(relaxedAdapter, "fipsEnabled")).isEqualTo(false);
+        }
+
+        @Test
+        @DisplayName("should enable BCFIPS provider outside relaxed profiles")
+        void shouldEnableBcfipsProviderOutsideRelaxedProfiles() {
+            TikaContentValidatorAdapter productionAdapter = new TikaContentValidatorAdapter();
+            ReflectionTestUtils.setField(productionAdapter, "fipsModeEnabled", true);
+            ReflectionTestUtils.setField(productionAdapter, "activeProfile", "prod");
+
+            productionAdapter.init();
+
+            assertThat(Security.getProvider(BouncyCastleFipsProvider.PROVIDER_NAME)).isNotNull();
+            assertThat(ReflectionTestUtils.getField(productionAdapter, "fipsEnabled")).isEqualTo(true);
+            assertThat(productionAdapter.computeChecksum(new ByteArrayInputStream("secure".getBytes(StandardCharsets.UTF_8)))
+                    .value()).hasSize(64);
+        }
     }
 
     @Nested

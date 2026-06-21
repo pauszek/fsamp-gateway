@@ -146,23 +146,23 @@ class AwsConfigTest {
         }
 
         @Test
-        @DisplayName("should fail closed when FIPS endpoints are requested in unsupported regions")
-        void shouldFailClosedForUnsupportedFipsRegions() {
+        @DisplayName("should fail closed for unsupported deployment regions")
+        void shouldFailClosedForUnsupportedDeploymentRegions() {
             assertThatThrownBy(() -> new AwsConfig.ProductionAwsConfig("eu-west-1", true))
                     .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("FIPS endpoints requested");
+                    .hasMessageContaining("us-west-2 FIPS endpoint baseline");
             assertThatThrownBy(() -> new AwsConfig.ProductionAwsConfig("us-east-1", true))
                     .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("FIPS endpoints requested");
+                    .hasMessageContaining("us-west-2 FIPS endpoint baseline");
         }
 
         @Test
-        @DisplayName("should allow unsupported regions when FIPS endpoints are disabled")
-        void shouldAllowUnsupportedRegionsWhenFipsEndpointsDisabled() {
-            var euConfig = new AwsConfig.ProductionAwsConfig("eu-west-1", false);
+        @DisplayName("should keep us-west-2 pinned even when FIPS endpoint flag is disabled")
+        void shouldKeepUsWest2PinnedWhenFipsEndpointFlagIsDisabled() {
+            var usWest2Config = new AwsConfig.ProductionAwsConfig("us-west-2", false);
             var provider = testCredentials();
 
-            S3Client client = euConfig.s3Client(provider);
+            S3Client client = usWest2Config.s3Client(provider);
 
             assertThat(client).isNotNull();
             client.close();
