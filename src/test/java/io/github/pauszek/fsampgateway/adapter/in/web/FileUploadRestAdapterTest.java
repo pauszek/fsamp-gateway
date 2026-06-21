@@ -16,6 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -172,11 +173,38 @@ class FileUploadRestAdapterTest {
         void shouldReturnFileSuccessfully() {
             SecureFile file = createUploadedFile();
             String fileId = file.getId().toString();
-            given(currentUserService.getCurrentUserId()).willReturn(Optional.of(USER_ID));
+            given(currentUserService.getCurrentUser()).willReturn(Optional.of(createTestUser()));
             given(getFileUseCase.getByIdOrThrow(any(FileId.class))).willReturn(file);
             given(fileMapper.toResponseDto(file)).willReturn(createResponseDto());
 
             ResponseEntity<FileUploadResponseDto> response = adapter.getFile(fileId);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(response.getBody()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("should deny metadata access for non-owner")
+        void shouldDenyMetadataAccessForNonOwner() {
+            SecureFile file = createUploadedFileFor("other-user");
+            given(currentUserService.getCurrentUser()).willReturn(Optional.of(createTestUser()));
+            given(getFileUseCase.getByIdOrThrow(any(FileId.class))).willReturn(file);
+
+            assertThatThrownBy(() -> adapter.getFile(file.getId().toString()))
+                    .isInstanceOf(AccessDeniedException.class)
+                    .hasMessageContaining("not accessible");
+            then(fileMapper).shouldHaveNoInteractions();
+        }
+
+        @Test
+        @DisplayName("should allow admin to read any file metadata")
+        void shouldAllowAdminToReadAnyFileMetadata() {
+            SecureFile file = createUploadedFileFor("other-user");
+            given(currentUserService.getCurrentUser()).willReturn(Optional.of(createAdminUser()));
+            given(getFileUseCase.getByIdOrThrow(any(FileId.class))).willReturn(file);
+            given(fileMapper.toResponseDto(file)).willReturn(createResponseDto());
+
+            ResponseEntity<FileUploadResponseDto> response = adapter.getFile(file.getId().toString());
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             assertThat(response.getBody()).isNotNull();
@@ -203,12 +231,16 @@ class FileUploadRestAdapterTest {
 
 
     private SecureFile createUploadedFile() {
+        return createUploadedFileFor(USER_ID);
+    }
+
+    private SecureFile createUploadedFileFor(String createdBy) {
         return SecureFile.createPending(
                 FileName.of("test-document.pdf"),
                 MimeType.of("application/pdf"),
                 FileSize.of(1024L),
                 CorrelationId.of("a1b2c3d4e5f67890a1b2c3d4e5f67890"),
-                USER_ID
+                createdBy
         ).markAsUploaded(
                 StorageLocation.of("bucket", "key"),
                 EncryptionMetadata.kmsEncrypted("kms-key-id"),
@@ -223,6 +255,19 @@ class FileUploadRestAdapterTest {
                 "Test User",
                 Set.of("USERS"),
                 Set.of("files.write"),
+                null,
+                Instant.now().minusSeconds(60),
+                Instant.now().plusSeconds(3600)
+        );
+    }
+
+    private UserPrincipal createAdminUser() {
+        return new UserPrincipal(
+                "admin-123",
+                "admin@test.com",
+                "Admin User",
+                Set.of("admins"),
+                Set.of("files.read"),
                 null,
                 Instant.now().minusSeconds(60),
                 Instant.now().plusSeconds(3600)

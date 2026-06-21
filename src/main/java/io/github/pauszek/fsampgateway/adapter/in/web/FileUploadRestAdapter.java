@@ -30,6 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -222,13 +223,28 @@ public class FileUploadRestAdapter {
             @Parameter(description = "File ID", required = true)
             @PathVariable String fileId
     ) {
-        String userId = currentUserService.getCurrentUserId().orElse("unknown");
-        log.info("Get file request: fileId={}, userId={}", fileId, userId);
+        UserPrincipal currentUser = currentUserService.getCurrentUser()
+                .orElseThrow(() -> new IllegalStateException("User not found in security context"));
+        log.info("Get file request: fileId={}, userId={}", fileId, currentUser.userId());
 
         SecureFile file = getFileUseCase.getByIdOrThrow(FileId.of(fileId));
+        verifyFileAccess(file, currentUser);
         FileUploadResponseDto response = fileMapper.toResponseDto(file);
 
         return ResponseEntity.ok(response);
+    }
+
+    private void verifyFileAccess(SecureFile file, UserPrincipal currentUser) {
+        if (currentUser.isAdmin()) {
+            return;
+        }
+
+        String owner = file.getAuditInfo().createdBy();
+        if (!currentUser.userId().equals(owner)) {
+            log.warn("Denied file metadata access: fileId={}, owner={}, requester={}",
+                    file.getId(), owner, currentUser.userId());
+            throw new AccessDeniedException("File metadata is not accessible for the current user");
+        }
     }
 
     @Operation(
