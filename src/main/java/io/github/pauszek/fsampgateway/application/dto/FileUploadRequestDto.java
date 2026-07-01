@@ -34,12 +34,16 @@ public record FileUploadRequestDto(
         if (this == other) {
             return true;
         }
-        if (!(other instanceof FileUploadRequestDto that)) {
+        if (!(other instanceof FileUploadRequestDto(
+                String otherCorrelationId,
+                String otherDescription,
+                String[] otherTags
+        ))) {
             return false;
         }
-        return Objects.equals(correlationId, that.correlationId)
-                && Objects.equals(description, that.description)
-                && Arrays.equals(tags, that.tags);
+        return Objects.equals(correlationId, otherCorrelationId)
+                && Objects.equals(description, otherDescription)
+                && Arrays.equals(tags, otherTags);
     }
 
     @Override

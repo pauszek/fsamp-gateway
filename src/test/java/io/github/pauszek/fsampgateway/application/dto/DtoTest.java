@@ -215,6 +215,46 @@ class DtoTest {
 
             assertThat(request.tags()).isEmpty();
         }
+
+        @Test
+        @DisplayName("should defensively copy tags")
+        void shouldDefensivelyCopyTags() {
+            String[] tags = {"report", "finance"};
+            FileUploadRequestDto request = new FileUploadRequestDto("corr-123", "Document", tags);
+
+            tags[0] = "changed";
+            String[] returnedTags = request.tags();
+            returnedTags[1] = "changed";
+
+            assertThat(request.tags()).containsExactly("report", "finance");
+        }
+
+        @Test
+        @DisplayName("should compare tags by content")
+        void shouldCompareTagsByContent() {
+            FileUploadRequestDto first = new FileUploadRequestDto(
+                    "corr-123",
+                    "Document",
+                    new String[]{"report", "finance"}
+            );
+            FileUploadRequestDto second = new FileUploadRequestDto(
+                    "corr-123",
+                    "Document",
+                    new String[]{"report", "finance"}
+            );
+            FileUploadRequestDto different = new FileUploadRequestDto(
+                    "corr-123",
+                    "Document",
+                    new String[]{"report"}
+            );
+
+            assertThat(first)
+                    .isEqualTo(second)
+                    .hasSameHashCodeAs(second)
+                    .isNotEqualTo(different)
+                    .isNotEqualTo("corr-123")
+                    .hasToString("FileUploadRequestDto[correlationId=corr-123, description=Document, tags=[report, finance]]");
+        }
     }
 
     @Nested

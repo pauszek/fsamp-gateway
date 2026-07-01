@@ -18,7 +18,12 @@ FROM amazoncorretto:21-al2023-headless
 # AL2023 pins repositories to the base image's release snapshot, so security
 # updates for named packages need --releasever=latest (same pattern as the
 # processor's Dockerfile.lambda).
-RUN dnf --refresh --releasever=latest update -y python3-pip-wheel libsolv && \
+RUN dnf --refresh --releasever=latest update -y \
+        graphite2 \
+        libsolv \
+        openssl-fips-provider-latest \
+        openssl-libs \
+        python3-pip-wheel && \
     dnf install -y --allowerasing curl shadow-utils && \
     dnf clean all && \
     rpm -e --nodeps python3-pip-wheel

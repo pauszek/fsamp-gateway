@@ -49,7 +49,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
-                .csrf(SecurityConfig::disableCsrfForStatelessApi)
+                .csrf(SecurityConfig::disableCsrfForStatelessApi) // NOSONAR java:S4502 - stateless bearer-token API.
                 
                 .sessionManagement(session -> 
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
