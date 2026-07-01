@@ -249,6 +249,7 @@ class DtoTest {
             );
 
             assertThat(first)
+                    .isEqualTo(first)
                     .isEqualTo(second)
                     .hasSameHashCodeAs(second)
                     .isNotEqualTo(different)

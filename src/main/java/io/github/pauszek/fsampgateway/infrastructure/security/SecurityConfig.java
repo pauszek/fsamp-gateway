@@ -34,6 +34,7 @@ public class SecurityConfig {
     private static final String ROLE_ADMINS = "ADMINS";
     private static final String ROLE_ADMINS_AUTHORITY = "ROLE_" + ROLE_ADMINS;
     private static final String ROLE_USERS_AUTHORITY = "ROLE_USERS";
+    private static final String STATELESS_API_PATTERN = "/api/v1/**";
     private static final String FILES_API_PATTERN = "/api/v1/files/**";
 
     private final JwtDecoder jwtDecoder;
@@ -49,7 +50,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
-                .csrf(SecurityConfig::disableCsrfForStatelessApi) // NOSONAR java:S4502 - stateless bearer-token API.
+                .csrf(SecurityConfig::configureCsrfForStatelessApi)
                 
                 .sessionManagement(session -> 
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -110,9 +111,8 @@ public class SecurityConfig {
                 .build();
     }
 
-    private static void disableCsrfForStatelessApi(CsrfConfigurer<HttpSecurity> csrf) {
-        // This API uses bearer tokens and stateless sessions, without cookie-based authentication.
-        csrf.disable();
+    private static void configureCsrfForStatelessApi(CsrfConfigurer<HttpSecurity> csrf) {
+        csrf.ignoringRequestMatchers(STATELESS_API_PATTERN);
     }
 
     @Bean
