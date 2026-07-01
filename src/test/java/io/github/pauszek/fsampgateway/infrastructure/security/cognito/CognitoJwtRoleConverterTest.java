@@ -119,6 +119,19 @@ class CognitoJwtRoleConverterTest {
     }
 
     @Test
+    @DisplayName("should ignore unsupported scope claim type")
+    void shouldIgnoreUnsupportedScopeClaimType() {
+        Jwt jwt = createJwt(Map.of(
+                "scope", 42,
+                "sub", "user-123"
+        ));
+
+        Collection<GrantedAuthority> authorities = converter.convert(jwt);
+
+        assertThat(authorities).isEmpty();
+    }
+
+    @Test
     @DisplayName("should handle empty claims")
     void shouldHandleEmptyClaims() {
         Jwt jwt = createJwt(Map.of("sub", "user-123"));

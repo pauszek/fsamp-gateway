@@ -21,14 +21,14 @@ public record FileUploadedEvent(
 
     public static final String SCHEMA_VERSION = "1.1.2";
     public static final String EVENT_TYPE = "FILE_UPLOADED";
-    public static final String SOURCE = "fsamp-gateway";
+    public static final String EVENT_SOURCE = "fsamp-gateway";
 
     public FileUploadedEvent {
         if (schemaVersion == null) schemaVersion = SCHEMA_VERSION;
         if (fileId == null) fileId = UUID.randomUUID();
         if (eventId == null) eventId = UUID.randomUUID();
         if (timestamp == null) timestamp = Instant.now();
-        if (source == null) source = SOURCE;
+        if (source == null) source = EVENT_SOURCE;
         if (eventType == null) eventType = EVENT_TYPE;
     }
 
@@ -39,7 +39,7 @@ public record FileUploadedEvent(
                 UUID.randomUUID(),
                 correlationIdToUUID(file.getCorrelationId().value()),
                 Instant.now(),
-                SOURCE,
+                EVENT_SOURCE,
                 EVENT_TYPE,
                 FilePayload.of(
                         file.getFileName().value(),

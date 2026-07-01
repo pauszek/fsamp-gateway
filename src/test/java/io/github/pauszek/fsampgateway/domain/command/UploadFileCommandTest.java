@@ -41,25 +41,24 @@ class UploadFileCommandTest {
         @DisplayName("should throw NullPointerException for null fileName")
         void shouldThrowForNullFileName() {
             InputStream content = new ByteArrayInputStream("content".getBytes());
+            var builder = UploadFileCommand.builder()
+                    .fileName(null)
+                    .content(content);
 
-            assertThatThrownBy(() ->
-                    UploadFileCommand.builder()
-                            .fileName(null)
-                            .content(content)
-                            .build()
-            ).isInstanceOf(NullPointerException.class)
+            assertThatThrownBy(builder::build)
+                    .isInstanceOf(NullPointerException.class)
                     .hasMessageContaining("File name is required");
         }
 
         @Test
         @DisplayName("should throw NullPointerException for null content")
         void shouldThrowForNullContent() {
-            assertThatThrownBy(() ->
-                    UploadFileCommand.builder()
-                            .fileName("test.pdf")
-                            .content(null)
-                            .build()
-            ).isInstanceOf(NullPointerException.class)
+            var builder = UploadFileCommand.builder()
+                    .fileName("test.pdf")
+                    .content(null);
+
+            assertThatThrownBy(builder::build)
+                    .isInstanceOf(NullPointerException.class)
                     .hasMessageContaining("Content is required");
         }
     }

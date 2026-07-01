@@ -187,13 +187,13 @@ class S3StorageAdapterIntegrationTest extends BaseIntegrationTest {
         @DisplayName("should throw exception for non-existent file")
         void shouldThrowExceptionForNonExistentFile() {
             String nonExistentKey = "non-existent/" + UUID.randomUUID() + "/file.txt";
+            GetObjectRequest getRequest = GetObjectRequest.builder()
+                    .bucket(TEST_BUCKET)
+                    .key(nonExistentKey)
+                    .build();
 
-            assertThatThrownBy(() -> {
-                s3Client.getObject(GetObjectRequest.builder()
-                        .bucket(TEST_BUCKET)
-                        .key(nonExistentKey)
-                        .build());
-            }).isInstanceOf(NoSuchKeyException.class);
+            assertThatThrownBy(() -> s3Client.getObject(getRequest))
+                    .isInstanceOf(NoSuchKeyException.class);
         }
     }
 }

@@ -22,7 +22,6 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -73,53 +72,51 @@ public class FileUploadRestAdapter {
                     **Idempotency:** Send `X-Idempotency-Key` header for safe retries
                     """
     )
-    @ApiResponses({
-            @ApiResponse(
-                    responseCode = "201",
-                    description = "File uploaded successfully",
-                    content = @Content(schema = @Schema(implementation = FileUploadResponseDto.class))
-            ),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Invalid request (validation error)",
-                    content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
-            ),
-            @ApiResponse(
-                    responseCode = "401",
-                    description = "Authentication required",
-                    content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
-            ),
-            @ApiResponse(
-                    responseCode = "403",
-                    description = "Insufficient permissions",
-                    content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
-            ),
-            @ApiResponse(
-                    responseCode = "409",
-                    description = "Idempotency key conflict - request already in progress",
-                    content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
-            ),
-            @ApiResponse(
-                    responseCode = "413",
-                    description = "File too large",
-                    content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
-            ),
-            @ApiResponse(
-                    responseCode = "415",
-                    description = "Unsupported media type",
-                    content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
-            ),
-            @ApiResponse(
-                    responseCode = "429",
-                    description = "Rate limit exceeded",
-                    content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
-            ),
-            @ApiResponse(
-                    responseCode = "503",
-                    description = "Service unavailable (storage or messaging error)",
-                    content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
-            )
-    })
+    @ApiResponse(
+            responseCode = "201",
+            description = "File uploaded successfully",
+            content = @Content(schema = @Schema(implementation = FileUploadResponseDto.class))
+    )
+    @ApiResponse(
+            responseCode = "400",
+            description = "Invalid request (validation error)",
+            content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
+    )
+    @ApiResponse(
+            responseCode = "401",
+            description = "Authentication required",
+            content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
+    )
+    @ApiResponse(
+            responseCode = "403",
+            description = "Insufficient permissions",
+            content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
+    )
+    @ApiResponse(
+            responseCode = "409",
+            description = "Idempotency key conflict - request already in progress",
+            content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
+    )
+    @ApiResponse(
+            responseCode = "413",
+            description = "File too large",
+            content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
+    )
+    @ApiResponse(
+            responseCode = "415",
+            description = "Unsupported media type",
+            content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
+    )
+    @ApiResponse(
+            responseCode = "429",
+            description = "Rate limit exceeded",
+            content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
+    )
+    @ApiResponse(
+            responseCode = "503",
+            description = "Service unavailable (storage or messaging error)",
+            content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
+    )
     @PostMapping(
             value = "/upload",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
@@ -193,28 +190,26 @@ public class FileUploadRestAdapter {
                     **Required permissions:** `files.read` scope OR `users`/`admins` group membership
                     """
     )
-    @ApiResponses({
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "File metadata retrieved",
-                    content = @Content(schema = @Schema(implementation = FileUploadResponseDto.class))
-            ),
-            @ApiResponse(
-                    responseCode = "401",
-                    description = "Authentication required",
-                    content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
-            ),
-            @ApiResponse(
-                    responseCode = "403",
-                    description = "Insufficient permissions",
-                    content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
-            ),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "File not found",
-                    content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
-            )
-    })
+    @ApiResponse(
+            responseCode = "200",
+            description = "File metadata retrieved",
+            content = @Content(schema = @Schema(implementation = FileUploadResponseDto.class))
+    )
+    @ApiResponse(
+            responseCode = "401",
+            description = "Authentication required",
+            content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
+    )
+    @ApiResponse(
+            responseCode = "403",
+            description = "Insufficient permissions",
+            content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
+    )
+    @ApiResponse(
+            responseCode = "404",
+            description = "File not found",
+            content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
+    )
     @GetMapping("/{fileId}")
     @PreAuthorize("hasAnyAuthority('SCOPE_files.read', 'ROLE_USERS', 'ROLE_ADMINS')")
     @Timed(value = "file.get", description = "Time taken to get file metadata")
@@ -255,27 +250,25 @@ public class FileUploadRestAdapter {
                     **Required permissions:** `admins` group membership only
                     """
     )
-    @ApiResponses({
-            @ApiResponse(
-                    responseCode = "204",
-                    description = "File deleted successfully"
-            ),
-            @ApiResponse(
-                    responseCode = "401",
-                    description = "Authentication required",
-                    content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
-            ),
-            @ApiResponse(
-                    responseCode = "403",
-                    description = "Admin role required",
-                    content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
-            ),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "File not found",
-                    content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
-            )
-    })
+    @ApiResponse(
+            responseCode = "204",
+            description = "File deleted successfully"
+    )
+    @ApiResponse(
+            responseCode = "401",
+            description = "Authentication required",
+            content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
+    )
+    @ApiResponse(
+            responseCode = "403",
+            description = "Admin role required",
+            content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
+    )
+    @ApiResponse(
+            responseCode = "404",
+            description = "File not found",
+            content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
+    )
     @DeleteMapping("/{fileId}")
     @PreAuthorize("hasRole('ADMINS')")
     @Timed(value = "file.delete", description = "Time taken to delete a file")

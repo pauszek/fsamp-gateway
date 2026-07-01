@@ -87,10 +87,10 @@ class IdempotencyKeyServiceIntegrationTest extends BaseIntegrationTest {
 
             idempotencyKeyService.completeKey(idempotencyKey, userId, response);
 
-            Optional<IdempotencyRecord> record = idempotencyKeyService.acquireKey(idempotencyKey, userId);
-            assertThat(record).isPresent();
-            assertThat(record.get().status()).isEqualTo(KeyStatus.COMPLETED);
-            assertThat(record.get().response()).isEqualTo(response);
+            Optional<IdempotencyRecord> acquiredRecord = idempotencyKeyService.acquireKey(idempotencyKey, userId);
+            assertThat(acquiredRecord).isPresent();
+            assertThat(acquiredRecord.get().status()).isEqualTo(KeyStatus.COMPLETED);
+            assertThat(acquiredRecord.get().response()).isEqualTo(response);
         }
     }
 

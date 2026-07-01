@@ -54,7 +54,6 @@ class FileUploadRestAdapterTest {
     private ArgumentCaptor<UploadFileCommand> commandCaptor;
 
     private static final String USER_ID = "user-123";
-    private static final String FILE_ID = "file-abc-123";
 
     @Nested
     @DisplayName("uploadFile")
@@ -187,10 +186,11 @@ class FileUploadRestAdapterTest {
         @DisplayName("should deny metadata access for non-owner")
         void shouldDenyMetadataAccessForNonOwner() {
             SecureFile file = createUploadedFileFor("other-user");
+            String fileId = file.getId().toString();
             given(currentUserService.getCurrentUser()).willReturn(Optional.of(createTestUser()));
             given(getFileUseCase.getByIdOrThrow(any(FileId.class))).willReturn(file);
 
-            assertThatThrownBy(() -> adapter.getFile(file.getId().toString()))
+            assertThatThrownBy(() -> adapter.getFile(fileId))
                     .isInstanceOf(AccessDeniedException.class)
                     .hasMessageContaining("not accessible");
             then(fileMapper).shouldHaveNoInteractions();
@@ -204,7 +204,8 @@ class FileUploadRestAdapterTest {
             given(getFileUseCase.getByIdOrThrow(any(FileId.class))).willReturn(file);
             given(fileMapper.toResponseDto(file)).willReturn(createResponseDto());
 
-            ResponseEntity<FileUploadResponseDto> response = adapter.getFile(file.getId().toString());
+            String fileId = file.getId().toString();
+            ResponseEntity<FileUploadResponseDto> response = adapter.getFile(fileId);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             assertThat(response.getBody()).isNotNull();

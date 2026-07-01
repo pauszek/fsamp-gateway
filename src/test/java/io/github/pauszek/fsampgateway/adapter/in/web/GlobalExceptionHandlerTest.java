@@ -334,5 +334,6 @@ class GlobalExceptionHandlerTest {
     }
 
     public void dummyMethodForTest(String param) {
+        // Reflection target used to construct MethodArgumentNotValidException in validation tests.
     }
 }

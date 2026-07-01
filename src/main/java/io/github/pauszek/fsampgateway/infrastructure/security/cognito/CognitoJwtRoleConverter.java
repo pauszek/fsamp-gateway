@@ -43,24 +43,19 @@ public class CognitoJwtRoleConverter implements Converter<Jwt, Collection<Grante
 
     private Stream<GrantedAuthority> extractScopeAuthorities(Jwt jwt) {
         Object scopeClaim = jwt.getClaim(SCOPE_CLAIM);
-        
-        if (scopeClaim == null) {
-            return Stream.empty();
-        }
 
-        Collection<String> scopes;
-        
-        if (scopeClaim instanceof String scopeString) {
-            scopes = Arrays.asList(scopeString.split("\\s+"));
-        } else if (scopeClaim instanceof Collection<?> scopeCollection) {
-            scopes = scopeCollection.stream()
+        Collection<String> scopes = switch (scopeClaim) {
+            case null -> Collections.emptyList();
+            case String scopeString -> Arrays.asList(scopeString.split("\\s+"));
+            case Collection<?> scopeCollection -> scopeCollection.stream()
                     .filter(String.class::isInstance)
                     .map(String.class::cast)
                     .toList();
-        } else {
-            log.warn("Unexpected scope claim type: {}", scopeClaim.getClass());
-            return Stream.empty();
-        }
+            default -> {
+                log.warn("Unexpected scope claim type: {}", scopeClaim.getClass());
+                yield Collections.emptyList();
+            }
+        };
         
         return scopes.stream()
                 .filter(Objects::nonNull)
@@ -68,7 +63,6 @@ public class CognitoJwtRoleConverter implements Converter<Jwt, Collection<Grante
                 .map(scope -> new SimpleGrantedAuthority(SCOPE_PREFIX + scope));
     }
 
-    @SuppressWarnings("unchecked")
     private List<String> extractClaim(Jwt jwt, String claimName) {
         Object claim = jwt.getClaim(claimName);
         

@@ -11,7 +11,7 @@ import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.CsrfConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -34,6 +34,8 @@ public class SecurityConfig {
     private static final String ROLE_ADMINS = "ADMINS";
     private static final String ROLE_ADMINS_AUTHORITY = "ROLE_" + ROLE_ADMINS;
     private static final String ROLE_USERS_AUTHORITY = "ROLE_USERS";
+    private static final String STATELESS_API_PATTERN = "/api/v1/**";
+    private static final String FILES_API_PATTERN = "/api/v1/files/**";
 
     private final JwtDecoder jwtDecoder;
     private final Converter<Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter;
@@ -48,7 +50,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
-                .csrf(AbstractHttpConfigurer::disable)
+                .csrf(SecurityConfig::configureCsrfForStatelessApi)
                 
                 .sessionManagement(session -> 
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -89,24 +91,29 @@ public class SecurityConfig {
                         
                         auth.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         
-                        .requestMatchers(HttpMethod.POST, "/api/v1/files/**")
+                        .requestMatchers(HttpMethod.POST, FILES_API_PATTERN)
                                 .hasAnyAuthority("SCOPE_files.write", ROLE_ADMINS_AUTHORITY, ROLE_USERS_AUTHORITY)
                         
-                        .requestMatchers(HttpMethod.GET, "/api/v1/files/**")
+                        .requestMatchers(HttpMethod.GET, FILES_API_PATTERN)
                                 .hasAnyAuthority("SCOPE_files.read", ROLE_ADMINS_AUTHORITY, ROLE_USERS_AUTHORITY)
                         
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/files/**")
+                        .requestMatchers(HttpMethod.DELETE, FILES_API_PATTERN)
                                 .hasRole(ROLE_ADMINS)
                         
                         .requestMatchers("/api/v1/admin/**")
                                 .hasRole(ROLE_ADMINS)
                         
-                        .requestMatchers("/api/v1/**").authenticated()
+                        .requestMatchers(STATELESS_API_PATTERN).authenticated()
                         
                         .anyRequest().denyAll();
                 })
                 
                 .build();
+    }
+
+    @SuppressWarnings("java:S4502")
+    private static void configureCsrfForStatelessApi(CsrfConfigurer<HttpSecurity> csrf) {
+        csrf.ignoringRequestMatchers(STATELESS_API_PATTERN); // NOSONAR
     }
 
     @Bean
