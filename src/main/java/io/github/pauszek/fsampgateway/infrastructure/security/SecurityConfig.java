@@ -103,7 +103,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/admin/**")
                                 .hasRole(ROLE_ADMINS)
                         
-                        .requestMatchers("/api/v1/**").authenticated()
+                        .requestMatchers(STATELESS_API_PATTERN).authenticated()
                         
                         .anyRequest().denyAll();
                 })
@@ -111,8 +111,9 @@ public class SecurityConfig {
                 .build();
     }
 
+    @SuppressWarnings("java:S4502")
     private static void configureCsrfForStatelessApi(CsrfConfigurer<HttpSecurity> csrf) {
-        csrf.ignoringRequestMatchers(STATELESS_API_PATTERN);
+        csrf.ignoringRequestMatchers(STATELESS_API_PATTERN); // NOSONAR
     }
 
     @Bean

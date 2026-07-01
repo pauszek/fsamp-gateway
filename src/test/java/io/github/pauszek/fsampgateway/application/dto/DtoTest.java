@@ -247,9 +247,10 @@ class DtoTest {
                     "Document",
                     new String[]{"report"}
             );
+            boolean sameInstanceEquals = first.equals(first);
 
+            assertThat(sameInstanceEquals).isTrue();
             assertThat(first)
-                    .isEqualTo(first)
                     .isEqualTo(second)
                     .hasSameHashCodeAs(second)
                     .isNotEqualTo(different)
