@@ -63,7 +63,7 @@ class ValueObjectsTest {
         @DisplayName("should implement toString")
         void shouldImplementToString() {
             MimeType type = MimeType.of("text/plain");
-            assertThat(type.toString()).isEqualTo("text/plain");
+            assertThat(type).hasToString("text/plain");
         }
     }
 
@@ -128,7 +128,7 @@ class ValueObjectsTest {
         @DisplayName("should implement toString")
         void shouldImplementToString() {
             FileName fileName = FileName.of("test.pdf");
-            assertThat(fileName.toString()).isEqualTo("test.pdf");
+            assertThat(fileName).hasToString("test.pdf");
         }
 
         @Test
@@ -235,7 +235,7 @@ class ValueObjectsTest {
         @DisplayName("should implement toString")
         void shouldImplementToString() {
             CorrelationId id = CorrelationId.of("a1b2c3d4e5f67890a1b2c3d4e5f67890");
-            assertThat(id.toString()).isEqualTo("a1b2c3d4e5f67890a1b2c3d4e5f67890");
+            assertThat(id).hasToString("a1b2c3d4e5f67890a1b2c3d4e5f67890");
         }
     }
 
@@ -412,9 +412,8 @@ class ValueObjectsTest {
 
         @Test
         @DisplayName("should update audit info")
-        void shouldUpdateAuditInfo() throws InterruptedException {
+        void shouldUpdateAuditInfo() {
             AuditInfo original = AuditInfo.create("user-123");
-            Thread.sleep(10); // Ensure different timestamp
             
             AuditInfo updated = original.update();
             
@@ -639,11 +638,12 @@ class ValueObjectsTest {
             );
 
             SecureFile uploadedFile = file;
-            assertThatThrownBy(() -> uploadedFile.markAsUploaded(
-                    StorageLocation.of("bucket", "key"),
-                    EncryptionMetadata.kmsEncrypted("key-id"),
-                    Checksum.sha256("a".repeat(64))
-            )).isInstanceOf(IllegalStateException.class);
+            StorageLocation location = StorageLocation.of("bucket", "key");
+            EncryptionMetadata encryption = EncryptionMetadata.kmsEncrypted("key-id");
+            Checksum checksum = Checksum.sha256("a".repeat(64));
+
+            assertThatThrownBy(() -> uploadedFile.markAsUploaded(location, encryption, checksum))
+                    .isInstanceOf(IllegalStateException.class);
         }
 
         @Test
@@ -721,8 +721,9 @@ class ValueObjectsTest {
             EncryptionMetadata metadata = EncryptionMetadata.kmsEncrypted("alias/very-long-key-id-12345");
             
             String str = metadata.toString();
-            assertThat(str).contains("alia...2345");
-            assertThat(str).doesNotContain("very-long-key-id");
+            assertThat(str)
+                    .contains("alia...2345")
+                    .doesNotContain("very-long-key-id");
         }
 
         @Test
@@ -794,7 +795,7 @@ class ValueObjectsTest {
         @DisplayName("toString should return human readable")
         void toStringShouldReturnHumanReadable() {
             FileSize size = FileSize.of(1024);
-            assertThat(size.toString()).isEqualTo("1.00 KB");
+            assertThat(size).hasToString("1.00 KB");
         }
     }
 
@@ -805,7 +806,9 @@ class ValueObjectsTest {
         @Test
         @DisplayName("should throw for non-hex checksum")
         void shouldThrowForNonHexChecksum() {
-            assertThatThrownBy(() -> Checksum.sha256("g".repeat(64)))  // 'g' is not hex
+            String nonHexChecksum = "g".repeat(64);
+
+            assertThatThrownBy(() -> Checksum.sha256(nonHexChecksum))
                     .isInstanceOf(IllegalArgumentException.class);
         }
 
@@ -844,8 +847,9 @@ class ValueObjectsTest {
         @DisplayName("toString should contain algorithm and value")
         void toStringShouldContainAlgorithmAndValue() {
             Checksum checksum = Checksum.sha256("a".repeat(64));
-            assertThat(checksum.toString()).contains("SHA-256");
-            assertThat(checksum.toString()).contains("a".repeat(64));
+            assertThat(checksum.toString())
+                    .contains("SHA-256")
+                    .contains("a".repeat(64));
         }
     }
 

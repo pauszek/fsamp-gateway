@@ -9,6 +9,7 @@ import com.networknt.schema.*;
 import io.github.pauszek.fsampgateway.domain.event.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
@@ -98,37 +99,20 @@ class EventSchemaContractTest {
             assertThat(jsonNode.has("securityContext")).isTrue();
         }
 
-        @Test
-        @DisplayName("should use schema version 1.1.2")
-        void shouldUseSchemaVersion() throws Exception {
+        @ParameterizedTest
+        @CsvSource({
+                "schemaVersion, 1.1.2",
+                "source, fsamp-gateway",
+                "eventType, FILE_UPLOADED"
+        })
+        @DisplayName("should include expected top-level values")
+        void shouldIncludeExpectedTopLevelValues(String fieldName, String expectedValue) throws Exception {
             FileUploadedEvent event = createSampleEvent();
 
             String json = OBJECT_MAPPER.writeValueAsString(event);
             JsonNode jsonNode = OBJECT_MAPPER.readTree(json);
 
-            assertThat(jsonNode.get("schemaVersion").asText()).isEqualTo("1.1.2");
-        }
-
-        @Test
-        @DisplayName("should identify source as fsamp-gateway")
-        void shouldIdentifySource() throws Exception {
-            FileUploadedEvent event = createSampleEvent();
-
-            String json = OBJECT_MAPPER.writeValueAsString(event);
-            JsonNode jsonNode = OBJECT_MAPPER.readTree(json);
-
-            assertThat(jsonNode.get("source").asText()).isEqualTo("fsamp-gateway");
-        }
-
-        @Test
-        @DisplayName("should use correct event type")
-        void shouldUseCorrectEventType() throws Exception {
-            FileUploadedEvent event = createSampleEvent();
-
-            String json = OBJECT_MAPPER.writeValueAsString(event);
-            JsonNode jsonNode = OBJECT_MAPPER.readTree(json);
-
-            assertThat(jsonNode.get("eventType").asText()).isEqualTo("FILE_UPLOADED");
+            assertThat(jsonNode.get(fieldName).asText()).isEqualTo(expectedValue);
         }
 
         @ParameterizedTest
@@ -141,7 +125,7 @@ class EventSchemaContractTest {
                     UUID.randomUUID(),
                     UUID.randomUUID(),
                     EVENT_TIMESTAMP,
-                    FileUploadedEvent.SOURCE,
+                    FileUploadedEvent.EVENT_SOURCE,
                     eventType,
                     FilePayload.of("test.pdf", 1024L, "application/pdf", 
                             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
@@ -196,7 +180,7 @@ class EventSchemaContractTest {
                     UUID.randomUUID(),
                     UUID.randomUUID(),
                     EVENT_TIMESTAMP,
-                    FileUploadedEvent.SOURCE,
+                    FileUploadedEvent.EVENT_SOURCE,
                     FileUploadedEvent.EVENT_TYPE,
                     FilePayload.of("large.pdf", 104857600L, "application/pdf",
                             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
@@ -271,75 +255,21 @@ class EventSchemaContractTest {
     @DisplayName("Schema Validation - Negative Tests")
     class SchemaValidation {
 
-        @Test
-        @DisplayName("should reject invalid event type")
-        void shouldRejectInvalidEventType() throws Exception {
-            String invalidJson = """
-                {
-                    "schemaVersion": "1.1.2",
-                    "fileId": "550e8400-e29b-41d4-a716-446655440002",
-                    "eventId": "550e8400-e29b-41d4-a716-446655440000",
-                    "correlationId": "550e8400-e29b-41d4-a716-446655440001",
-                    "timestamp": "2026-01-01T12:00:00Z",
-                    "source": "fsamp-gateway",
-                    "eventType": "INVALID_TYPE",
-                    "fileMetadata": {
-                        "originalFilename": "test.pdf",
-                        "fileSizeBytes": 1024,
-                        "checksumSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-                    },
-                    "storageLocation": {
-                        "bucketName": "fsamp-bucket",
-                        "objectKey": "key"
-                    },
-                    "securityContext": {
-                        "isEncrypted": true,
-                        "encryptionAlgorithm": "AES/GCM/NoPadding",
-                        "kmsKeyId": "arn:aws:kms:eu-central-1:123456789012:key/12345678-1234-1234-1234-123456789012"
-                    }
-                }
-                """;
-
-            JsonNode jsonNode = OBJECT_MAPPER.readTree(invalidJson);
+        @ParameterizedTest
+        @CsvSource({
+                "invalid event type, eventType",
+                "missing source, source",
+                "AES-CBC algorithm, encryptionAlgorithm",
+                "unencrypted file, isEncrypted",
+                "oversized file, fileSizeBytes"
+        })
+        @DisplayName("should reject invalid schema cases")
+        void shouldRejectInvalidSchemaCases(String scenario, String expectedErrorFragment) throws Exception {
+            JsonNode jsonNode = OBJECT_MAPPER.readTree(invalidJsonFor(scenario));
             Set<ValidationMessage> errors = schema.validate(jsonNode);
 
             assertThat(errors).isNotEmpty();
-            assertThat(errors.toString()).containsIgnoringCase("eventType");
-        }
-
-        @Test
-        @DisplayName("should reject missing required fields")
-        void shouldRejectMissingRequiredFields() throws Exception {
-            String invalidJson = """
-                {
-                    "schemaVersion": "1.1.2",
-                    "fileId": "550e8400-e29b-41d4-a716-446655440002",
-                    "eventId": "550e8400-e29b-41d4-a716-446655440000",
-                    "correlationId": "550e8400-e29b-41d4-a716-446655440001",
-                    "timestamp": "2026-01-01T12:00:00Z",
-                    "eventType": "FILE_UPLOADED",
-                    "fileMetadata": {
-                        "originalFilename": "test.pdf",
-                        "fileSizeBytes": 1024,
-                        "checksumSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-                    },
-                    "storageLocation": {
-                        "bucketName": "fsamp-bucket",
-                        "objectKey": "key"
-                    },
-                    "securityContext": {
-                        "isEncrypted": true,
-                        "encryptionAlgorithm": "AES/GCM/NoPadding",
-                        "kmsKeyId": "arn:aws:kms:eu-central-1:123456789012:key/12345678-1234-1234-1234-123456789012"
-                    }
-                }
-                """;
-
-            JsonNode jsonNode = OBJECT_MAPPER.readTree(invalidJson);
-            Set<ValidationMessage> errors = schema.validate(jsonNode);
-
-            assertThat(errors).isNotEmpty();
-            assertThat(errors.toString()).containsIgnoringCase("source");
+            assertThat(errors.toString()).containsIgnoringCase(expectedErrorFragment);
         }
 
         @Test
@@ -355,112 +285,84 @@ class EventSchemaContractTest {
             assertThat(errors.toString()).containsIgnoringCase("fileId");
         }
 
-        @Test
-        @DisplayName("should reject invalid encryption algorithm (AES-CBC not allowed)")
-        void shouldRejectAesCbc() throws Exception {
-            String invalidJson = """
-                {
-                    "schemaVersion": "1.1.2",
-                    "fileId": "550e8400-e29b-41d4-a716-446655440002",
-                    "eventId": "550e8400-e29b-41d4-a716-446655440000",
-                    "correlationId": "550e8400-e29b-41d4-a716-446655440001",
-                    "timestamp": "2026-01-01T12:00:00Z",
-                    "source": "fsamp-gateway",
-                    "eventType": "FILE_UPLOADED",
-                    "fileMetadata": {
+        private String invalidJsonFor(String scenario) {
+            return switch (scenario) {
+                case "invalid event type" -> validJsonTemplate("""
+                        "source": "fsamp-gateway",
+                        "eventType": "INVALID_TYPE",
+                        """, """
                         "originalFilename": "test.pdf",
                         "fileSizeBytes": 1024,
-                        "checksumSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-                    },
-                    "storageLocation": {
-                        "bucketName": "fsamp-bucket",
-                        "objectKey": "key"
-                    },
-                    "securityContext": {
+                        """, """
+                        "isEncrypted": true,
+                        "encryptionAlgorithm": "AES/GCM/NoPadding",
+                        """);
+                case "missing source" -> validJsonTemplate("""
+                        "eventType": "FILE_UPLOADED",
+                        """, """
+                        "originalFilename": "test.pdf",
+                        "fileSizeBytes": 1024,
+                        """, """
+                        "isEncrypted": true,
+                        "encryptionAlgorithm": "AES/GCM/NoPadding",
+                        """);
+                case "AES-CBC algorithm" -> validJsonTemplate("""
+                        "source": "fsamp-gateway",
+                        "eventType": "FILE_UPLOADED",
+                        """, """
+                        "originalFilename": "test.pdf",
+                        "fileSizeBytes": 1024,
+                        """, """
                         "isEncrypted": true,
                         "encryptionAlgorithm": "AES/CBC/PKCS5Padding",
-                        "kmsKeyId": "arn:aws:kms:eu-central-1:123456789012:key/12345678-1234-1234-1234-123456789012"
-                    }
-                }
-                """;
-
-            JsonNode jsonNode = OBJECT_MAPPER.readTree(invalidJson);
-            Set<ValidationMessage> errors = schema.validate(jsonNode);
-
-            assertThat(errors).isNotEmpty();
-            assertThat(errors.toString()).containsIgnoringCase("encryptionAlgorithm");
-        }
-
-        @Test
-        @DisplayName("should reject unencrypted files (isEncrypted: false)")
-        void shouldRejectUnencryptedFiles() throws Exception {
-            String invalidJson = """
-                {
-                    "schemaVersion": "1.1.2",
-                    "fileId": "550e8400-e29b-41d4-a716-446655440002",
-                    "eventId": "550e8400-e29b-41d4-a716-446655440000",
-                    "correlationId": "550e8400-e29b-41d4-a716-446655440001",
-                    "timestamp": "2026-01-01T12:00:00Z",
-                    "source": "fsamp-gateway",
-                    "eventType": "FILE_UPLOADED",
-                    "fileMetadata": {
+                        """);
+                case "unencrypted file" -> validJsonTemplate("""
+                        "source": "fsamp-gateway",
+                        "eventType": "FILE_UPLOADED",
+                        """, """
                         "originalFilename": "test.pdf",
                         "fileSizeBytes": 1024,
-                        "checksumSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-                    },
-                    "storageLocation": {
-                        "bucketName": "fsamp-bucket",
-                        "objectKey": "key"
-                    },
-                    "securityContext": {
+                        """, """
                         "isEncrypted": false,
                         "encryptionAlgorithm": "AES/GCM/NoPadding",
-                        "kmsKeyId": "arn:aws:kms:eu-central-1:123456789012:key/12345678-1234-1234-1234-123456789012"
-                    }
-                }
-                """;
-
-            JsonNode jsonNode = OBJECT_MAPPER.readTree(invalidJson);
-            Set<ValidationMessage> errors = schema.validate(jsonNode);
-
-            assertThat(errors).isNotEmpty();
-            assertThat(errors.toString()).containsIgnoringCase("isEncrypted");
-        }
-
-        @Test
-        @DisplayName("should reject file size exceeding 100MB")
-        void shouldRejectOversizedFiles() throws Exception {
-            String invalidJson = """
-                {
-                    "schemaVersion": "1.1.2",
-                    "fileId": "550e8400-e29b-41d4-a716-446655440002",
-                    "eventId": "550e8400-e29b-41d4-a716-446655440000",
-                    "correlationId": "550e8400-e29b-41d4-a716-446655440001",
-                    "timestamp": "2026-01-01T12:00:00Z",
-                    "source": "fsamp-gateway",
-                    "eventType": "FILE_UPLOADED",
-                    "fileMetadata": {
+                        """);
+                case "oversized file" -> validJsonTemplate("""
+                        "source": "fsamp-gateway",
+                        "eventType": "FILE_UPLOADED",
+                        """, """
                         "originalFilename": "huge.pdf",
                         "fileSizeBytes": 104857601,
-                        "checksumSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-                    },
-                    "storageLocation": {
-                        "bucketName": "fsamp-bucket",
-                        "objectKey": "key"
-                    },
-                    "securityContext": {
+                        """, """
                         "isEncrypted": true,
                         "encryptionAlgorithm": "AES/GCM/NoPadding",
-                        "kmsKeyId": "arn:aws:kms:eu-central-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+                        """);
+                default -> throw new IllegalArgumentException("Unknown schema scenario: " + scenario);
+            };
+        }
+
+        private String validJsonTemplate(String topLevelFields, String fileMetadataFields, String securityFields) {
+            return """
+                    {
+                        "schemaVersion": "1.1.2",
+                        "fileId": "550e8400-e29b-41d4-a716-446655440002",
+                        "eventId": "550e8400-e29b-41d4-a716-446655440000",
+                        "correlationId": "550e8400-e29b-41d4-a716-446655440001",
+                        "timestamp": "2026-01-01T12:00:00Z",
+                    %s
+                        "fileMetadata": {
+                    %s
+                            "checksumSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                        },
+                        "storageLocation": {
+                            "bucketName": "fsamp-bucket",
+                            "objectKey": "key"
+                        },
+                        "securityContext": {
+                    %s
+                            "kmsKeyId": "arn:aws:kms:eu-central-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+                        }
                     }
-                }
-                """;
-
-            JsonNode jsonNode = OBJECT_MAPPER.readTree(invalidJson);
-            Set<ValidationMessage> errors = schema.validate(jsonNode);
-
-            assertThat(errors).isNotEmpty();
-            assertThat(errors.toString()).containsIgnoringCase("fileSizeBytes");
+                    """.formatted(topLevelFields, fileMetadataFields, securityFields);
         }
     }
 
@@ -471,7 +373,7 @@ class EventSchemaContractTest {
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 EVENT_TIMESTAMP,
-                FileUploadedEvent.SOURCE,
+                FileUploadedEvent.EVENT_SOURCE,
                 FileUploadedEvent.EVENT_TYPE,
                 FilePayload.of(
                         "document.pdf", 

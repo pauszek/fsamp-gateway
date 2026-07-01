@@ -49,7 +49,6 @@ class FileUploadDomainServiceTest {
     private static final byte[] TEST_CONTENT = "PDF content".getBytes();
     private static final String TEST_USER = "user-123";
     private static final String TEST_CORRELATION_ID = "a1b2c3d4e5f67890a1b2c3d4e5f67890";
-    private static final String TEST_CHECKSUM = "abc123hash";
     private static final String TEST_MESSAGE_ID = "msg-123";
 
     @BeforeEach

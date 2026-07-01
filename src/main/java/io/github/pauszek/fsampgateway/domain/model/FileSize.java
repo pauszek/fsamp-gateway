@@ -2,7 +2,7 @@ package io.github.pauszek.fsampgateway.domain.model;
 
 public record FileSize(long bytes) {
 
-    public static final long MAX_SIZE = 100 * 1024 * 1024; // 100 MB
+    public static final long MAX_SIZE = 100L * 1024 * 1024; // 100 MB
     public static final long MIN_SIZE = 1; // 1 byte
 
     public FileSize {

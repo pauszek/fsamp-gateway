@@ -2,12 +2,6 @@ package io.github.pauszek.fsampgateway.infrastructure.security;
 
 import io.github.pauszek.fsampgateway.adapter.out.storage.S3StorageProperties;
 import io.github.pauszek.fsampgateway.application.mapper.FileMapper;
-import io.github.pauszek.fsampgateway.domain.port.in.UploadFileUseCase;
-import io.github.pauszek.fsampgateway.domain.port.out.ContentValidatorPort;
-import io.github.pauszek.fsampgateway.domain.port.out.EventPublisherPort;
-import io.github.pauszek.fsampgateway.domain.port.out.FileRepositoryPort;
-import io.github.pauszek.fsampgateway.domain.port.out.FileStoragePort;
-import io.github.pauszek.fsampgateway.infrastructure.security.cognito.CurrentUserService;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;

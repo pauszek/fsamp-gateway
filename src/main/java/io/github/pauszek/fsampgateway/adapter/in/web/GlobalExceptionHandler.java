@@ -27,6 +27,10 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
     private static final String ERROR_TYPE_BASE = "https://api.fsamp.io/errors/";
+    private static final String RETRY_AFTER_HEADER = "Retry-After";
+    private static final String RETRY_AFTER_SHORT_DELAY = "1";
+    private static final String RETRY_AFTER_OVERLOAD_DELAY = "5";
+    private static final String RETRY_AFTER_CIRCUIT_BREAKER_DELAY = "30";
 
     @ExceptionHandler(FileValidationException.class)
     public ResponseEntity<ApiErrorDto> handleFileValidation(
@@ -151,7 +155,7 @@ public class GlobalExceptionHandler {
         log.warn("Rate limit exceeded: {}", ex.getMessage());
         
         HttpHeaders headers = new HttpHeaders();
-        headers.add("Retry-After", "1");  // Suggest retry after 1 second
+        headers.add(RETRY_AFTER_HEADER, RETRY_AFTER_SHORT_DELAY);
         
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .headers(headers)
@@ -166,7 +170,7 @@ public class GlobalExceptionHandler {
         log.warn("Rate limit exceeded: {}", ex.getMessage());
         
         HttpHeaders headers = new HttpHeaders();
-        headers.add("Retry-After", "1");
+        headers.add(RETRY_AFTER_HEADER, RETRY_AFTER_SHORT_DELAY);
         
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .headers(headers)
@@ -181,7 +185,7 @@ public class GlobalExceptionHandler {
         log.warn("Bulkhead full (service overloaded): {}", ex.getMessage());
         
         HttpHeaders headers = new HttpHeaders();
-        headers.add("Retry-After", "5");  // Suggest retry after 5 seconds
+        headers.add(RETRY_AFTER_HEADER, RETRY_AFTER_OVERLOAD_DELAY);
         
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .headers(headers)
@@ -196,7 +200,7 @@ public class GlobalExceptionHandler {
         log.warn("Circuit breaker open: {}", ex.getMessage());
         
         HttpHeaders headers = new HttpHeaders();
-        headers.add("Retry-After", "30");  // Circuit breaker wait duration
+        headers.add(RETRY_AFTER_HEADER, RETRY_AFTER_CIRCUIT_BREAKER_DELAY);
         
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .headers(headers)
@@ -211,7 +215,7 @@ public class GlobalExceptionHandler {
         log.warn("Service unavailable: {}", ex.getMessage());
         
         HttpHeaders headers = new HttpHeaders();
-        headers.add("Retry-After", "5");
+        headers.add(RETRY_AFTER_HEADER, RETRY_AFTER_OVERLOAD_DELAY);
         
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .headers(headers)

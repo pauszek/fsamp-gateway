@@ -56,13 +56,13 @@ public class IdempotencyKeyService {
 
         Optional<IdempotencyRecord> existing = getKey(idempotencyKey, userId);
         if (existing.isPresent()) {
-            IdempotencyRecord record = existing.get();
-            if (record.status() == KeyStatus.COMPLETED) {
+            IdempotencyRecord existingRecord = existing.get();
+            if (existingRecord.status() == KeyStatus.COMPLETED) {
                 log.info("Idempotency key already completed: key={}", idempotencyKey);
                 return existing;
             }
-            if (record.status() == KeyStatus.IN_PROGRESS) {
-                if (record.createdAt().plus(5, ChronoUnit.MINUTES).isBefore(Instant.now())) {
+            if (existingRecord.status() == KeyStatus.IN_PROGRESS) {
+                if (existingRecord.createdAt().plus(5, ChronoUnit.MINUTES).isBefore(Instant.now())) {
                     log.warn("Found stale IN_PROGRESS key, allowing retry: key={}", idempotencyKey);
                     deleteKey(idempotencyKey, userId);
                 } else {

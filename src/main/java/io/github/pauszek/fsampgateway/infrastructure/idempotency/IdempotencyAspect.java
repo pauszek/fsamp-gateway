@@ -45,11 +45,12 @@ public class IdempotencyAspect {
                 idempotencyKeyService.acquireKey(idempotencyKey, userId);
 
         if (existingRecord.isPresent()) {
-            IdempotencyKeyService.IdempotencyRecord record = existingRecord.get();
+            IdempotencyKeyService.IdempotencyRecord idempotencyRecord = existingRecord.get();
             
-            if (record.status() == IdempotencyKeyService.KeyStatus.COMPLETED && record.response() != null) {
+            if (idempotencyRecord.status() == IdempotencyKeyService.KeyStatus.COMPLETED
+                    && idempotencyRecord.response() != null) {
                 log.info("Returning cached response for idempotency key: key={}", idempotencyKey);
-                return deserializeResponse(record.response(), idempotent.responseType());
+                return deserializeResponse(idempotencyRecord.response(), idempotent.responseType());
             }
             
             log.warn("Idempotency key exists without cached response: key={}", idempotencyKey);

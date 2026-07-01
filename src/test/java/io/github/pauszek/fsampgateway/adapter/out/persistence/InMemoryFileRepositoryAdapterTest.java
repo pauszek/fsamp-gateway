@@ -37,19 +37,12 @@ class InMemoryFileRepositoryAdapterTest {
             SecureFile file1 = createTestFile();
             adapter.save(file1);
 
-            SecureFile file2 = SecureFile.createPending(
-                    FileName.of("different.pdf"),
-                    MimeType.of("application/pdf"),
-                    FileSize.of(2048L),
-                    file1.getCorrelationId(),
-                    "user-456"
-            );
             SecureFile file2WithSameId = createFileWithId(file1.getId());
 
             adapter.save(file2WithSameId);
 
             Optional<SecureFile> found = adapter.findById(file1.getId());
-            assertThat(found).isPresent();
+            assertThat(found).contains(file2WithSameId);
         }
     }
 
@@ -184,12 +177,14 @@ class InMemoryFileRepositoryAdapterTest {
     }
 
     private SecureFile createFileWithId(FileId id) {
-        return SecureFile.createPending(
-                FileName.of("updated-document.pdf"),
-                MimeType.of("application/pdf"),
-                FileSize.of(2048L),
-                CorrelationId.generate(),
-                "user-456"
-        );
+        return SecureFile.builder()
+                .id(id)
+                .correlationId(CorrelationId.generate())
+                .fileName(FileName.of("updated-document.pdf"))
+                .mimeType(MimeType.of("application/pdf"))
+                .size(FileSize.of(2048L))
+                .status(FileStatus.PENDING)
+                .auditInfo(AuditInfo.create("user-456"))
+                .build();
     }
 }

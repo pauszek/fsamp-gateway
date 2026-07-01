@@ -11,6 +11,8 @@ import io.github.pauszek.fsampgateway.domain.exception.EventPublishException;
 import io.github.pauszek.fsampgateway.domain.exception.EventSerializationException;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 import software.amazon.awssdk.services.sns.SnsClient;
@@ -71,9 +73,14 @@ class SnsEventPublisherAdapterTest {
             assertThat(requestCaptor.getValue().topicArn()).isEqualTo(TOPIC_ARN);
         }
 
-        @Test
-        @DisplayName("should include eventType in message attributes")
-        void shouldIncludeEventTypeInMessageAttributes() throws Exception {
+        @ParameterizedTest
+        @CsvSource({
+                "eventType, FILE_UPLOADED",
+                "correlationId, 00000000-0000-0000-0000-000000000123",
+                "mimeType, application/pdf"
+        })
+        @DisplayName("should include expected message attributes")
+        void shouldIncludeExpectedMessageAttributes(String attributeName, String expectedValue) throws Exception {
             FileUploadedEvent event = createFileUploadedEvent();
             given(objectMapper.writeValueAsString(event)).willReturn("{\"fileId\":\"123\"}");
             given(snsClient.publish(any(PublishRequest.class)))
@@ -83,41 +90,8 @@ class SnsEventPublisherAdapterTest {
 
             then(snsClient).should().publish(requestCaptor.capture());
             var attributes = requestCaptor.getValue().messageAttributes();
-            assertThat(attributes).containsKey("eventType");
-            assertThat(attributes.get("eventType").stringValue()).isEqualTo("FILE_UPLOADED");
-        }
-
-        @Test
-        @DisplayName("should include correlationId in message attributes")
-        void shouldIncludeCorrelationIdInMessageAttributes() throws Exception {
-            FileUploadedEvent event = createFileUploadedEvent();
-            given(objectMapper.writeValueAsString(event)).willReturn("{\"fileId\":\"123\"}");
-            given(snsClient.publish(any(PublishRequest.class)))
-                    .willReturn(PublishResponse.builder().messageId(MESSAGE_ID).build());
-
-            adapter.publish(event);
-
-            then(snsClient).should().publish(requestCaptor.capture());
-            var attributes = requestCaptor.getValue().messageAttributes();
-            assertThat(attributes).containsKey("correlationId");
-            assertThat(attributes.get("correlationId").stringValue())
-                    .isEqualTo("00000000-0000-0000-0000-000000000123");
-        }
-
-        @Test
-        @DisplayName("should include mimeType in message attributes")
-        void shouldIncludeMimeTypeInMessageAttributes() throws Exception {
-            FileUploadedEvent event = createFileUploadedEvent();
-            given(objectMapper.writeValueAsString(event)).willReturn("{\"fileId\":\"123\"}");
-            given(snsClient.publish(any(PublishRequest.class)))
-                    .willReturn(PublishResponse.builder().messageId(MESSAGE_ID).build());
-
-            adapter.publish(event);
-
-            then(snsClient).should().publish(requestCaptor.capture());
-            var attributes = requestCaptor.getValue().messageAttributes();
-            assertThat(attributes).containsKey("mimeType");
-            assertThat(attributes.get("mimeType").stringValue()).isEqualTo("application/pdf");
+            assertThat(attributes).containsKey(attributeName);
+            assertThat(attributes.get(attributeName).stringValue()).isEqualTo(expectedValue);
         }
 
         @Test
@@ -147,7 +121,7 @@ class SnsEventPublisherAdapterTest {
 
         @Test
         @DisplayName("should throw IllegalArgumentException for unknown event types")
-        void shouldThrowIllegalArgumentExceptionForUnknownEventTypes() throws Exception {
+        void shouldThrowIllegalArgumentExceptionForUnknownEventTypes() {
             DomainEvent unknownEvent = new DomainEvent() {
                 @Override
                 public String getEventType() {

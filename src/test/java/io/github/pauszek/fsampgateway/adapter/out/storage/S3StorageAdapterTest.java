@@ -14,7 +14,6 @@ import software.amazon.awssdk.services.s3.model.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -62,7 +61,7 @@ class S3StorageAdapterTest {
             given(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
                     .willReturn(PutObjectResponse.builder().eTag("etag-123").build());
 
-            StorageResult result = adapter.store(fileId, content, size, mimeType, metadata);
+            adapter.store(fileId, content, size, mimeType, metadata);
 
             then(s3Client).should().putObject(requestCaptor.capture(), any(RequestBody.class));
             PutObjectRequest request = requestCaptor.getValue();
@@ -90,9 +89,10 @@ class S3StorageAdapterTest {
             then(s3Client).should().putObject(requestCaptor.capture(), any(RequestBody.class));
             var s3Metadata = requestCaptor.getValue().metadata();
 
-            assertThat(s3Metadata).containsEntry("correlation-id", "a1b2c3d4e5f67890a1b2c3d4e5f67890");
-            assertThat(s3Metadata).containsEntry("original-filename", "test-file.pdf");
-            assertThat(s3Metadata).containsEntry("checksum-sha256", "sha256hash");
+            assertThat(s3Metadata)
+                    .containsEntry("correlation-id", "a1b2c3d4e5f67890a1b2c3d4e5f67890")
+                    .containsEntry("original-filename", "test-file.pdf")
+                    .containsEntry("checksum-sha256", "sha256hash");
         }
 
         @Test
@@ -112,8 +112,9 @@ class S3StorageAdapterTest {
             then(s3Client).should().putObject(requestCaptor.capture(), any(RequestBody.class));
             String key = requestCaptor.getValue().key();
 
-            assertThat(key).matches("uploads/\\d{4}/\\d{2}/\\d{2}/.*");
-            assertThat(key).contains(fileId.value().toString());
+            assertThat(key)
+                    .matches("uploads/\\d{4}/\\d{2}/\\d{2}/.*")
+                    .contains(fileId.value().toString());
         }
 
         @Test
@@ -130,9 +131,12 @@ class S3StorageAdapterTest {
 
             StorageResult result = adapter.store(fileId, content, size, mimeType, metadata);
 
-            assertThat(result.getLocation().bucketName()).isEqualTo(BUCKET_NAME);
-            assertThat(result.getEncryptionMetadata().kmsKeyId()).isEqualTo(KMS_KEY_ID);
-            assertThat(result.getEtag()).isEqualTo("\"etag-123\"");
+            assertThat(result)
+                    .satisfies(storageResult -> {
+                        assertThat(storageResult.getLocation().bucketName()).isEqualTo(BUCKET_NAME);
+                        assertThat(storageResult.getEncryptionMetadata().kmsKeyId()).isEqualTo(KMS_KEY_ID);
+                        assertThat(storageResult.getEtag()).isEqualTo("\"etag-123\"");
+                    });
         }
 
         @Test

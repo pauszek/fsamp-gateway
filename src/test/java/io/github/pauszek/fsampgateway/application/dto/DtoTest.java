@@ -39,13 +39,25 @@ class DtoTest {
                     .timestamp(Instant.parse("2024-01-01T12:00:00Z"))
                     .build();
 
-            assertThat(error.type()).isEqualTo("https://api.fsamp.io/errors/validation-error");
-            assertThat(error.status()).isEqualTo(400);
-            assertThat(error.error()).isEqualTo("VALIDATION_ERROR");
-            assertThat(error.message()).isEqualTo("Validation failed");
-            assertThat(error.detail()).isEqualTo("Field 'file' is required");
-            assertThat(error.path()).isEqualTo("/api/v1/files/upload");
-            assertThat(error.correlationId()).isEqualTo("corr-123");
+            assertThat(error)
+                    .extracting(
+                            ApiErrorDto::type,
+                            ApiErrorDto::status,
+                            ApiErrorDto::error,
+                            ApiErrorDto::message,
+                            ApiErrorDto::detail,
+                            ApiErrorDto::path,
+                            ApiErrorDto::correlationId
+                    )
+                    .containsExactly(
+                            "https://api.fsamp.io/errors/validation-error",
+                            400,
+                            "VALIDATION_ERROR",
+                            "Validation failed",
+                            "Field 'file' is required",
+                            "/api/v1/files/upload",
+                            "corr-123"
+                    );
         }
 
         @Test
@@ -79,9 +91,16 @@ class DtoTest {
                     ))
                     .build();
 
-            assertThat(error.validationErrors()).hasSize(2);
-            assertThat(error.validationErrors().get(0).field()).isEqualTo("file");
-            assertThat(error.validationErrors().get(1).rejectedValue()).isEqualTo(-1);
+            assertThat(error.validationErrors())
+                    .hasSize(2)
+                    .extracting(
+                            ApiErrorDto.ValidationErrorDto::field,
+                            ApiErrorDto.ValidationErrorDto::rejectedValue
+                    )
+                    .containsExactly(
+                            tuple("file", null),
+                            tuple("size", -1)
+                    );
         }
 
         @Test
@@ -124,14 +143,27 @@ class DtoTest {
                     .message("File uploaded successfully")
                     .build();
 
-            assertThat(response.fileId()).isEqualTo(fileId);
-            assertThat(response.correlationId()).isEqualTo("corr-123");
-            assertThat(response.filename()).isEqualTo("document.pdf");
-            assertThat(response.sizeBytes()).isEqualTo(1024000L);
-            assertThat(response.sizeHuman()).isEqualTo("1000.00 KB");
-            assertThat(response.mimeType()).isEqualTo("application/pdf");
-            assertThat(response.status()).isEqualTo("UPLOADED");
-            assertThat(response.uploadedAt()).isEqualTo(now);
+            assertThat(response)
+                    .extracting(
+                            FileUploadResponseDto::fileId,
+                            FileUploadResponseDto::correlationId,
+                            FileUploadResponseDto::filename,
+                            FileUploadResponseDto::sizeBytes,
+                            FileUploadResponseDto::sizeHuman,
+                            FileUploadResponseDto::mimeType,
+                            FileUploadResponseDto::status,
+                            FileUploadResponseDto::uploadedAt
+                    )
+                    .containsExactly(
+                            fileId,
+                            "corr-123",
+                            "document.pdf",
+                            1024000L,
+                            "1000.00 KB",
+                            "application/pdf",
+                            "UPLOADED",
+                            now
+                    );
         }
 
         @Test
@@ -198,9 +230,13 @@ class DtoTest {
                     ""
             );
 
-            assertThat(error.field()).isEqualTo("fileName");
-            assertThat(error.message()).isEqualTo("must not be blank");
-            assertThat(error.rejectedValue()).isEqualTo("");
+            assertThat(error)
+                    .extracting(
+                            ApiErrorDto.ValidationErrorDto::field,
+                            ApiErrorDto.ValidationErrorDto::message,
+                            ApiErrorDto.ValidationErrorDto::rejectedValue
+                    )
+                    .containsExactly("fileName", "must not be blank", "");
         }
 
         @Test

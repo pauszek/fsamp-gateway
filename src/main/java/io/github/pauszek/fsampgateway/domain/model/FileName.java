@@ -8,7 +8,7 @@ public record FileName(String value) {
     private static final int MAX_LENGTH = 255;
     private static final Pattern INVALID_CHARS = Pattern.compile("[\\\\/:*?\"<>|\\x00-\\x1F]");
     private static final Pattern PATH_TRAVERSAL = Pattern.compile("\\.\\.[\\\\/]");
-    private static final Pattern UNSAFE_LOG_CHARS = Pattern.compile("[\\r\\n\\t\\x00-\\x1F\\x7F]");
+    private static final Pattern UNSAFE_LOG_CHARS = Pattern.compile("[\\x00-\\x1F\\x7F]");
 
     public FileName {
         Objects.requireNonNull(value, "File name cannot be null");

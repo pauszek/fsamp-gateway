@@ -3,6 +3,9 @@ package io.github.pauszek.fsampgateway.application.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Size;
 
+import java.util.Arrays;
+import java.util.Objects;
+
 @Schema(description = "File upload request metadata")
 public record FileUploadRequestDto(
         
@@ -18,8 +21,38 @@ public record FileUploadRequestDto(
         String[] tags
 ) {
     public FileUploadRequestDto {
-        if (tags == null) {
-            tags = new String[0];
+        tags = tags == null ? new String[0] : tags.clone();
+    }
+
+    @Override
+    public String[] tags() {
+        return tags.clone();
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if (this == other) {
+            return true;
         }
+        if (!(other instanceof FileUploadRequestDto that)) {
+            return false;
+        }
+        return Objects.equals(correlationId, that.correlationId)
+                && Objects.equals(description, that.description)
+                && Arrays.equals(tags, that.tags);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(correlationId, description);
+        result = 31 * result + Arrays.hashCode(tags);
+        return result;
+    }
+
+    @Override
+    public String toString() {
+        return "FileUploadRequestDto[correlationId=" + correlationId
+                + ", description=" + description
+                + ", tags=" + Arrays.toString(tags) + "]";
     }
 }

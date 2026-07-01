@@ -1,7 +1,5 @@
 package io.github.pauszek.fsampgateway.domain.model;
 
-import io.github.pauszek.fsampgateway.domain.model.EncryptionMetadata;
-import io.github.pauszek.fsampgateway.domain.model.StorageLocation;
 import lombok.Getter;
 
 @Getter

@@ -26,6 +26,7 @@ public class SnsEventPublisherAdapter implements EventPublisherPort {
 
     private static final Logger log = LoggerFactory.getLogger(SnsEventPublisherAdapter.class);
     private static final String CIRCUIT_BREAKER_NAME = "snsPublisher";
+    private static final String SNS_STRING_DATA_TYPE = "String";
 
     private final SnsClient snsClient;
     private final ObjectMapper objectMapper;
@@ -102,24 +103,24 @@ public class SnsEventPublisherAdapter implements EventPublisherPort {
         Map<String, MessageAttributeValue> attributes = new HashMap<>();
         
         attributes.put("eventType", MessageAttributeValue.builder()
-                .dataType("String")
+                .dataType(SNS_STRING_DATA_TYPE)
                 .stringValue(event.getEventType())
                 .build());
 
         if (event instanceof FileUploadedEvent fileEvent) {
             attributes.put("fileId", MessageAttributeValue.builder()
-                    .dataType("String")
+                    .dataType(SNS_STRING_DATA_TYPE)
                     .stringValue(fileEvent.fileId().toString())
                     .build());
 
             attributes.put("correlationId", MessageAttributeValue.builder()
-                    .dataType("String")
+                    .dataType(SNS_STRING_DATA_TYPE)
                     .stringValue(fileEvent.correlationId().toString())
                     .build());
             
             if (fileEvent.fileMetadata() != null) {
                 attributes.put("mimeType", MessageAttributeValue.builder()
-                        .dataType("String")
+                        .dataType(SNS_STRING_DATA_TYPE)
                         .stringValue(fileEvent.fileMetadata().getMimeType())
                         .build());
             }
