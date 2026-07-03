@@ -51,9 +51,10 @@ public class S3StorageAdapter implements FileStoragePort {
         return keyId;
     }
 
+    // No @Retry here: the InputStream argument is consumed by the first attempt,
+    // so a retry would upload truncated content or fail on a length mismatch.
     @Override
     @CircuitBreaker(name = CIRCUIT_BREAKER_NAME, fallbackMethod = "storeFallback")
-    @Retry(name = CIRCUIT_BREAKER_NAME)
     public StorageResult store(
             FileId fileId,
             InputStream content,

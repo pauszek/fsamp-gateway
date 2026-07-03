@@ -314,7 +314,7 @@ aws:
 
 security:
   cors:
-    allowed-origins: ${SECURITY_CORS_ALLOWED_ORIGINS:https://*.execute-api.us-west-2.amazonaws.com}
+    allowed-origins: ${SECURITY_CORS_ALLOWED_ORIGINS:}
 
 fsamp:
   security:
@@ -364,7 +364,7 @@ aws:
 
 security:
   cors:
-    allowed-origins: ${SECURITY_CORS_ALLOWED_ORIGINS:https://*.execute-api.us-west-2.amazonaws.com}
+    allowed-origins: ${SECURITY_CORS_ALLOWED_ORIGINS:}
 
 server:
   error:
