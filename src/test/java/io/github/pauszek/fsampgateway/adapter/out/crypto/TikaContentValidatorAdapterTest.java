@@ -176,16 +176,16 @@ class TikaContentValidatorAdapterTest {
         }
 
         @Test
-        @DisplayName("should return invalid for disallowed MIME type")
-        void shouldReturnInvalidForDisallowedType() {
+        @DisplayName("should return the detected MIME type for domain policy evaluation")
+        void shouldReturnDetectedTypeForDomainPolicyEvaluation() {
             byte[] elfHeader = new byte[] {0x7f, 'E', 'L', 'F', 0x02, 0x01, 0x01, 0x00};
             InputStream content = new ByteArrayInputStream(elfHeader);
             MimeType declaredType = MimeType.of("application/x-executable");
 
             ValidationResult result = adapter.validate(content, declaredType, "malware.exe");
 
-            assertThat(result.isValid()).isFalse();
-            assertThat(result.getMessage()).contains("is not allowed");
+            assertThat(result.isValid()).isTrue();
+            assertThat(result.getDetectedType().value()).isEqualTo("application/x-elf");
         }
 
         @Test

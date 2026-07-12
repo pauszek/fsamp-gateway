@@ -18,6 +18,7 @@ import software.amazon.awssdk.services.sns.SnsClient;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sts.StsClient;
 import software.amazon.awssdk.services.cloudwatch.CloudWatchClient;
+import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient;
 
 import java.net.URI;
 
@@ -46,6 +47,10 @@ public class AwsConfig {
                 throw new IllegalArgumentException(
                         "FSAMP active AWS deployments are pinned to the us-west-2 FIPS endpoint baseline: "
                                 + region);
+            }
+            if (!useFipsEndpoints) {
+                throw new IllegalArgumentException(
+                        "AWS FIPS endpoints must be enabled outside the local profile");
             }
             this.useFipsEndpoints = useFipsEndpoints;
         }
@@ -129,6 +134,16 @@ public class AwsConfig {
                     .fipsEnabled(useFipsEndpoints)
                     .build();
         }
+
+        @Bean
+        public CloudWatchAsyncClient cloudWatchAsyncClient(AwsCredentialsProvider credentialsProvider) {
+            log.info("Creating async CloudWatch client for region: {} (FIPS: {})", region, useFipsEndpoints);
+            return CloudWatchAsyncClient.builder()
+                    .region(Region.of(region))
+                    .credentialsProvider(credentialsProvider)
+                    .fipsEnabled(useFipsEndpoints)
+                    .build();
+        }
     }
 
     @Configuration
@@ -193,7 +208,7 @@ public class AwsConfig {
                     .credentialsProvider(credentialsProvider)
                     .build();
         }
-        
+
         @Bean
         public DynamoDbClient dynamoDbClient(AwsCredentialsProvider credentialsProvider) {
             log.info("Creating DynamoDB client for LocalStack: {}", localstackUrl);
@@ -218,6 +233,16 @@ public class AwsConfig {
         public CloudWatchClient cloudWatchClient(AwsCredentialsProvider credentialsProvider) {
             log.info("Creating CloudWatch client for LocalStack: {}", localstackUrl);
             return CloudWatchClient.builder()
+                    .region(Region.of(region))
+                    .endpointOverride(URI.create(localstackUrl))
+                    .credentialsProvider(credentialsProvider)
+                    .build();
+        }
+
+        @Bean
+        public CloudWatchAsyncClient cloudWatchAsyncClient(AwsCredentialsProvider credentialsProvider) {
+            log.info("Creating async CloudWatch client for LocalStack: {}", localstackUrl);
+            return CloudWatchAsyncClient.builder()
                     .region(Region.of(region))
                     .endpointOverride(URI.create(localstackUrl))
                     .credentialsProvider(credentialsProvider)

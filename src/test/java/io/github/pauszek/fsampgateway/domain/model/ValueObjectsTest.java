@@ -23,7 +23,7 @@ class ValueObjectsTest {
         @DisplayName("should normalize MIME type to lowercase")
         void shouldNormalizeToLowercase() {
             MimeType type = MimeType.of("APPLICATION/PDF");
-            
+
             assertThat(type.value()).isEqualTo("application/pdf");
         }
 
@@ -75,7 +75,7 @@ class ValueObjectsTest {
         @DisplayName("should return empty extension for file without extension")
         void shouldReturnEmptyExtensionForFileWithoutExtension() {
             FileName fileName = FileName.of("README");
-            
+
             assertThat(fileName.getExtension()).isEmpty();
             assertThat(fileName.getBaseName()).isEqualTo("README");
         }
@@ -84,7 +84,7 @@ class ValueObjectsTest {
         @DisplayName("should handle file starting with dot")
         void shouldHandleFileStartingWithDot() {
             FileName fileName = FileName.of(".gitignore");
-            
+
             assertThat(fileName.getExtension()).isEmpty();
             assertThat(fileName.getBaseName()).isEqualTo(".gitignore");
         }
@@ -93,7 +93,7 @@ class ValueObjectsTest {
         @DisplayName("should handle multiple dots in filename")
         void shouldHandleMultipleDots() {
             FileName fileName = FileName.of("archive.tar.gz");
-            
+
             assertThat(fileName.getExtension()).isEqualTo("gz");
             assertThat(fileName.getBaseName()).isEqualTo("archive.tar");
         }
@@ -109,7 +109,7 @@ class ValueObjectsTest {
         @DisplayName("should throw for filename exceeding max length")
         void shouldThrowForExceedingMaxLength() {
             String longName = "a".repeat(256);
-            
+
             assertThatThrownBy(() -> FileName.of(longName))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("exceeds maximum length");
@@ -194,33 +194,33 @@ class ValueObjectsTest {
         @DisplayName("should generate valid correlation ID")
         void shouldGenerateValidCorrelationId() {
             CorrelationId id = CorrelationId.generate();
-            
-            assertThat(id.value()).hasSize(32);
-            assertThat(id.value()).matches("^[a-f0-9]{32}$");
+
+            assertThat(id.value()).hasSize(36);
+            assertThat(id.value()).matches("^[a-f0-9-]{36}$");
         }
 
         @Test
         @DisplayName("should normalize to lowercase")
         void shouldNormalizeToLowercase() {
-            CorrelationId id = CorrelationId.of("A1B2C3D4E5F67890A1B2C3D4E5F67890");
-            
-            assertThat(id.value()).isEqualTo("a1b2c3d4e5f67890a1b2c3d4e5f67890");
+            CorrelationId id = CorrelationId.of("A1B2C3D4-E5F6-4890-A1B2-C3D4E5F67890");
+
+            assertThat(id.value()).isEqualTo("a1b2c3d4-e5f6-4890-a1b2-c3d4e5f67890");
         }
 
         @Test
         @DisplayName("should generate new ID for null input")
         void shouldGenerateNewIdForNull() {
             CorrelationId id = CorrelationId.of(null);
-            
-            assertThat(id.value()).isNotNull().hasSize(32);
+
+            assertThat(id.value()).isNotNull().hasSize(36);
         }
 
         @Test
         @DisplayName("should generate new ID for blank input")
         void shouldGenerateNewIdForBlank() {
             CorrelationId id = CorrelationId.of("   ");
-            
-            assertThat(id.value()).isNotNull().hasSize(32);
+
+            assertThat(id.value()).isNotNull().hasSize(36);
         }
 
         @Test
@@ -228,14 +228,14 @@ class ValueObjectsTest {
         void shouldThrowForInvalidFormat() {
             assertThatThrownBy(() -> CorrelationId.of("not-a-valid-hex"))
                     .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("32-character hex string");
+                    .hasMessageContaining("UUID v4");
         }
 
         @Test
         @DisplayName("should implement toString")
         void shouldImplementToString() {
-            CorrelationId id = CorrelationId.of("a1b2c3d4e5f67890a1b2c3d4e5f67890");
-            assertThat(id).hasToString("a1b2c3d4e5f67890a1b2c3d4e5f67890");
+            CorrelationId id = CorrelationId.of("a1b2c3d4-e5f6-4890-a1b2-c3d4e5f67890");
+            assertThat(id).hasToString("a1b2c3d4-e5f6-4890-a1b2-c3d4e5f67890");
         }
     }
 
@@ -247,7 +247,7 @@ class ValueObjectsTest {
         @DisplayName("should create SHA-256 checksum")
         void shouldCreateSha256Checksum() {
             Checksum checksum = Checksum.sha256("a".repeat(64));
-            
+
             assertThat(checksum.value()).isEqualTo("a".repeat(64));
             assertThat(checksum.algorithm()).isEqualTo(Checksum.Algorithm.SHA256);
         }
@@ -276,7 +276,7 @@ class ValueObjectsTest {
         @DisplayName("should create storage location")
         void shouldCreateStorageLocation() {
             StorageLocation location = StorageLocation.of("my-bucket", "uploads/file.pdf");
-            
+
             assertThat(location.bucketName()).isEqualTo("my-bucket");
             assertThat(location.objectKey()).isEqualTo("uploads/file.pdf");
         }
@@ -304,7 +304,7 @@ class ValueObjectsTest {
         @DisplayName("should create KMS encrypted metadata")
         void shouldCreateKmsEncrypted() {
             EncryptionMetadata metadata = EncryptionMetadata.kmsEncrypted("alias/my-key");
-            
+
             assertThat(metadata.kmsKeyId()).isEqualTo("alias/my-key");
             assertThat(metadata.encrypted()).isTrue();
             assertThat(metadata.getAlgorithmName()).isEqualTo("AES/GCM/NoPadding");
@@ -326,7 +326,7 @@ class ValueObjectsTest {
         @DisplayName("should create valid result")
         void shouldCreateValidResult() {
             ValidationResult result = ValidationResult.valid(MimeType.of("text/plain"));
-            
+
             assertThat(result.isValid()).isTrue();
             assertThat(result.isInvalid()).isFalse();
             assertThat(result.getDetectedType().value()).isEqualTo("text/plain");
@@ -337,10 +337,10 @@ class ValueObjectsTest {
         @DisplayName("should create invalid result")
         void shouldCreateInvalidResult() {
             ValidationResult result = ValidationResult.invalid(
-                    MimeType.of("application/x-msdownload"), 
+                    MimeType.of("application/x-msdownload"),
                     "Executable files not allowed"
             );
-            
+
             assertThat(result.isValid()).isFalse();
             assertThat(result.isInvalid()).isTrue();
             assertThat(result.getMessage()).isEqualTo("Executable files not allowed");
@@ -356,9 +356,9 @@ class ValueObjectsTest {
         void shouldCreateStorageResult() {
             StorageLocation location = StorageLocation.of("bucket", "key");
             EncryptionMetadata encryption = EncryptionMetadata.kmsEncrypted("key-id");
-            
+
             StorageResult result = StorageResult.of(location, encryption, "etag-123");
-            
+
             assertThat(result.getLocation()).isEqualTo(location);
             assertThat(result.getEncryptionMetadata()).isEqualTo(encryption);
             assertThat(result.getEtag()).isEqualTo("etag-123");
@@ -373,12 +373,12 @@ class ValueObjectsTest {
         @DisplayName("should create storage metadata")
         void shouldCreateStorageMetadata() {
             StorageMetadata metadata = StorageMetadata.of(
-                    "a1b2c3d4e5f67890a1b2c3d4e5f67890",
+                    "a1b2c3d4-e5f6-4890-a1b2-c3d4e5f67890",
                     "document.pdf",
                     "checksum123"
             );
-            
-            assertThat(metadata.getCorrelationId()).isEqualTo("a1b2c3d4e5f67890a1b2c3d4e5f67890");
+
+            assertThat(metadata.getCorrelationId()).isEqualTo("a1b2c3d4-e5f6-4890-a1b2-c3d4e5f67890");
             assertThat(metadata.getOriginalFilename()).isEqualTo("document.pdf");
             assertThat(metadata.getChecksum()).isEqualTo("checksum123");
         }
@@ -387,11 +387,11 @@ class ValueObjectsTest {
         @DisplayName("should handle null checksum")
         void shouldHandleNullChecksum() {
             StorageMetadata metadata = StorageMetadata.of(
-                    "a1b2c3d4e5f67890a1b2c3d4e5f67890",
+                    "a1b2c3d4-e5f6-4890-a1b2-c3d4e5f67890",
                     "document.pdf",
                     null
             );
-            
+
             assertThat(metadata.getChecksum()).isNull();
         }
     }
@@ -404,7 +404,7 @@ class ValueObjectsTest {
         @DisplayName("should create audit info")
         void shouldCreateAuditInfo() {
             AuditInfo info = AuditInfo.create("user-123");
-            
+
             assertThat(info.createdBy()).isEqualTo("user-123");
             assertThat(info.createdAt()).isNotNull();
             assertThat(info.createdAt()).isAfter(Instant.parse("2020-01-01T00:00:00Z"));
@@ -414,26 +414,26 @@ class ValueObjectsTest {
         @DisplayName("should update audit info")
         void shouldUpdateAuditInfo() {
             AuditInfo original = AuditInfo.create("user-123");
-            
+
             AuditInfo updated = original.update();
-            
+
             assertThat(updated.createdBy()).isEqualTo("user-123");
             assertThat(updated.updatedAt()).isAfterOrEqualTo(original.createdAt());
         }
-        
+
         @Test
         @DisplayName("should create system audit info")
         void shouldCreateSystemAuditInfo() {
             AuditInfo info = AuditInfo.system();
-            
+
             assertThat(info.createdBy()).isEqualTo("SYSTEM");
         }
-        
+
         @Test
         @DisplayName("should create anonymous audit info")
         void shouldCreateAnonymousAuditInfo() {
             AuditInfo info = AuditInfo.anonymous();
-            
+
             assertThat(info.createdBy()).isEqualTo("ANONYMOUS");
         }
     }
@@ -455,7 +455,7 @@ class ValueObjectsTest {
                     TEST_ISSUED_AT,
                     TEST_EXPIRES_AT
             );
-            
+
             assertThat(user.userId()).isEqualTo("user-123");
             assertThat(user.email()).isEqualTo("user@test.com");
             assertThat(user.name()).isEqualTo("Test User");
@@ -474,7 +474,7 @@ class ValueObjectsTest {
                     TEST_ISSUED_AT,
                     TEST_EXPIRES_AT
             );
-            
+
             assertThat(user.hasGroup("USERS")).isTrue();
             assertThat(user.hasGroup("ADMINS")).isFalse();
         }
@@ -490,7 +490,7 @@ class ValueObjectsTest {
                     TEST_ISSUED_AT,
                     TEST_EXPIRES_AT
             );
-            
+
             assertThat(user.hasScope("files.read")).isTrue();
             assertThat(user.hasScope("files.write")).isFalse();
         }
@@ -719,7 +719,7 @@ class ValueObjectsTest {
         @DisplayName("should mask KMS key in toString")
         void shouldMaskKmsKeyInToString() {
             EncryptionMetadata metadata = EncryptionMetadata.kmsEncrypted("alias/very-long-key-id-12345");
-            
+
             String str = metadata.toString();
             assertThat(str)
                     .contains("alia...2345")
@@ -730,7 +730,7 @@ class ValueObjectsTest {
         @DisplayName("should mask short KMS key in toString")
         void shouldMaskShortKmsKeyInToString() {
             EncryptionMetadata metadata = EncryptionMetadata.kmsEncrypted("short");
-            
+
             String str = metadata.toString();
             assertThat(str).contains("***");
         }
@@ -823,7 +823,7 @@ class ValueObjectsTest {
         void shouldMatchEqualChecksums() {
             Checksum checksum1 = Checksum.sha256("a".repeat(64));
             Checksum checksum2 = Checksum.sha256("A".repeat(64));
-            
+
             assertThat(checksum1.matches(checksum2)).isTrue();
         }
 
@@ -832,7 +832,7 @@ class ValueObjectsTest {
         void shouldNotMatchDifferentChecksums() {
             Checksum checksum1 = Checksum.sha256("a".repeat(64));
             Checksum checksum2 = Checksum.sha256("b".repeat(64));
-            
+
             assertThat(checksum1.matches(checksum2)).isFalse();
         }
 

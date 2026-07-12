@@ -113,7 +113,7 @@ class SecurityIntegrationTest {
                 .issuedAt(Instant.now().minusSeconds(7200))
                 .expiresAt(Instant.now().minusSeconds(3600)) // Expired 1 hour ago
                 .build();
-        
+
         when(jwtDecoder.decode(anyString())).thenReturn(jwt);
 
         mockMvc.perform(get("/api/v1/files/123")

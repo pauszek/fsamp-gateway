@@ -25,7 +25,7 @@ class UploadFileCommandTest {
                     .contentType("application/pdf")
                     .size(1024L)
                     .content(content)
-                    .correlationId("a1b2c3d4e5f67890a1b2c3d4e5f67890")
+                    .correlationId("a1b2c3d4-e5f6-4890-a1b2-c3d4e5f67890")
                     .uploadedBy("user-456")
                     .build();
 
@@ -33,7 +33,7 @@ class UploadFileCommandTest {
             assertThat(command.getContentType()).isEqualTo("application/pdf");
             assertThat(command.getSize()).isEqualTo(1024L);
             assertThat(command.getContent()).isSameAs(content);
-            assertThat(command.getCorrelationId()).isEqualTo("a1b2c3d4e5f67890a1b2c3d4e5f67890");
+            assertThat(command.getCorrelationId()).isEqualTo("a1b2c3d4-e5f6-4890-a1b2-c3d4e5f67890");
             assertThat(command.getUploadedBy()).isEqualTo("user-456");
         }
 
@@ -73,12 +73,12 @@ class UploadFileCommandTest {
             UploadFileCommand command = UploadFileCommand.builder()
                     .fileName("test.pdf")
                     .content(new ByteArrayInputStream("content".getBytes()))
-                    .correlationId("b1c2d3e4f5a67890b1c2d3e4f5a67890")
+                    .correlationId("b1c2d3e4-f5a6-4890-b1c2-d3e4f5a67890")
                     .build();
 
             CorrelationId result = command.getCorrelationIdOrGenerate();
 
-            assertThat(result.value()).isEqualTo("b1c2d3e4f5a67890b1c2d3e4f5a67890");
+            assertThat(result.value()).isEqualTo("b1c2d3e4-f5a6-4890-b1c2-d3e4f5a67890");
         }
 
         @Test

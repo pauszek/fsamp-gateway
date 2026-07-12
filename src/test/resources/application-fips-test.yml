@@ -30,7 +30,7 @@ cognito:
 aws:
   region: us-west-2
   endpoint: http://localhost:4566
-  fips-endpoints: false
+  fips-endpoints: true
   credentials:
     access-key: test
     secret-key: test

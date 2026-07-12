@@ -8,8 +8,12 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.kms.KmsClient;
+import software.amazon.awssdk.services.kms.model.DescribeKeyRequest;
+import software.amazon.awssdk.services.kms.model.KmsException;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,18 +32,26 @@ public class S3StorageAdapter implements FileStoragePort {
 
     private final S3Client s3Client;
     private final S3StorageProperties properties;
-    
+    private final KmsClient kmsClient;
+    private volatile String resolvedKmsKeyArn;
+
     @Value("${KMS_KEY_ID:#{null}}")
     private String fallbackKmsKeyId;
 
-    public S3StorageAdapter(S3Client s3Client, S3StorageProperties properties) {
+    @Autowired
+    public S3StorageAdapter(
+            S3Client s3Client,
+            S3StorageProperties properties,
+            KmsClient kmsClient
+    ) {
         this.s3Client = s3Client;
         this.properties = properties;
-        log.info("S3StorageAdapter initialized: bucketName={}, kmsKeyId={}", 
+        this.kmsClient = kmsClient;
+        log.info("S3StorageAdapter initialized: bucketName={}, kmsKeyId={}",
                 properties.getBucketName(), properties.getKmsKeyId());
     }
-    
-    private String getKmsKeyId() {
+
+    private String configuredKmsKeyId() {
         String keyId = properties.getKmsKeyId();
         if (keyId == null || keyId.isBlank()) {
             keyId = fallbackKmsKeyId;
@@ -49,6 +61,36 @@ public class S3StorageAdapter implements FileStoragePort {
             throw new StorageConfigurationException("KMS key id is required for S3 SSE-KMS encryption");
         }
         return keyId;
+    }
+
+    private String getKmsKeyArn() {
+        String cached = resolvedKmsKeyArn;
+        if (cached != null) {
+            return cached;
+        }
+        synchronized (this) {
+            if (resolvedKmsKeyArn != null) {
+                return resolvedKmsKeyArn;
+            }
+            String configuredKeyId = configuredKmsKeyId();
+            try {
+                String arn = kmsClient.describeKey(DescribeKeyRequest.builder()
+                                .keyId(configuredKeyId)
+                                .build())
+                        .keyMetadata()
+                        .arn();
+                if (arn == null || arn.isBlank()) {
+                    throw new StorageConfigurationException(
+                            "KMS DescribeKey returned no ARN for the configured key");
+                }
+                resolvedKmsKeyArn = arn;
+                log.info("Resolved configured KMS key to ARN: {}", arn);
+                return arn;
+            } catch (KmsException e) {
+                throw new StorageConfigurationException(
+                        "Cannot resolve configured KMS key to an ARN", e);
+            }
+        }
     }
 
     // No @Retry here: the InputStream argument is consumed by the first attempt,
@@ -64,7 +106,7 @@ public class S3StorageAdapter implements FileStoragePort {
     ) {
         String objectKey = generateObjectKey(fileId);
         String bucketName = properties.getBucketName();
-        String kmsKeyId = getKmsKeyId();
+        String kmsKeyId = getKmsKeyArn();
 
         log.info("Storing file: fileId={}, bucket={}, key={}", fileId, bucketName, objectKey);
 
@@ -116,6 +158,9 @@ public class S3StorageAdapter implements FileStoragePort {
             Exception e
     ) {
         log.error("Circuit breaker fallback for store: fileId={}, error={}", fileId, e.getMessage());
+        if (e instanceof StorageConfigurationException configurationException) {
+            throw configurationException;
+        }
         throw new StorageException("Storage service unavailable", e);
     }
 

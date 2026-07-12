@@ -10,7 +10,7 @@ public record EncryptionMetadata(
 
     public enum EncryptionAlgorithm {
         AES_256_GCM("AES/GCM/NoPadding", "AES-256-GCM");
-        
+
 
         private final String javaName;
         private final String displayName;

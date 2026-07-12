@@ -34,21 +34,21 @@ public class OpenApiConfig {
                 .title("FSAMP Gateway API")
                 .description("""
                         ## Bezpieczna platforma mikroserwisowa w chmurze AWS
-                        
+
                         **FSAMP (FedRAMP-aligned Secure AWS Microservices Platform)** - Gateway Service
-                        
+
                         ### Features:
                         - FIPS 140-3-oriented encryption controls (AWS KMS)
                         - Secure file upload with content validation
                         - Event-driven architecture (SNS/SQS)
                         - Full observability (metrics, tracing, logging)
                         - Enterprise security patterns
-                        
+
                         ### Architecture:
                         - Hexagonal Architecture (Ports & Adapters)
                         - Domain-Driven Design (DDD)
                         - Resilience patterns (Circuit Breaker, Retry)
-                        
+
                         ### Thesis Project
                         Master's thesis implementation demonstrating cloud-native microservices
                         with AWS Free Tier and LocalStack for local development.
@@ -82,11 +82,11 @@ public class OpenApiConfig {
                         .bearerFormat("JWT")
                         .description("""
                                 AWS Cognito JWT authentication.
-                                
+
                                 Obtain a token via:
                                 1. Cognito Hosted UI OAuth2 flow
                                 2. Cognito API (InitiateAuth)
-                                
+
                                 Token contains:
                                 - `cognito:groups` - User groups (admins, users)
                                 - `scope` - OAuth2 scopes (files.read, files.write)

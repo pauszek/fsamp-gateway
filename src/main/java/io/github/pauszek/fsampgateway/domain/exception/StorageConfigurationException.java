@@ -7,4 +7,8 @@ public class StorageConfigurationException extends DomainException {
     public StorageConfigurationException(String message) {
         super(ERROR_CODE, message);
     }
+
+    public StorageConfigurationException(String message, Throwable cause) {
+        super(ERROR_CODE, message, cause);
+    }
 }

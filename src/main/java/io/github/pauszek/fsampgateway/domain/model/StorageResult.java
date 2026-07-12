@@ -4,7 +4,7 @@ import lombok.Getter;
 
 @Getter
 public final class StorageResult {
-    
+
     private final StorageLocation location;
     private final EncryptionMetadata encryptionMetadata;
     private final String etag;

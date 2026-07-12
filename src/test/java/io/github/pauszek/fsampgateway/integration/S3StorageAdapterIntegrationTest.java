@@ -11,6 +11,7 @@ import io.github.pauszek.fsampgateway.domain.model.StorageResult;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import software.amazon.awssdk.core.ResponseInputStream;
+import software.amazon.awssdk.services.kms.KmsClient;
 import software.amazon.awssdk.services.s3.model.*;
 
 import java.io.ByteArrayInputStream;
@@ -27,12 +28,16 @@ class S3StorageAdapterIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private S3StorageProperties s3Properties;
 
+    @Autowired
+    private KmsClient kmsClient;
+
     private S3StorageAdapter s3StorageAdapter;
 
     @BeforeEach
     void setUp() {
         s3Properties.setBucketName(TEST_BUCKET);
-        s3StorageAdapter = new S3StorageAdapter(s3Client, s3Properties);
+        s3Properties.setKmsKeyId(kmsKeyId);
+        s3StorageAdapter = new S3StorageAdapter(s3Client, s3Properties, kmsClient);
     }
 
     @Nested
@@ -129,7 +134,7 @@ class S3StorageAdapterIntegrationTest extends BaseIntegrationTest {
             InputStream inputStream = new ByteArrayInputStream(contentBytes);
             FileSize fileSize = FileSize.of(contentBytes.length);
             MimeType mimeType = MimeType.of("text/plain");
-            String correlationId = "a1b2c3d4e5f67890a1b2c3d4e5f67890";
+            String correlationId = "a1b2c3d4-e5f6-4890-a1b2-c3d4e5f67890";
             String originalFilename = "original-file.txt";
             StorageMetadata metadata = StorageMetadata.of(
                     correlationId,

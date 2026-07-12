@@ -1,165 +1,117 @@
 package io.github.pauszek.fsampgateway.integration;
 
+import io.github.pauszek.fsampgateway.infrastructure.idempotency.IdempotencyConflictException;
 import io.github.pauszek.fsampgateway.infrastructure.idempotency.IdempotencyKeyService;
-import io.github.pauszek.fsampgateway.infrastructure.idempotency.IdempotencyKeyService.IdempotencyRecord;
-import io.github.pauszek.fsampgateway.infrastructure.idempotency.IdempotencyKeyService.KeyStatus;
-import org.junit.jupiter.api.*;
+import io.github.pauszek.fsampgateway.infrastructure.idempotency.InvalidIdempotencyKeyException;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import java.util.Optional;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DisplayName("IdempotencyKeyService Integration Tests")
 class IdempotencyKeyServiceIntegrationTest extends BaseIntegrationTest {
+
+    private static final String FINGERPRINT = "a".repeat(64);
 
     @Autowired
     private IdempotencyKeyService idempotencyKeyService;
 
     @Nested
-    @DisplayName("acquireKey")
     class AcquireKey {
 
         @Test
-        @DisplayName("should acquire new idempotency key successfully")
-        void shouldAcquireNewIdempotencyKeySuccessfully() {
-            String idempotencyKey = "idem-" + UUID.randomUUID();
-            String userId = "user-" + UUID.randomUUID();
+        void shouldAcquireAndCacheACompletedResponse() {
+            String key = uniqueKey("complete");
+            String user = uniqueUser();
 
-            Optional<IdempotencyRecord> result = idempotencyKeyService.acquireKey(idempotencyKey, userId);
+            IdempotencyKeyService.Acquisition first =
+                    idempotencyKeyService.acquireKey(key, user, FINGERPRINT);
+            assertThat(first.hasCachedResponse()).isFalse();
 
-            assertThat(result).isEmpty();
+            idempotencyKeyService.completeKey(
+                    key,
+                    user,
+                    first.ownerToken(),
+                    "{\"statusCode\":201,\"headers\":{},\"body\":\"{}\"}"
+            );
+            IdempotencyKeyService.Acquisition retry =
+                    idempotencyKeyService.acquireKey(key, user, FINGERPRINT);
+
+            assertThat(retry.hasCachedResponse()).isTrue();
+            assertThat(retry.cachedRecord().status())
+                    .isEqualTo(IdempotencyKeyService.KeyStatus.COMPLETED);
+            assertThat(retry.cachedRecord().requestFingerprint()).isEqualTo(FINGERPRINT);
         }
 
         @Test
-        @DisplayName("should return existing record for duplicate key after completion")
-        void shouldReturnExistingRecordForDuplicateKey() {
-            String idempotencyKey = "idem-duplicate-" + UUID.randomUUID();
-            String userId = "user-" + UUID.randomUUID();
-            
-            Optional<IdempotencyRecord> firstResult = idempotencyKeyService.acquireKey(idempotencyKey, userId);
-            assertThat(firstResult).isEmpty(); // First acquisition succeeds
-            
-            idempotencyKeyService.completeKey(idempotencyKey, userId, "{\"fileId\":\"123\"}");
+        void shouldRejectTheSameKeyForDifferentContent() {
+            String key = uniqueKey("mismatch");
+            String user = uniqueUser();
+            IdempotencyKeyService.Acquisition first =
+                    idempotencyKeyService.acquireKey(key, user, FINGERPRINT);
+            idempotencyKeyService.completeKey(key, user, first.ownerToken(), "response");
 
-            Optional<IdempotencyRecord> result = idempotencyKeyService.acquireKey(idempotencyKey, userId);
-
-            assertThat(result).isPresent();
-            assertThat(result.get().idempotencyKey()).isEqualTo(idempotencyKey);
-            assertThat(result.get().status()).isEqualTo(KeyStatus.COMPLETED);
-            assertThat(result.get().response()).isEqualTo("{\"fileId\":\"123\"}");
+            assertThatThrownBy(() -> idempotencyKeyService.acquireKey(key, user, "b".repeat(64)))
+                    .isInstanceOf(IdempotencyConflictException.class)
+                    .hasMessageContaining("different request");
         }
 
         @Test
-        @DisplayName("should handle null idempotency key gracefully")
-        void shouldHandleNullIdempotencyKeyGracefully() {
-            String userId = "user-" + UUID.randomUUID();
-
-            Optional<IdempotencyRecord> result = idempotencyKeyService.acquireKey(null, userId);
-
-            assertThat(result).isEmpty();
-        }
-
-        @Test
-        @DisplayName("should handle blank idempotency key gracefully")
-        void shouldHandleBlankIdempotencyKeyGracefully() {
-            String userId = "user-" + UUID.randomUUID();
-
-            Optional<IdempotencyRecord> result = idempotencyKeyService.acquireKey("   ", userId);
-
-            assertThat(result).isEmpty();
+        void shouldRejectInvalidKeys() {
+            assertThatThrownBy(() ->
+                    idempotencyKeyService.acquireKey("contains whitespace", uniqueUser(), FINGERPRINT))
+                    .isInstanceOf(InvalidIdempotencyKeyException.class);
         }
     }
 
     @Nested
-    @DisplayName("completeKey")
-    class CompleteKey {
+    class FailureRecovery {
 
         @Test
-        @DisplayName("should mark key as completed with response")
-        void shouldMarkKeyAsCompletedWithResponse() {
-            String idempotencyKey = "idem-complete-" + UUID.randomUUID();
-            String userId = "user-" + UUID.randomUUID();
-            String response = "{\"fileId\":\"file-123\",\"status\":\"uploaded\"}";
-            
-            idempotencyKeyService.acquireKey(idempotencyKey, userId);
+        void shouldAllowReacquisitionAfterTheOwnerReleasesAFailedRequest() {
+            String key = uniqueKey("fail");
+            String user = uniqueUser();
+            IdempotencyKeyService.Acquisition first =
+                    idempotencyKeyService.acquireKey(key, user, FINGERPRINT);
 
-            idempotencyKeyService.completeKey(idempotencyKey, userId, response);
+            idempotencyKeyService.failKey(key, user, first.ownerToken());
+            IdempotencyKeyService.Acquisition second =
+                    idempotencyKeyService.acquireKey(key, user, FINGERPRINT);
 
-            Optional<IdempotencyRecord> acquiredRecord = idempotencyKeyService.acquireKey(idempotencyKey, userId);
-            assertThat(acquiredRecord).isPresent();
-            assertThat(acquiredRecord.get().status()).isEqualTo(KeyStatus.COMPLETED);
-            assertThat(acquiredRecord.get().response()).isEqualTo(response);
+            assertThat(second.hasCachedResponse()).isFalse();
+            assertThat(second.ownerToken()).isNotEqualTo(first.ownerToken());
         }
     }
 
-    @Nested
-    @DisplayName("failKey")
-    class FailKey {
+    @Test
+    void shouldIsolateTheSameKeyByAuthenticatedUser() {
+        String key = uniqueKey("shared");
+        String firstUser = uniqueUser();
+        String secondUser = uniqueUser();
 
-        @Test
-        @DisplayName("should allow reacquisition after failure")
-        void shouldAllowReacquisitionAfterFailure() {
-            String idempotencyKey = "idem-fail-" + UUID.randomUUID();
-            String userId = "user-" + UUID.randomUUID();
-            
-            Optional<IdempotencyRecord> firstAcquire = idempotencyKeyService.acquireKey(idempotencyKey, userId);
-            assertThat(firstAcquire).isEmpty();
+        IdempotencyKeyService.Acquisition first =
+                idempotencyKeyService.acquireKey(key, firstUser, FINGERPRINT);
+        IdempotencyKeyService.Acquisition second =
+                idempotencyKeyService.acquireKey(key, secondUser, FINGERPRINT);
+        idempotencyKeyService.completeKey(key, firstUser, first.ownerToken(), "first");
+        idempotencyKeyService.completeKey(key, secondUser, second.ownerToken(), "second");
 
-            idempotencyKeyService.failKey(idempotencyKey, userId);
-
-            Optional<IdempotencyRecord> secondAcquire = idempotencyKeyService.acquireKey(idempotencyKey, userId);
-            assertThat(secondAcquire).isEmpty(); // Can acquire again after failure
-        }
+        assertThat(idempotencyKeyService.acquireKey(key, firstUser, FINGERPRINT)
+                .cachedRecord().response()).isEqualTo("first");
+        assertThat(idempotencyKeyService.acquireKey(key, secondUser, FINGERPRINT)
+                .cachedRecord().response()).isEqualTo("second");
     }
 
-    @Nested
-    @DisplayName("idempotency workflow")
-    class IdempotencyWorkflow {
+    private static String uniqueKey(String purpose) {
+        return "idem-" + purpose + "-" + UUID.randomUUID();
+    }
 
-        @Test
-        @DisplayName("should differentiate keys by user ID")
-        void shouldDifferentiateKeysByUserId() {
-            String idempotencyKey = "idem-shared-" + UUID.randomUUID();
-            String user1 = "user-1-" + UUID.randomUUID();
-            String user2 = "user-2-" + UUID.randomUUID();
-            
-            idempotencyKeyService.acquireKey(idempotencyKey, user1);
-            idempotencyKeyService.completeKey(idempotencyKey, user1, "{\"user\":\"1\"}");
-
-            Optional<IdempotencyRecord> result = idempotencyKeyService.acquireKey(idempotencyKey, user2);
-
-            assertThat(result).isEmpty();
-            
-            idempotencyKeyService.completeKey(idempotencyKey, user2, "{\"user\":\"2\"}");
-            
-            Optional<IdempotencyRecord> user1Record = idempotencyKeyService.acquireKey(idempotencyKey, user1);
-            Optional<IdempotencyRecord> user2Record = idempotencyKeyService.acquireKey(idempotencyKey, user2);
-            
-            assertThat(user1Record).isPresent();
-            assertThat(user1Record.get().response()).isEqualTo("{\"user\":\"1\"}");
-            
-            assertThat(user2Record).isPresent();
-            assertThat(user2Record.get().response()).isEqualTo("{\"user\":\"2\"}");
-        }
-
-        @Test
-        @DisplayName("should complete full idempotency workflow")
-        void shouldCompleteFullIdempotencyWorkflow() {
-            String idempotencyKey = "idem-workflow-" + UUID.randomUUID();
-            String userId = "user-" + UUID.randomUUID();
-            String expectedResponse = "{\"fileId\":\"abc-123\",\"status\":\"success\"}";
-
-            Optional<IdempotencyRecord> firstRequest = idempotencyKeyService.acquireKey(idempotencyKey, userId);
-            assertThat(firstRequest).isEmpty();
-
-            idempotencyKeyService.completeKey(idempotencyKey, userId, expectedResponse);
-
-            Optional<IdempotencyRecord> retryRequest = idempotencyKeyService.acquireKey(idempotencyKey, userId);
-            assertThat(retryRequest).isPresent();
-            assertThat(retryRequest.get().status()).isEqualTo(KeyStatus.COMPLETED);
-            assertThat(retryRequest.get().response()).isEqualTo(expectedResponse);
-        }
+    private static String uniqueUser() {
+        return "user-" + UUID.randomUUID();
     }
 }

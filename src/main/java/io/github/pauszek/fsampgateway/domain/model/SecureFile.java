@@ -1,12 +1,15 @@
 package io.github.pauszek.fsampgateway.domain.model;
 
 import java.util.Objects;
+import java.util.Set;
 
 public final class SecureFile {
 
     private final FileId id;
     private final CorrelationId correlationId;
     private final FileName fileName;
+    private final String description;
+    private final Set<String> tags;
     private final MimeType mimeType;
     private final FileSize size;
     private final Checksum checksum;
@@ -19,6 +22,8 @@ public final class SecureFile {
         this.id = Objects.requireNonNull(builder.id, "File ID is required");
         this.correlationId = Objects.requireNonNull(builder.correlationId, "Correlation ID is required");
         this.fileName = Objects.requireNonNull(builder.fileName, "File name is required");
+        this.description = normalizeDescription(builder.description);
+        this.tags = builder.tags == null ? Set.of() : Set.copyOf(builder.tags);
         this.mimeType = Objects.requireNonNull(builder.mimeType, "MIME type is required");
         this.size = Objects.requireNonNull(builder.size, "File size is required");
         this.checksum = builder.checksum;
@@ -35,10 +40,24 @@ public final class SecureFile {
             CorrelationId correlationId,
             String uploadedBy
     ) {
+        return createPending(fileName, mimeType, size, correlationId, uploadedBy, null, Set.of());
+    }
+
+    public static SecureFile createPending(
+            FileName fileName,
+            MimeType mimeType,
+            FileSize size,
+            CorrelationId correlationId,
+            String uploadedBy,
+            String description,
+            Set<String> tags
+    ) {
         return builder()
                 .id(FileId.generate())
                 .correlationId(correlationId)
                 .fileName(fileName)
+                .description(description)
+                .tags(tags)
                 .mimeType(mimeType)
                 .size(size)
                 .status(FileStatus.PENDING)
@@ -55,7 +74,7 @@ public final class SecureFile {
             throw new IllegalStateException(
                     "Cannot mark file as uploaded from status: " + this.status);
         }
-        
+
         return toBuilder()
                 .storageLocation(storageLocation)
                 .encryptionMetadata(encryptionMetadata)
@@ -70,7 +89,7 @@ public final class SecureFile {
             throw new IllegalStateException(
                     "Cannot start processing from status: " + this.status);
         }
-        
+
         return toBuilder()
                 .status(FileStatus.PROCESSING)
                 .auditInfo(auditInfo.update())
@@ -82,7 +101,7 @@ public final class SecureFile {
             throw new IllegalStateException(
                     "Cannot complete from status: " + this.status);
         }
-        
+
         return toBuilder()
                 .status(FileStatus.COMPLETED)
                 .auditInfo(auditInfo.update())
@@ -96,9 +115,18 @@ public final class SecureFile {
                 .build();
     }
 
+    public SecureFile markAsDeleting() {
+        return toBuilder()
+                .status(FileStatus.DELETING)
+                .auditInfo(auditInfo.update())
+                .build();
+    }
+
     public FileId getId() { return id; }
     public CorrelationId getCorrelationId() { return correlationId; }
     public FileName getFileName() { return fileName; }
+    public String getDescription() { return description; }
+    public Set<String> getTags() { return tags; }
     public MimeType getMimeType() { return mimeType; }
     public FileSize getSize() { return size; }
     public Checksum getChecksum() { return checksum; }
@@ -116,6 +144,8 @@ public final class SecureFile {
                 .id(this.id)
                 .correlationId(this.correlationId)
                 .fileName(this.fileName)
+                .description(this.description)
+                .tags(this.tags)
                 .mimeType(this.mimeType)
                 .size(this.size)
                 .checksum(this.checksum)
@@ -129,6 +159,8 @@ public final class SecureFile {
         private FileId id;
         private CorrelationId correlationId;
         private FileName fileName;
+        private String description;
+        private Set<String> tags = Set.of();
         private MimeType mimeType;
         private FileSize size;
         private Checksum checksum;
@@ -140,6 +172,8 @@ public final class SecureFile {
         public Builder id(FileId id) { this.id = id; return this; }
         public Builder correlationId(CorrelationId correlationId) { this.correlationId = correlationId; return this; }
         public Builder fileName(FileName fileName) { this.fileName = fileName; return this; }
+        public Builder description(String description) { this.description = description; return this; }
+        public Builder tags(Set<String> tags) { this.tags = tags; return this; }
         public Builder mimeType(MimeType mimeType) { this.mimeType = mimeType; return this; }
         public Builder size(FileSize size) { this.size = size; return this; }
         public Builder checksum(Checksum checksum) { this.checksum = checksum; return this; }
@@ -151,6 +185,13 @@ public final class SecureFile {
         public SecureFile build() {
             return new SecureFile(this);
         }
+    }
+
+    private static String normalizeDescription(String description) {
+        if (description == null || description.isBlank()) {
+            return null;
+        }
+        return description.trim();
     }
 
     @Override

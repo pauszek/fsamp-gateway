@@ -25,7 +25,7 @@ public class TikaContentValidatorAdapter implements ContentValidatorPort {
 
     private final Tika tika = new Tika();
     private boolean fipsEnabled = false;
-    
+
     @Value("${spring.profiles.active:}")
     private String activeProfile;
 
@@ -43,7 +43,7 @@ public class TikaContentValidatorAdapter implements ContentValidatorPort {
             log.info("Skipping FIPS provider for profile: {}", activeProfile);
             return;
         }
-        
+
         try {
             if (Security.getProvider(BouncyCastleFipsProvider.PROVIDER_NAME) == null) {
                 Security.addProvider(new BouncyCastleFipsProvider());
@@ -80,16 +80,11 @@ public class TikaContentValidatorAdapter implements ContentValidatorPort {
             String detected = tika.detect(content, fileName);
             MimeType detectedType = MimeType.of(detected);
 
-            log.debug("Validating content: declared={}, detected={}, file={}", 
+            log.debug("Validating content: declared={}, detected={}, file={}",
                     declaredType, detectedType, FileName.safeForLogs(fileName));
 
-            if (!detectedType.isAllowed()) {
-                return ValidationResult.invalid(detectedType, 
-                        "File type '" + detectedType + "' is not allowed");
-            }
-
             if (declaredType != null && !declaredType.value().equals(detectedType.value())) {
-                log.warn("MIME type mismatch detected: declared={}, actual={}, file={}", 
+                log.warn("MIME type mismatch detected: declared={}, actual={}, file={}",
                         declaredType, detectedType, FileName.safeForLogs(fileName));
             }
 
@@ -100,7 +95,7 @@ public class TikaContentValidatorAdapter implements ContentValidatorPort {
             return ValidationResult.invalid(declaredType, "Failed to validate content: " + e.getMessage());
         }
     }
-    
+
     private static final String FIPS_PROVIDER_NAME = BouncyCastleFipsProvider.PROVIDER_NAME;
 
     @Override
@@ -121,9 +116,9 @@ public class TikaContentValidatorAdapter implements ContentValidatorPort {
 
             byte[] hash = digest.digest();
             String hexHash = HexFormat.of().formatHex(hash);
-            
+
             return Checksum.sha256(hexHash);
-            
+
         } catch (Exception e) {
             log.error("Failed to compute checksum: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to compute checksum", e);

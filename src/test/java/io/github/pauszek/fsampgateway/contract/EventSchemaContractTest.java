@@ -66,7 +66,7 @@ class EventSchemaContractTest {
     class FileUploadedEventContract {
 
         @Test
-        @DisplayName("should produce valid JSON according to schema v1.1.2")
+        @DisplayName("should produce valid JSON according to schema v1.2.0")
         void shouldProduceValidJson() throws Exception {
             FileUploadedEvent event = createSampleEvent();
 
@@ -80,7 +80,7 @@ class EventSchemaContractTest {
         }
 
         @Test
-        @DisplayName("should include all required fields per schema v1.1.2")
+        @DisplayName("should include all required fields per schema v1.2.0")
         void shouldIncludeAllRequiredFields() throws Exception {
             FileUploadedEvent event = createSampleEvent();
 
@@ -101,7 +101,7 @@ class EventSchemaContractTest {
 
         @ParameterizedTest
         @CsvSource({
-                "schemaVersion, 1.1.2",
+                "schemaVersion, 1.2.0",
                 "source, fsamp-gateway",
                 "eventType, FILE_UPLOADED"
         })
@@ -116,9 +116,9 @@ class EventSchemaContractTest {
         }
 
         @ParameterizedTest
-        @ValueSource(strings = {"FILE_UPLOADED", "FILE_SCANNED", "ANALYSIS_COMPLETED", "PROCESSING_FAILED"})
-        @DisplayName("should accept valid event types from schema")
-        void shouldAcceptValidEventTypes(String eventType) throws Exception {
+        @ValueSource(strings = {"FILE_SCANNED", "ANALYSIS_COMPLETED", "PROCESSING_FAILED"})
+        @DisplayName("should reject processor event types from the gateway producer")
+        void shouldRejectProcessorEventTypes(String eventType) throws Exception {
             FileUploadedEvent event = new FileUploadedEvent(
                     FileUploadedEvent.SCHEMA_VERSION,
                     UUID.randomUUID(),
@@ -127,10 +127,10 @@ class EventSchemaContractTest {
                     EVENT_TIMESTAMP,
                     FileUploadedEvent.EVENT_SOURCE,
                     eventType,
-                    FilePayload.of("test.pdf", 1024L, "application/pdf", 
+                    FilePayload.of("test.pdf", 1024L, "application/pdf",
                             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
                     StoragePayload.of("fsamp-bucket", "uploads/test.pdf"),
-                    SecurityPayload.of(true, "AES/GCM/NoPadding", 
+                    SecurityPayload.of(true, "AES/GCM/NoPadding",
                             "arn:aws:kms:eu-central-1:123456789012:key/12345678-1234-1234-1234-123456789012")
             );
 
@@ -138,7 +138,7 @@ class EventSchemaContractTest {
             JsonNode jsonNode = OBJECT_MAPPER.readTree(json);
 
             Set<ValidationMessage> errors = schema.validate(jsonNode);
-            assertThat(errors).isEmpty();
+            assertThat(errors).isNotEmpty();
         }
     }
 
@@ -343,7 +343,7 @@ class EventSchemaContractTest {
         private String validJsonTemplate(String topLevelFields, String fileMetadataFields, String securityFields) {
             return """
                     {
-                        "schemaVersion": "1.1.2",
+                        "schemaVersion": "1.2.0",
                         "fileId": "550e8400-e29b-41d4-a716-446655440002",
                         "eventId": "550e8400-e29b-41d4-a716-446655440000",
                         "correlationId": "550e8400-e29b-41d4-a716-446655440001",
@@ -376,15 +376,15 @@ class EventSchemaContractTest {
                 FileUploadedEvent.EVENT_SOURCE,
                 FileUploadedEvent.EVENT_TYPE,
                 FilePayload.of(
-                        "document.pdf", 
-                        2048L, 
+                        "document.pdf",
+                        2048L,
                         "application/pdf",
                         "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
                 ),
                 StoragePayload.of("fsamp-secure-bucket", "uploads/2026/01/document.pdf"),
                 SecurityPayload.of(
-                        true, 
-                        "AES/GCM/NoPadding", 
+                        true,
+                        "AES/GCM/NoPadding",
                         "arn:aws:kms:eu-central-1:123456789012:key/12345678-1234-1234-1234-123456789012"
                 )
         );

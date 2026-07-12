@@ -103,7 +103,7 @@ class FileQueryDomainServiceTest {
     class Execute {
 
         @Test
-        @DisplayName("should delete uploaded file: mark failed -> delete S3 -> delete metadata")
+        @DisplayName("should delete uploaded file: mark deleting -> delete S3 -> delete metadata")
         void shouldDeleteUploadedFile() {
             SecureFile uploadedFile = createUploadedFile();
             given(fileRepository.findById(uploadedFile.getId())).willReturn(Optional.of(uploadedFile));
@@ -114,7 +114,7 @@ class FileQueryDomainServiceTest {
             var inOrder = inOrder(fileRepository, fileStorage);
             inOrder.verify(fileRepository).findById(uploadedFile.getId());
             inOrder.verify(fileRepository).save(fileCaptor.capture());
-            assertThat(fileCaptor.getValue().getStatus()).isEqualTo(FileStatus.FAILED);
+            assertThat(fileCaptor.getValue().getStatus()).isEqualTo(FileStatus.DELETING);
             inOrder.verify(fileStorage).delete(uploadedFile.getStorageLocation());
             inOrder.verify(fileRepository).delete(uploadedFile.getId());
         }
@@ -130,7 +130,7 @@ class FileQueryDomainServiceTest {
 
             then(fileStorage).shouldHaveNoInteractions(); // no S3 delete for pending file
             then(fileRepository).should().save(fileCaptor.capture());
-            assertThat(fileCaptor.getValue().getStatus()).isEqualTo(FileStatus.FAILED);
+            assertThat(fileCaptor.getValue().getStatus()).isEqualTo(FileStatus.DELETING);
             then(fileRepository).should().delete(pendingFile.getId());
         }
 
@@ -149,18 +149,19 @@ class FileQueryDomainServiceTest {
         }
 
         @Test
-        @DisplayName("should continue deletion when S3 delete fails")
-        void shouldContinueWhenS3DeleteFails() {
+        @DisplayName("should keep metadata recoverable when S3 delete fails")
+        void shouldKeepMetadataWhenS3DeleteFails() {
             SecureFile uploadedFile = createUploadedFile();
             given(fileRepository.findById(uploadedFile.getId())).willReturn(Optional.of(uploadedFile));
             given(fileRepository.save(any(SecureFile.class))).willAnswer(inv -> inv.getArgument(0));
             willThrow(new RuntimeException("S3 unavailable"))
                     .given(fileStorage).delete(any(StorageLocation.class));
 
-            assertThatCode(() -> service.execute(uploadedFile.getId()))
-                    .doesNotThrowAnyException();
+            assertThatThrownBy(() -> service.execute(uploadedFile.getId()))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("S3 unavailable");
 
-            then(fileRepository).should().delete(uploadedFile.getId());
+            then(fileRepository).should(never()).delete(uploadedFile.getId());
         }
     }
     private SecureFile createTestFile() {

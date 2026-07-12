@@ -19,13 +19,16 @@ public class DomainConfig {
             EventPublisherPort eventPublisher,
             FileRepositoryPort fileRepository,
             ContentValidatorPort contentValidator,
+            UploadSecurityProperties uploadSecurityProperties,
             @Value("${aws.dynamodb.direct-publish-after-outbox:false}") boolean directPublishAfterOutbox) {
-        
+
         return new FileUploadDomainService(
                 contentValidator,
                 fileStorage,
                 eventPublisher,
                 fileRepository,
+                uploadSecurityProperties.allowedContentTypes(),
+                uploadSecurityProperties.maxFileSizeBytes(),
                 directPublishAfterOutbox
         );
     }
@@ -34,7 +37,7 @@ public class DomainConfig {
     public FileQueryDomainService fileQueryDomainService(
             FileRepositoryPort fileRepository,
             FileStoragePort fileStorage) {
-        
+
         return new FileQueryDomainService(fileRepository, fileStorage);
     }
 

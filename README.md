@@ -22,6 +22,7 @@
 | **Idempotency** | DynamoDB-backed duplicate prevention |
 | **OAuth2 Security** | AWS Cognito JWT validation |
 | **Observability** | Metrics, structured logging, distributed tracing |
+| **Reliable events** | Schema 1.2.0 validation and transactional DynamoDB outbox |
 
 ## Quick Start
 
@@ -62,14 +63,15 @@ curl -X POST http://localhost:8080/api/v1/files/upload \
   -H "Authorization: Bearer <JWT_TOKEN>" \
   -H "X-Idempotency-Key: $(uuidgen)" \
   -F "file=@document.pdf" \
-  -F "correlationId=my-trace-123"
+  -F "correlationId=9b2c9fa4-8d5d-4f75-8de8-86335fcd4621"
 ```
 
 **Response** (`201 Created`):
+
 ```json
 {
   "fileId": "550e8400-e29b-41d4-a716-446655440000",
-  "correlationId": "my-trace-123",
+  "correlationId": "9b2c9fa4-8d5d-4f75-8de8-86335fcd4621",
   "filename": "document.pdf",
   "sizeBytes": 102400,
   "mimeType": "application/pdf",
@@ -93,14 +95,14 @@ curl -X POST http://localhost:8080/api/v1/files/upload \
 
 The gateway follows **Hexagonal Architecture** (Ports & Adapters):
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                        File Upload Flow                          │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │  Client ──▶ REST API ──▶ Domain Service ──┬──▶ S3 (KMS)         │
 │              │                            │                      │
-│              ▼                            ├──▶ SNS (events)      │
+│              ▼                            ├──▶ DynamoDB outbox   │
 │        Validation (Tika)                  │                      │
 │        SHA-256 Checksum                   └──▶ DynamoDB          │
 │                                                                  │
@@ -109,7 +111,7 @@ The gateway follows **Hexagonal Architecture** (Ports & Adapters):
 
 ### Project Structure
 
-```
+```text
 src/main/java/io/github/pauszek/fsampgateway/
 ├── adapter/           # Infrastructure adapters (REST, S3, SNS, DynamoDB)
 │   ├── in/web/        # REST controllers
@@ -136,6 +138,10 @@ src/main/java/io/github/pauszek/fsampgateway/
 | `KMS_KEY_ID` | KMS key ID/alias | `alias/fsamp-files-key` |
 | `SNS_TOPIC_ARN` | SNS topic for events | - |
 | `COGNITO_USER_POOL_ID` | Cognito User Pool ID | - |
+
+Non-local profiles accept Cognito access tokens with `files.read`,
+`files.write`, or `files.delete` scopes. Group fallback is restricted to
+local/dev/test profiles.
 
 ### Profiles
 
@@ -211,6 +217,10 @@ Please report security vulnerabilities to [security@fsamp.io](mailto:security@fs
 | **fsamp-infra** | Terraform IaC, Docker Compose, e2e tests, load tests |
 | **fsamp-event-schema** | Canonical JSON Schema for domain events |
 | **fsamp-code-ci** | Reusable GitHub Actions workflows & composite actions |
+
+## License
+
+MIT. See [LICENSE](LICENSE).
 
 ### Central Compliance Documentation (fsamp-infra)
 

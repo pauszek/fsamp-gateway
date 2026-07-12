@@ -37,7 +37,7 @@ class SnsEventPublisherAdapterIntegrationTest extends BaseIntegrationTest {
     void setUp() {
         snsProperties = new SnsPublisherProperties();
         snsProperties.setFileEventsTopicArn(topicArn);
-        
+
         snsEventPublisherAdapter = new SnsEventPublisherAdapter(snsClient, objectMapper, snsProperties);
 
         String queueArn = sqsClient.getQueueAttributes(GetQueueAttributesRequest.builder()
@@ -109,7 +109,7 @@ class SnsEventPublisherAdapterIntegrationTest extends BaseIntegrationTest {
 
                 List<Message> messages = response.messages();
                 assertThat(messages).isNotEmpty();
-                
+
                 String snsEnvelope = messages.get(0).body();
                 assertThat(snsEnvelope).contains("FILE_UPLOADED");
             });
@@ -190,11 +190,11 @@ class SnsEventPublisherAdapterIntegrationTest extends BaseIntegrationTest {
                 "application/pdf",
                 "sha256hashvalue"
         );
-        
+
         StoragePayload storagePayload = StoragePayload.of(TEST_BUCKET, "files/test/integration-test.pdf");
         SecurityPayload securityPayload = SecurityPayload.of(
-                true, 
-                "AES-256-GCM", 
+                true,
+                "AES-256-GCM",
                 "arn:aws:kms:us-west-2:000000000000:key/test-key"
         );
 

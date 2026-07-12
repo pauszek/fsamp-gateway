@@ -182,7 +182,7 @@ class SnsEventPublisherAdapterTest {
                 "application/pdf",
                 "sha256hash"
         );
-        
+
         StoragePayload storagePayload = StoragePayload.of("bucket", "key");
         SecurityPayload securityPayload = SecurityPayload.of(true, "AES-256-GCM", "kms-key-id");
 

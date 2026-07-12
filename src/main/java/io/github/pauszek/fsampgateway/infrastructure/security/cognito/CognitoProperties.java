@@ -7,23 +7,23 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "cognito")
 public record CognitoProperties(
-        
+
         @NotBlank(message = "Cognito region is required")
         String region,
-        
+
         @NotBlank(message = "Cognito userPoolId is required")
         String userPoolId,
-        
+
         @NotBlank(message = "Cognito clientId is required")
         String clientId,
-        
+
         String clientSecret,
-        
+
         String jwksEndpoint,
-        
+
         String issuerUri
 ) {
-    
+
     public String getJwksUri() {
         if (jwksEndpoint != null && !jwksEndpoint.isBlank()) {
             return jwksEndpoint;
@@ -34,7 +34,7 @@ public record CognitoProperties(
                 userPoolId
         );
     }
-    
+
     public String getIssuerUri() {
         if (issuerUri != null && !issuerUri.isBlank()) {
             return issuerUri;
@@ -45,7 +45,7 @@ public record CognitoProperties(
                 userPoolId
         );
     }
-    
+
     public String getUserPoolDomain() {
         return String.format(
                 "https://%s.auth.%s.amazoncognito.com",
@@ -53,11 +53,11 @@ public record CognitoProperties(
                 region
         );
     }
-    
+
     public String getTokenEndpoint() {
         return getUserPoolDomain() + "/oauth2/token";
     }
-    
+
     public String getAuthorizationEndpoint() {
         return getUserPoolDomain() + "/oauth2/authorize";
     }

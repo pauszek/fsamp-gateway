@@ -157,15 +157,11 @@ class AwsConfigTest {
         }
 
         @Test
-        @DisplayName("should keep us-west-2 pinned even when FIPS endpoint flag is disabled")
-        void shouldKeepUsWest2PinnedWhenFipsEndpointFlagIsDisabled() {
-            var usWest2Config = new AwsConfig.ProductionAwsConfig("us-west-2", false);
-            var provider = testCredentials();
-
-            S3Client client = usWest2Config.s3Client(provider);
-
-            assertThat(client).isNotNull();
-            client.close();
+        @DisplayName("should fail closed when FIPS endpoints are disabled")
+        void shouldFailClosedWhenFipsEndpointFlagIsDisabled() {
+            assertThatThrownBy(() -> new AwsConfig.ProductionAwsConfig("us-west-2", false))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("FIPS endpoints must be enabled");
         }
 
         @Test

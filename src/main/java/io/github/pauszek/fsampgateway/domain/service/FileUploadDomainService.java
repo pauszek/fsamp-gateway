@@ -38,6 +38,8 @@ public class FileUploadDomainService implements UploadFileUseCase {
     private final FileStoragePort fileStorage;
     private final EventPublisherPort eventPublisher;
     private final FileRepositoryPort fileRepository;
+    private final Set<String> allowedContentTypes;
+    private final long maxFileSizeBytes;
     private final boolean directPublishAfterOutbox;
 
     public FileUploadDomainService(
@@ -46,7 +48,8 @@ public class FileUploadDomainService implements UploadFileUseCase {
             EventPublisherPort eventPublisher,
             FileRepositoryPort fileRepository
     ) {
-        this(contentValidator, fileStorage, eventPublisher, fileRepository, false);
+        this(contentValidator, fileStorage, eventPublisher, fileRepository,
+                MimeType.ALLOWED_TYPES, FileSize.MAX_SIZE, false);
     }
 
     public FileUploadDomainService(
@@ -56,26 +59,55 @@ public class FileUploadDomainService implements UploadFileUseCase {
             FileRepositoryPort fileRepository,
             boolean directPublishAfterOutbox
     ) {
+        this(contentValidator, fileStorage, eventPublisher, fileRepository,
+                MimeType.ALLOWED_TYPES, FileSize.MAX_SIZE, directPublishAfterOutbox);
+    }
+
+    public FileUploadDomainService(
+            ContentValidatorPort contentValidator,
+            FileStoragePort fileStorage,
+            EventPublisherPort eventPublisher,
+            FileRepositoryPort fileRepository,
+            Set<String> allowedContentTypes,
+            long maxFileSizeBytes,
+            boolean directPublishAfterOutbox
+    ) {
         this.contentValidator = contentValidator;
         this.fileStorage = fileStorage;
         this.eventPublisher = eventPublisher;
         this.fileRepository = fileRepository;
+        this.allowedContentTypes = Set.copyOf(allowedContentTypes);
+        this.maxFileSizeBytes = maxFileSizeBytes;
         this.directPublishAfterOutbox = directPublishAfterOutbox;
     }
 
     @Override
     public SecureFile execute(UploadFileCommand command) {
         CorrelationId correlationId = command.getCorrelationIdOrGenerate();
+        String previousCorrelationId = MDC.get("correlationId");
         MDC.put("correlationId", correlationId.value());
 
         Path tempFile = null;
+        SecureFile file = null;
+        StorageLocation storedLocation = null;
+        boolean metadataSaved = false;
+        boolean durableUpload = false;
         try {
             if (log.isInfoEnabled()) {
                 log.info("Starting file upload: fileName={}, size={}, correlationId={}",
                         FileName.safeForLogs(command.getFileName()), command.getSize(), correlationId);
             }
+            FileSize validatedSize;
+            try {
+                validatedSize = FileSize.ofWithLimit(command.getSize(), maxFileSizeBytes);
+            } catch (IllegalArgumentException e) {
+                throw new FileValidationException(e.getMessage(), e);
+            }
             tempFile = bufferToTempFile(command);
             FileName fileName = FileName.of(command.getFileName());
+            if (command.getContentType() == null || command.getContentType().isBlank()) {
+                throw new FileValidationException("Content type is required");
+            }
             MimeType declaredType = MimeType.of(command.getContentType());
 
             ValidationResult validationResult;
@@ -88,7 +120,7 @@ public class FileUploadDomainService implements UploadFileUseCase {
             }
 
             MimeType validatedType = validationResult.getDetectedType();
-            if (!validatedType.isAllowed()) {
+            if (!allowedContentTypes.contains(validatedType.value())) {
                 throw new FileValidationException(
                         "File type '" + validatedType + "' is not allowed");
             }
@@ -96,12 +128,14 @@ public class FileUploadDomainService implements UploadFileUseCase {
             try (InputStream is = Files.newInputStream(tempFile)) {
                 checksum = contentValidator.computeChecksum(is);
             }
-            SecureFile file = SecureFile.createPending(
+            file = SecureFile.createPending(
                     fileName,
                     validatedType,
-                    FileSize.of(command.getSize()),
+                    validatedSize,
                     correlationId,
-                    command.getUploadedBy()
+                    command.getUploadedBy(),
+                    command.getDescription(),
+                    command.getTags()
             );
 
             log.debug("Created pending file entity: fileId={}", file.getId());
@@ -121,6 +155,7 @@ public class FileUploadDomainService implements UploadFileUseCase {
             }
 
             log.debug("File stored: location={}", storageResult.getLocation());
+            storedLocation = storageResult.getLocation();
             file = file.markAsUploaded(
                     storageResult.getLocation(),
                     storageResult.getEncryptionMetadata(),
@@ -129,18 +164,27 @@ public class FileUploadDomainService implements UploadFileUseCase {
             FileUploadedEvent event = FileUploadedEvent.from(file);
             if (fileRepository.supportsTransactionalOutbox()) {
                 file = fileRepository.saveWithOutbox(file, event);
+                metadataSaved = true;
+                durableUpload = true;
                 log.info("File metadata and FILE_UPLOADED outbox event persisted: fileId={}, eventId={}",
                         file.getId(), event.eventId());
                 if (directPublishAfterOutbox) {
-                    String messageId = eventPublisher.publish(event);
-                    log.info("Published FILE_UPLOADED event directly after outbox write (local fallback): messageId={}, fileId={}",
-                            messageId, file.getId());
+                    try {
+                        String messageId = eventPublisher.publish(event);
+                        log.info("Published FILE_UPLOADED event directly after outbox write (local fallback): messageId={}, fileId={}",
+                                messageId, file.getId());
+                    } catch (RuntimeException e) {
+                        log.warn("Direct publish failed; durable outbox will retry: fileId={}, error={}",
+                                file.getId(), e.getMessage());
+                    }
                 }
             } else {
                 file = fileRepository.save(file);
+                metadataSaved = true;
                 log.debug("File metadata persisted: fileId={}", file.getId());
 
                 String messageId = eventPublisher.publish(event);
+                durableUpload = true;
                 log.info("Published FILE_UPLOADED event directly: messageId={}, fileId={}",
                         messageId, file.getId());
             }
@@ -152,9 +196,41 @@ public class FileUploadDomainService implements UploadFileUseCase {
 
         } catch (IOException e) {
             throw new FileValidationException("I/O error during file upload", e);
+        } catch (RuntimeException e) {
+            if (storedLocation != null && !durableUpload) {
+                compensateFailedUpload(file, storedLocation, metadataSaved, e);
+            }
+            throw e;
         } finally {
             deleteTempFile(tempFile);
-            MDC.remove("correlationId");
+            if (previousCorrelationId == null) {
+                MDC.remove("correlationId");
+            } else {
+                MDC.put("correlationId", previousCorrelationId);
+            }
+        }
+    }
+
+    private void compensateFailedUpload(
+            SecureFile file,
+            StorageLocation storedLocation,
+            boolean metadataSaved,
+            RuntimeException originalFailure
+    ) {
+        if (metadataSaved && file != null) {
+            try {
+                fileRepository.delete(file.getId());
+            } catch (RuntimeException cleanupFailure) {
+                originalFailure.addSuppressed(cleanupFailure);
+                log.error("Failed to compensate metadata write: fileId={}", file.getId(), cleanupFailure);
+            }
+        }
+        try {
+            fileStorage.delete(storedLocation);
+            log.info("Compensated failed upload by deleting stored object: location={}", storedLocation);
+        } catch (RuntimeException cleanupFailure) {
+            originalFailure.addSuppressed(cleanupFailure);
+            log.error("Failed to compensate stored object: location={}", storedLocation, cleanupFailure);
         }
     }
 

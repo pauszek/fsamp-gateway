@@ -48,7 +48,7 @@ class FileUploadDomainServiceTest {
     private static final String TEST_CONTENT_TYPE = "application/pdf";
     private static final byte[] TEST_CONTENT = "PDF content".getBytes();
     private static final String TEST_USER = "user-123";
-    private static final String TEST_CORRELATION_ID = "a1b2c3d4e5f67890a1b2c3d4e5f67890";
+    private static final String TEST_CORRELATION_ID = "a1b2c3d4-e5f6-4890-a1b2-c3d4e5f67890";
     private static final String TEST_MESSAGE_ID = "msg-123";
 
     @BeforeEach
@@ -197,7 +197,7 @@ class FileUploadDomainServiceTest {
             mockSuccessfulValidation();
             mockSuccessfulStorage();
             mockSuccessfulEventPublish();
-            
+
             given(fileRepository.save(any())).willAnswer(invocation -> {
                 assertThat(MDC.get("correlationId")).isEqualTo(TEST_CORRELATION_ID);
                 return invocation.getArgument(0);
@@ -290,7 +290,7 @@ class FileUploadDomainServiceTest {
         void shouldPropagateStorageException() {
             var command = createValidCommand();
             mockSuccessfulValidation();
-            
+
             given(fileStorage.store(any(), any(), any(), any(), any()))
                     .willThrow(new io.github.pauszek.fsampgateway.domain.exception.StorageException("S3 error"));
 
@@ -313,7 +313,7 @@ class FileUploadDomainServiceTest {
             mockSuccessfulValidation();
             mockSuccessfulStorage();
             mockSuccessfulRepository();
-            
+
             given(eventPublisher.publish(any()))
                     .willThrow(new io.github.pauszek.fsampgateway.domain.exception.EventPublishException("SNS error"));
 

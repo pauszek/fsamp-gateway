@@ -5,6 +5,7 @@ import io.github.pauszek.fsampgateway.application.dto.FileUploadRequestDto;
 import io.github.pauszek.fsampgateway.application.dto.FileUploadResponseDto;
 import io.github.pauszek.fsampgateway.application.mapper.FileMapper;
 import io.github.pauszek.fsampgateway.domain.command.UploadFileCommand;
+import io.github.pauszek.fsampgateway.domain.model.CorrelationId;
 import io.github.pauszek.fsampgateway.domain.model.FileId;
 import io.github.pauszek.fsampgateway.domain.model.FileName;
 import io.github.pauszek.fsampgateway.domain.model.SecureFile;
@@ -16,6 +17,12 @@ import io.github.pauszek.fsampgateway.infrastructure.idempotency.Idempotent;
 import io.github.pauszek.fsampgateway.infrastructure.security.cognito.CurrentUserService;
 import io.github.resilience4j.bulkhead.annotation.Bulkhead;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
+import io.github.pauszek.fsampgateway.infrastructure.security.CorrelationIdFilter;
+import io.github.pauszek.fsampgateway.domain.exception.FileValidationException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
+import org.slf4j.MDC;
 import io.micrometer.core.annotation.Timed;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -58,17 +65,18 @@ public class FileUploadRestAdapter {
             summary = "Upload a file",
             description = """
                     Upload a file to the FSAMP platform for secure storage and processing.
-                    
+
                     The file will be:
                     1. Validated (size, content type)
                     2. Encrypted and stored in S3 using KMS (FIPS 140-3-oriented posture)
                     3. An event will be published for async processing
-                    
+
                     **Allowed file types:** PDF, PNG, JPEG, JSON, XML, TXT, CSV
-                    **Max file size:** 100MB
-                    
+                    **Max file size:** 9MiB through the AWS API Gateway deployment
+                    (the standalone service limit is configurable up to the 100MiB event-contract maximum)
+
                     **Required permissions:** `files.write` scope OR `users`/`admins` group membership
-                    
+
                     **Idempotency:** Send `X-Idempotency-Key` header for safe retries
                     """
     )
@@ -122,17 +130,20 @@ public class FileUploadRestAdapter {
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE
     )
-    @PreAuthorize("hasAnyAuthority('SCOPE_files.write', 'ROLE_USERS', 'ROLE_ADMINS')")
+    @PreAuthorize("hasAuthority('SCOPE_files.write') or "
+            + "(@authorizationPolicy.isGroupFallbackAllowed() and hasAnyRole('USERS', 'ADMINS'))")
     @Timed(value = "file.upload", description = "Time taken to upload a file")
-    @RateLimiter(name = "fileUpload", fallbackMethod = "uploadFileFallback")
-    @Bulkhead(name = "fileUpload", fallbackMethod = "uploadFileFallback")
+    @RateLimiter(name = "fileUpload")
+    @Bulkhead(name = "fileUpload")
     @Idempotent(responseType = FileUploadResponseDto.class)
     public ResponseEntity<FileUploadResponseDto> uploadFile(
             @Parameter(description = "File to upload", required = true)
             @RequestParam("file") MultipartFile file,
-            
+
             @Parameter(description = "Optional upload metadata")
-            @ModelAttribute FileUploadRequestDto request
+            @Valid @ModelAttribute FileUploadRequestDto request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse
     ) throws IOException {
         UserPrincipal currentUser = currentUserService.getCurrentUser()
                 .orElseThrow(() -> new IllegalStateException("User not found in security context"));
@@ -143,50 +154,44 @@ public class FileUploadRestAdapter {
                 file.getContentType(),
                 currentUser.userId());
 
+        CorrelationId correlationId = resolveCorrelationId(request, httpRequest);
+        MDC.put(CorrelationIdFilter.MDC_CORRELATION_ID, correlationId.value());
+        httpResponse.setHeader(CorrelationIdFilter.CORRELATION_ID_HEADER, correlationId.value());
+
         UploadFileCommand command = UploadFileCommand.builder()
                 .fileName(file.getOriginalFilename())
                 .contentType(file.getContentType())
                 .size(file.getSize())
                 .content(file.getInputStream())
-                .correlationId(request != null ? request.correlationId() : null)
+                .correlationId(correlationId.value())
                 .uploadedBy(currentUser.userId())
+                .description(request != null ? request.description() : null)
+                .tags(request == null
+                        ? java.util.Set.of()
+                        : java.util.Arrays.stream(request.tags())
+                                .map(String::trim)
+                                .collect(java.util.stream.Collectors.toUnmodifiableSet()))
                 .build();
 
         SecureFile uploadedFile = uploadFileUseCase.execute(command);
         FileUploadResponseDto response = fileMapper.toResponseDto(uploadedFile);
 
-        log.info("Upload successful: fileId={}, status={}, userId={}", 
+        log.info("Upload successful: fileId={}, status={}, userId={}",
                 uploadedFile.getId(), uploadedFile.getStatus(), currentUser.userId());
 
-        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
-                .path("/../{fileId}")
+        URI location = ServletUriComponentsBuilder.fromCurrentContextPath()
+                .path("/api/v1/files/{fileId}")
                 .buildAndExpand(uploadedFile.getId())
                 .toUri();
 
         return ResponseEntity.created(location).body(response);
     }
 
-    @SuppressWarnings("unused")
-    private ResponseEntity<FileUploadResponseDto> uploadFileFallback(
-            MultipartFile file,
-            FileUploadRequestDto request,
-            Exception ex) {
-        log.warn("Upload fallback triggered: {}", ex.getMessage());
-        
-        if (ex instanceof io.github.resilience4j.ratelimiter.RequestNotPermitted) {
-            throw new RateLimitExceededException("Upload rate limit exceeded. Please try again later.");
-        }
-        if (ex instanceof io.github.resilience4j.bulkhead.BulkheadFullException) {
-            throw new ServiceUnavailableException("Service is currently overloaded. Please try again later.");
-        }
-        throw new RuntimeException("Upload failed", ex);
-    }
-
     @Operation(
             summary = "Get file metadata",
             description = """
                     Retrieve metadata for a previously uploaded file.
-                    
+
                     **Required permissions:** `files.read` scope OR `users`/`admins` group membership
                     """
     )
@@ -211,7 +216,8 @@ public class FileUploadRestAdapter {
             content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
     )
     @GetMapping("/{fileId}")
-    @PreAuthorize("hasAnyAuthority('SCOPE_files.read', 'ROLE_USERS', 'ROLE_ADMINS')")
+    @PreAuthorize("hasAuthority('SCOPE_files.read') or "
+            + "(@authorizationPolicy.isGroupFallbackAllowed() and hasAnyRole('USERS', 'ADMINS'))")
     @Timed(value = "file.get", description = "Time taken to get file metadata")
     @RateLimiter(name = "fileDownload")
     public ResponseEntity<FileUploadResponseDto> getFile(
@@ -246,7 +252,7 @@ public class FileUploadRestAdapter {
             summary = "Delete a file",
             description = """
                     Delete a file from the platform.
-                    
+
                     **Required permissions:** `admins` group membership only
                     """
     )
@@ -270,7 +276,8 @@ public class FileUploadRestAdapter {
             content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
     )
     @DeleteMapping("/{fileId}")
-    @PreAuthorize("hasRole('ADMINS')")
+    @PreAuthorize("hasAuthority('SCOPE_files.delete') or "
+            + "(@authorizationPolicy.isGroupFallbackAllowed() and hasRole('ADMINS'))")
     @Timed(value = "file.delete", description = "Time taken to delete a file")
     public ResponseEntity<Void> deleteFile(
             @Parameter(description = "File ID", required = true)
@@ -283,6 +290,29 @@ public class FileUploadRestAdapter {
 
         log.info("File deleted successfully: fileId={}, userId={}", fileId, userId);
         return ResponseEntity.noContent().build();
+    }
+
+    private static CorrelationId resolveCorrelationId(
+            FileUploadRequestDto metadata,
+            HttpServletRequest request
+    ) {
+        String filtered = (String) request.getAttribute(CorrelationIdFilter.REQUEST_CORRELATION_ID);
+        CorrelationId headerCorrelation = CorrelationId.of(filtered);
+        if (metadata == null || metadata.correlationId() == null || metadata.correlationId().isBlank()) {
+            return headerCorrelation;
+        }
+        CorrelationId formCorrelation;
+        try {
+            formCorrelation = CorrelationId.of(metadata.correlationId());
+        } catch (IllegalArgumentException e) {
+            throw new FileValidationException(e.getMessage(), e);
+        }
+        String suppliedHeader = request.getHeader(CorrelationIdFilter.CORRELATION_ID_HEADER);
+        if (suppliedHeader != null && !suppliedHeader.isBlank() && !formCorrelation.equals(headerCorrelation)) {
+            throw new FileValidationException(
+                    "Correlation ID in multipart metadata must match X-Correlation-ID");
+        }
+        return formCorrelation;
     }
 
 }

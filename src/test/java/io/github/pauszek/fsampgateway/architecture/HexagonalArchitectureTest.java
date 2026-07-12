@@ -16,7 +16,7 @@ import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.sli
 class HexagonalArchitectureTest {
 
     private static final String BASE_PACKAGE = "io.github.pauszek.fsampgateway";
-    
+
     private static JavaClasses classes;
 
     @BeforeAll
@@ -81,14 +81,14 @@ class HexagonalArchitectureTest {
                     .layer("InfraConfig").definedBy("..infrastructure.config..")
                     .layer("InfraSecurity").definedBy("..infrastructure.security..", "..infrastructure.idempotency..")
                     .layer("InfraObservability").definedBy("..infrastructure.observability..")
-                    
+
                     .whereLayer("Domain").mayOnlyBeAccessedByLayers("Application", "Adapter", "InfraConfig", "InfraSecurity", "InfraObservability")
                     .whereLayer("Application").mayOnlyBeAccessedByLayers("Adapter", "InfraConfig", "InfraSecurity", "InfraObservability")
                     .whereLayer("Adapter").mayOnlyBeAccessedByLayers("InfraConfig", "InfraSecurity")
                     .whereLayer("InfraSecurity").mayOnlyBeAccessedByLayers("Adapter", "InfraConfig")
                     .whereLayer("InfraConfig").mayNotBeAccessedByAnyLayer()
                     .whereLayer("InfraObservability").mayNotBeAccessedByAnyLayer()
-                    
+
                     .check(classes);
         }
     }
@@ -232,7 +232,7 @@ class HexagonalArchitectureTest {
                     .should().beFreeOfCycles()
                     .because("Circular dependencies in domain lead to maintainability issues")
                     .check(classes);
-            
+
             slices()
                     .matching(BASE_PACKAGE + ".application.(*)..")
                     .should().beFreeOfCycles()

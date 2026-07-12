@@ -41,31 +41,30 @@ public class CognitoJwtConfig {
     @Bean
     public JwtDecoder jwtDecoder() {
         log.info("Configuring Cognito JWT decoder with issuer: {}", cognitoProperties.getIssuerUri());
-        
+
         NimbusJwtDecoder decoder = NimbusJwtDecoder
                 .withJwkSetUri(cognitoProperties.getJwksUri())
                 .jwsAlgorithm(SignatureAlgorithm.RS256)
                 .build();
-        
+
         OAuth2TokenValidator<Jwt> validators = new DelegatingOAuth2TokenValidator<>(
                 createValidators()
         );
-        
+
         decoder.setJwtValidator(validators);
-        
+
         return decoder;
     }
 
     private List<OAuth2TokenValidator<Jwt>> createValidators() {
         return List.of(
                 new JwtTimestampValidator(Duration.ofSeconds(30)),
-                
+
                 new JwtIssuerValidator(cognitoProperties.getIssuerUri()),
-                
+
                 cognitoClientValidator(),
-                
-                new JwtClaimValidator<>("token_use", 
-                        tokenUse -> "access".equals(tokenUse) || "id".equals(tokenUse))
+
+                new JwtClaimValidator<>("token_use", "access"::equals)
         );
     }
 
@@ -73,15 +72,13 @@ public class CognitoJwtConfig {
         return jwt -> {
             String expectedClientId = cognitoProperties.clientId();
             String accessTokenClientId = jwt.getClaimAsString("client_id");
-            List<String> audience = jwt.getAudience();
-
-            if (expectedClientId.equals(accessTokenClientId) || audience.contains(expectedClientId)) {
+            if (expectedClientId.equals(accessTokenClientId)) {
                 return OAuth2TokenValidatorResult.success();
             }
 
             return OAuth2TokenValidatorResult.failure(new OAuth2Error(
                     "invalid_token",
-                    "JWT client_id or audience does not match the configured Cognito client",
+                    "JWT client_id does not match the configured Cognito resource-server client",
                     null
             ));
         };
@@ -90,11 +87,11 @@ public class CognitoJwtConfig {
     @Bean
     public Converter<Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter(
             CognitoJwtRoleConverter cognitoJwtRoleConverter) {
-        
+
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
         converter.setJwtGrantedAuthoritiesConverter(cognitoJwtRoleConverter);
         converter.setPrincipalClaimName("sub"); // Use Cognito user ID as principal
-        
+
         return converter;
     }
 
