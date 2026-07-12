@@ -42,6 +42,7 @@ public class FileUploadDomainService implements UploadFileUseCase {
     private final Set<String> allowedContentTypes;
     private final long maxFileSizeBytes;
     private final boolean directPublishAfterOutbox;
+    private final String storageRegion;
 
     public FileUploadDomainService(
             ContentValidatorPort contentValidator,
@@ -50,7 +51,7 @@ public class FileUploadDomainService implements UploadFileUseCase {
             FileRepositoryPort fileRepository
     ) {
         this(contentValidator, fileStorage, eventPublisher, fileRepository,
-                MimeType.ALLOWED_TYPES, FileSize.MAX_SIZE, false);
+                MimeType.ALLOWED_TYPES, FileSize.MAX_SIZE, false, null);
     }
 
     public FileUploadDomainService(
@@ -61,7 +62,7 @@ public class FileUploadDomainService implements UploadFileUseCase {
             boolean directPublishAfterOutbox
     ) {
         this(contentValidator, fileStorage, eventPublisher, fileRepository,
-                MimeType.ALLOWED_TYPES, FileSize.MAX_SIZE, directPublishAfterOutbox);
+                MimeType.ALLOWED_TYPES, FileSize.MAX_SIZE, directPublishAfterOutbox, null);
     }
 
     public FileUploadDomainService(
@@ -73,6 +74,21 @@ public class FileUploadDomainService implements UploadFileUseCase {
             long maxFileSizeBytes,
             boolean directPublishAfterOutbox
     ) {
+        this(contentValidator, fileStorage, eventPublisher, fileRepository,
+                allowedContentTypes, maxFileSizeBytes, directPublishAfterOutbox, null);
+    }
+
+    @SuppressWarnings("java:S107")
+    public FileUploadDomainService(
+            ContentValidatorPort contentValidator,
+            FileStoragePort fileStorage,
+            EventPublisherPort eventPublisher,
+            FileRepositoryPort fileRepository,
+            Set<String> allowedContentTypes,
+            long maxFileSizeBytes,
+            boolean directPublishAfterOutbox,
+            String storageRegion
+    ) {
         this.contentValidator = contentValidator;
         this.fileStorage = fileStorage;
         this.eventPublisher = eventPublisher;
@@ -80,6 +96,7 @@ public class FileUploadDomainService implements UploadFileUseCase {
         this.allowedContentTypes = Set.copyOf(allowedContentTypes);
         this.maxFileSizeBytes = maxFileSizeBytes;
         this.directPublishAfterOutbox = directPublishAfterOutbox;
+        this.storageRegion = storageRegion;
     }
 
     @Override
@@ -134,7 +151,7 @@ public class FileUploadDomainService implements UploadFileUseCase {
                     storageResult.getEncryptionMetadata(),
                     validated.checksum()
             );
-            FileUploadedEvent event = FileUploadedEvent.from(file);
+            FileUploadedEvent event = FileUploadedEvent.from(file, storageRegion);
             if (fileRepository.supportsTransactionalOutbox()) {
                 file = fileRepository.saveWithOutbox(file, event);
                 metadataSaved = true;

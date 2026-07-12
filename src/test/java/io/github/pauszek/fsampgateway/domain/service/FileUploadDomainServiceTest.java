@@ -134,6 +134,16 @@ class FileUploadDomainServiceTest {
         @Test
         @DisplayName("should publish FileUploadedEvent with correct data")
         void shouldPublishFileUploadedEvent() {
+            service = new FileUploadDomainService(
+                    contentValidator,
+                    fileStorage,
+                    eventPublisher,
+                    fileRepository,
+                    MimeType.ALLOWED_TYPES,
+                    FileSize.MAX_SIZE,
+                    false,
+                    "us-west-2"
+            );
             var command = createValidCommand();
             mockSuccessfulValidation();
             mockSuccessfulStorage();
@@ -148,6 +158,7 @@ class FileUploadDomainServiceTest {
             assertThat(event.eventId()).isNotNull();
             assertThat(event.fileMetadata().getOriginalFilename()).isEqualTo(TEST_FILENAME);
             assertThat(event.fileMetadata().getMimeType()).isEqualTo(TEST_CONTENT_TYPE);
+            assertThat(event.storageLocation().getRegion()).isEqualTo("us-west-2");
         }
 
         @Test

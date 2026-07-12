@@ -33,6 +33,10 @@ public record FileUploadedEvent(
     }
 
     public static FileUploadedEvent from(SecureFile file) {
+        return from(file, null);
+    }
+
+    public static FileUploadedEvent from(SecureFile file, String storageRegion) {
         return new FileUploadedEvent(
                 SCHEMA_VERSION,
                 file.getId().value(),
@@ -49,7 +53,8 @@ public record FileUploadedEvent(
                 ),
                 StoragePayload.of(
                         file.getStorageLocation().bucketName(),
-                        file.getStorageLocation().objectKey()
+                        file.getStorageLocation().objectKey(),
+                        storageRegion
                 ),
                 SecurityPayload.of(
                         true,
