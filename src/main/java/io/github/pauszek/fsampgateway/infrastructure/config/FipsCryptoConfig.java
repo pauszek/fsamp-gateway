@@ -26,7 +26,7 @@ public class FipsCryptoConfig {
     @PostConstruct
     public void initializeFipsProvider() {
         log.info("Initializing FIPS 140-3 security configuration (ACCP + BouncyCastle FIPS)");
-        
+
         try {
             if (approvedOnlyMode) {
                 System.setProperty("org.bouncycastle.fips.approved_only", "true");
@@ -55,7 +55,7 @@ public class FipsCryptoConfig {
                 }
             }
             verifyFipsMode();
-            
+
         } catch (ReflectiveOperationException | IllegalStateException e) {
             log.error("Failed to initialize FIPS providers", e);
             throw new IllegalStateException("FIPS initialization failed - cannot start in non-FIPS mode", e);

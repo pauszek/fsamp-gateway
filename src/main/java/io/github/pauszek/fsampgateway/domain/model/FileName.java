@@ -12,24 +12,24 @@ public record FileName(String value) {
 
     public FileName {
         Objects.requireNonNull(value, "File name cannot be null");
-        
+
         if (value.isBlank()) {
             throw new IllegalArgumentException("File name cannot be blank");
         }
-        
+
         if (value.length() > MAX_LENGTH) {
             throw new IllegalArgumentException(
                     "File name exceeds maximum length of " + MAX_LENGTH + " characters");
         }
-        
+
         if (PATH_TRAVERSAL.matcher(value).find()) {
             throw new IllegalArgumentException("File name contains path traversal pattern");
         }
-        
+
         if (INVALID_CHARS.matcher(value).find()) {
             throw new IllegalArgumentException("File name contains invalid characters");
         }
-        
+
         value = value.trim();
     }
 

@@ -25,7 +25,7 @@
 
 ### High-Level Flow
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                           FSAMP Gateway - File Upload Flow                       │
 ├─────────────────────────────────────────────────────────────────────────────────┤
@@ -80,7 +80,7 @@ The project follows **Hexagonal Architecture** (Ports & Adapters) to maintain cl
 
 ### Package Structure
 
-```
+```text
 src/main/java/io/github/pauszek/fsampgateway/
 ├── FsampGatewayApplication.java     # Spring Boot entry point
 │
@@ -157,7 +157,7 @@ src/main/java/io/github/pauszek/fsampgateway/
 
 ### Dependency Flow
 
-```
+```text
                     ┌─────────────────────────┐
                     │       Adapters          │
                     │   (Infrastructure)       │
@@ -200,7 +200,7 @@ SecureFile
 
 ### File Status State Machine
 
-```
+```text
     ┌─────────┐         ┌──────────┐         ┌────────────┐         ┌───────────┐
     │ PENDING │────────▶│ UPLOADED │────────▶│ PROCESSING │────────▶│ COMPLETED │
     └─────────┘         └──────────┘         └────────────┘         └───────────┘
@@ -229,7 +229,7 @@ SecureFile
 
 The gateway implements a FIPS 140-3-oriented cryptographic posture:
 
-```
+```text
 ┌───────────────────────────────────────────────────────────────┐
 │                    FIPS 140-3 Cryptography                    │
 ├───────────────────────────────────────────────────────────────┤
@@ -250,6 +250,7 @@ The gateway implements a FIPS 140-3-oriented cryptographic posture:
 ```
 
 **Configuration**:
+
 ```yaml
 security:
   fips:
@@ -261,7 +262,7 @@ security:
 
 **OAuth2 Resource Server** with AWS Cognito:
 
-```
+```text
 ┌──────────────┐      ┌───────────────┐      ┌─────────────────┐
 │    Client    │─────▶│ AWS Cognito   │─────▶│  FSAMP Gateway  │
 │              │      │  (IdP)        │      │                 │
@@ -300,6 +301,7 @@ security:
 ```
 
 **Allowed MIME Types**:
+
 - `application/pdf`
 - `image/png`, `image/jpeg`
 - `application/json`, `application/xml`
@@ -315,13 +317,13 @@ security:
 |---------|---------|
 | **S3** | File storage (encrypted at rest with KMS) |
 | **KMS** | Envelope encryption (AES-256-GCM) |
-| **SNS** | Event publishing for async processing |
-| **DynamoDB** | Idempotency key storage, file metadata |
+| **SNS** | Delivery of outbox events for async processing |
+| **DynamoDB** | Idempotency keys, canonical file metadata, transactional outbox |
 | **Cognito** | OAuth2 authentication |
 
 ### Encryption Flow
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                     KMS Envelope Encryption                  │
 ├─────────────────────────────────────────────────────────────┤
@@ -350,7 +352,7 @@ Events follow a standardized JSON schema for interoperability:
 
 ```json
 {
-  "schemaVersion": "1.1.2",
+  "schemaVersion": "1.2.0",
   "fileId": "550e8400-e29b-41d4-a716-446655440000",
   "eventId": "123e4567-e89b-42d3-a456-426614174000",
   "correlationId": "123e4567-e89b-12d3-a456-426614174000",
@@ -385,7 +387,7 @@ The gateway implements several resilience patterns using **Resilience4j**:
 
 Prevents cascading failures when downstream services are unavailable:
 
-```
+```text
                    ┌─────────────────────────────────┐
                    │       Circuit Breaker           │
                    │                                 │
@@ -398,6 +400,7 @@ Prevents cascading failures when downstream services are unavailable:
 ```
 
 **Configuration**:
+
 ```yaml
 resilience4j:
   circuitbreaker:
@@ -410,7 +413,7 @@ resilience4j:
 
 ### Retry with Exponential Backoff
 
-```
+```text
 Attempt 1 ──failed──▶ wait 1s ──▶ Attempt 2 ──failed──▶ wait 2s ──▶ Attempt 3
 ```
 
@@ -460,6 +463,7 @@ correlationId: <optional-trace-id>
 ```
 
 **Response** (`201 Created`):
+
 ```json
 {
   "fileId": "550e8400-e29b-41d4-a716-446655440000",
@@ -494,7 +498,7 @@ GET /actuator/health
 | `401` | Missing or invalid JWT |
 | `403` | Insufficient permissions |
 | `409` | Idempotency key conflict |
-| `413` | File too large (>100MB) |
+| `413` | File exceeds the deployment limit (9MiB through API Gateway) |
 | `415` | Unsupported media type |
 | `429` | Rate limit exceeded |
 | `503` | Service unavailable (circuit open) |
@@ -544,6 +548,7 @@ docker run -p 8080:8080 \
 ### Kubernetes/ECS
 
 The Docker image includes:
+
 - Non-root user (`fsamp:1001`)
 - Health checks
 - JVM tuning for containers (`-XX:+UseContainerSupport`)
@@ -575,6 +580,7 @@ The Docker image includes:
 ### Architecture Tests (ArchUnit)
 
 Enforces architectural constraints:
+
 - Domain layer has no Spring dependencies
 - Adapters don't directly depend on each other
 - Cyclic dependencies are prohibited
@@ -593,11 +599,11 @@ Enforces architectural constraints:
 
 Structured logging with correlation ID:
 
-```
+```text
 2026-01-05 12:00:00.000 [http-nio-8080-exec-1] [123e4567-e89b-12d3-a456-426614174000] INFO FileUploadDomainService - File upload completed: fileId=550e8400, status=UPLOADED
 ```
 
-### Endpoints
+### Management Endpoints
 
 - `/actuator/health` - Health status
 - `/actuator/metrics` - Metrics

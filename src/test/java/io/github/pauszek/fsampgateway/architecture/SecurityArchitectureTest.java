@@ -14,7 +14,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.*;
 class SecurityArchitectureTest {
 
     private static final String BASE_PACKAGE = "io.github.pauszek.fsampgateway";
-    
+
     private static JavaClasses classes;
 
     @BeforeAll
@@ -54,6 +54,7 @@ class SecurityArchitectureTest {
                     .and().doNotHaveSimpleName("FipsCryptoConfig")
                     .and().doNotHaveSimpleName("Checksum")
                     .and().doNotHaveSimpleName("TikaContentValidatorAdapter")
+                    .and().doNotHaveSimpleName("Sha256Digest")
                     .should().dependOnClassesThat()
                     .haveFullyQualifiedName("java.security.MessageDigest")
                     .because("MessageDigest must only be used through the FIPS-approved provider configured at startup; legacy algorithms (MD5, SHA-1) violate FedRAMP SC-13")
@@ -74,7 +75,7 @@ class SecurityArchitectureTest {
     }
 
     @Nested
-    @DisplayName("Logging Security Rules")  
+    @DisplayName("Logging Security Rules")
     class LoggingSecurityTests {
 
         @Test

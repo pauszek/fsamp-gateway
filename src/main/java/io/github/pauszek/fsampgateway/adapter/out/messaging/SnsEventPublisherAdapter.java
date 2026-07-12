@@ -12,6 +12,7 @@ import io.github.resilience4j.retry.annotation.Retry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 import software.amazon.awssdk.services.sns.SnsClient;
 import software.amazon.awssdk.services.sns.model.MessageAttributeValue;
 import software.amazon.awssdk.services.sns.model.PublishRequest;
@@ -31,15 +32,27 @@ public class SnsEventPublisherAdapter implements EventPublisherPort {
     private final SnsClient snsClient;
     private final ObjectMapper objectMapper;
     private final SnsPublisherProperties properties;
+    private final EventContractValidator eventContractValidator;
+
+    @Autowired
+    public SnsEventPublisherAdapter(
+            SnsClient snsClient,
+            ObjectMapper objectMapper,
+            SnsPublisherProperties properties,
+            EventContractValidator eventContractValidator
+    ) {
+        this.snsClient = snsClient;
+        this.objectMapper = objectMapper;
+        this.properties = properties;
+        this.eventContractValidator = eventContractValidator;
+    }
 
     public SnsEventPublisherAdapter(
             SnsClient snsClient,
             ObjectMapper objectMapper,
             SnsPublisherProperties properties
     ) {
-        this.snsClient = snsClient;
-        this.objectMapper = objectMapper;
-        this.properties = properties;
+        this(snsClient, objectMapper, properties, null);
     }
 
     @Override
@@ -55,8 +68,11 @@ public class SnsEventPublisherAdapter implements EventPublisherPort {
     }
 
     private String doPublish(DomainEvent event) {
+        if (eventContractValidator != null) {
+            eventContractValidator.validate(event);
+        }
         String topicArn = resolveTopicArn(event);
-        
+
         try {
             String messageBody = objectMapper.writeValueAsString(event);
             Map<String, MessageAttributeValue> attributes = buildMessageAttributes(event);
@@ -71,7 +87,7 @@ public class SnsEventPublisherAdapter implements EventPublisherPort {
 
             PublishResponse response = snsClient.publish(request);
 
-            log.info("Event published: messageId={}, type={}", 
+            log.info("Event published: messageId={}, type={}",
                     response.messageId(), event.getEventType());
 
             return response.messageId();
@@ -87,7 +103,7 @@ public class SnsEventPublisherAdapter implements EventPublisherPort {
 
     @SuppressWarnings("unused")
     private String publishFallback(DomainEvent event, Exception e) {
-        log.error("Circuit breaker fallback for publish: type={}, error={}", 
+        log.error("Circuit breaker fallback for publish: type={}, error={}",
                 event.getEventType(), e.getMessage());
         throw new EventPublishException("Event publishing service unavailable", e);
     }
@@ -101,7 +117,7 @@ public class SnsEventPublisherAdapter implements EventPublisherPort {
 
     private Map<String, MessageAttributeValue> buildMessageAttributes(DomainEvent event) {
         Map<String, MessageAttributeValue> attributes = new HashMap<>();
-        
+
         attributes.put("eventType", MessageAttributeValue.builder()
                 .dataType(SNS_STRING_DATA_TYPE)
                 .stringValue(event.getEventType())
@@ -117,7 +133,7 @@ public class SnsEventPublisherAdapter implements EventPublisherPort {
                     .dataType(SNS_STRING_DATA_TYPE)
                     .stringValue(fileEvent.correlationId().toString())
                     .build());
-            
+
             if (fileEvent.fileMetadata() != null) {
                 attributes.put("mimeType", MessageAttributeValue.builder()
                         .dataType(SNS_STRING_DATA_TYPE)

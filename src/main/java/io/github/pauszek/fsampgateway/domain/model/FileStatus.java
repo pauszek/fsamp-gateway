@@ -1,17 +1,19 @@
 package io.github.pauszek.fsampgateway.domain.model;
 
 public enum FileStatus {
-    
+
     PENDING("pending", "File received, awaiting validation"),
-    
+
     UPLOADED("uploaded", "File stored, awaiting processing"),
-    
+
     SCANNING("scanning", "Security scan in progress"),
-    
+
     PROCESSING("processing", "File analysis in progress"),
-    
+
     COMPLETED("completed", "Processing completed"),
-    
+
+    DELETING("deleting", "Deletion in progress"),
+
     FAILED("failed", "Processing failed");
 
     private final String code;

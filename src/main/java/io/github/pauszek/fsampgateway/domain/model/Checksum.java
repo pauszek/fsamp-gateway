@@ -24,9 +24,9 @@ public record Checksum(String value, Algorithm algorithm) {
     public Checksum {
         Objects.requireNonNull(value, "Checksum value cannot be null");
         Objects.requireNonNull(algorithm, "Checksum algorithm cannot be null");
-        
+
         value = value.toLowerCase();
-        
+
         if (algorithm == Algorithm.SHA256 && !SHA256_PATTERN.matcher(value).matches()) {
             throw new IllegalArgumentException(
                     "Invalid SHA-256 checksum format: expected 64 hex characters");
@@ -39,7 +39,7 @@ public record Checksum(String value, Algorithm algorithm) {
 
     public boolean matches(Checksum other) {
         if (other == null) return false;
-        return this.algorithm == other.algorithm && 
+        return this.algorithm == other.algorithm &&
                this.value.equalsIgnoreCase(other.value);
     }
 

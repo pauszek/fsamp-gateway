@@ -45,18 +45,13 @@ public class FileQueryDomainService implements GetFileUseCase, DeleteFileUseCase
         SecureFile file = fileRepository.findById(fileId)
                 .orElseThrow(() -> new FileNotFoundException(fileId));
 
-        SecureFile deletedFile = file.markAsFailed();
-        fileRepository.save(deletedFile);
+        SecureFile deletingFile = file.markAsDeleting();
+        fileRepository.save(deletingFile);
 
         if (file.getStorageLocation() != null) {
-            try {
-                fileStorage.delete(file.getStorageLocation());
-                log.info("File removed from storage: fileId={}, location={}",
-                        fileId, file.getStorageLocation());
-            } catch (Exception e) {
-                log.warn("Failed to delete file from storage (metadata already updated): fileId={}, error={}",
-                        fileId, e.getMessage());
-            }
+            fileStorage.delete(file.getStorageLocation());
+            log.info("File removed from storage: fileId={}, location={}",
+                    fileId, file.getStorageLocation());
         }
 
         fileRepository.delete(fileId);

@@ -1,33 +1,53 @@
 package io.github.pauszek.fsampgateway.infrastructure.idempotency;
 
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.*;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.dynamodb.model.*;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
+import software.amazon.awssdk.services.dynamodb.model.DeleteItemRequest;
+import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
+import software.amazon.awssdk.services.dynamodb.model.GetItemResponse;
+import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
+import software.amazon.awssdk.services.dynamodb.model.PutItemResponse;
+import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
+import software.amazon.awssdk.services.dynamodb.model.UpdateItemResponse;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
-import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.BDDMockito.*;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("IdempotencyKeyService")
 class IdempotencyKeyServiceTest {
 
+    private static final String IDEM_KEY = "idem-key-123";
+    private static final String USER_ID = "user-123";
+    private static final String FINGERPRINT = "a".repeat(64);
+    private static final String TABLE = "test-idempotency";
+
     @Mock
     private DynamoDbClient dynamoDbClient;
 
-    @InjectMocks
-    private IdempotencyKeyService service;
-
     @Captor
     private ArgumentCaptor<PutItemRequest> putRequestCaptor;
+
+    @Captor
+    private ArgumentCaptor<GetItemRequest> getRequestCaptor;
 
     @Captor
     private ArgumentCaptor<UpdateItemRequest> updateRequestCaptor;
@@ -35,206 +55,159 @@ class IdempotencyKeyServiceTest {
     @Captor
     private ArgumentCaptor<DeleteItemRequest> deleteRequestCaptor;
 
-    private static final String IDEM_KEY = "idem-key-123";
-    private static final String USER_ID = "user-123";
+    private IdempotencyKeyService service;
+
+    @BeforeEach
+    void setUp() {
+        service = new IdempotencyKeyService(dynamoDbClient, TABLE);
+    }
 
     @Nested
     @DisplayName("acquireKey")
     class AcquireKey {
 
         @Test
-        @DisplayName("should acquire new key and return empty Optional")
-        void shouldAcquireNewKeyAndReturnEmpty() {
-            mockNoExistingKey();
+        void shouldAcquireNewKeyWithFingerprintAndOwnerToken() {
             given(dynamoDbClient.putItem(any(PutItemRequest.class)))
                     .willReturn(PutItemResponse.builder().build());
 
-            Optional<IdempotencyKeyService.IdempotencyRecord> result = 
-                    service.acquireKey(IDEM_KEY, USER_ID);
+            IdempotencyKeyService.Acquisition result =
+                    service.acquireKey(IDEM_KEY, USER_ID, FINGERPRINT);
 
-            assertThat(result).isEmpty();
+            assertThat(result.hasCachedResponse()).isFalse();
+            assertThat(result.ownerToken()).isNotBlank();
             then(dynamoDbClient).should().putItem(putRequestCaptor.capture());
-            assertThat(putRequestCaptor.getValue().item().get("idempotencyKey").s())
-                    .isEqualTo(IDEM_KEY);
-            assertThat(putRequestCaptor.getValue().item().get("status").s())
-                    .isEqualTo("IN_PROGRESS");
+            PutItemRequest request = putRequestCaptor.getValue();
+            assertThat(request.conditionExpression())
+                    .isEqualTo("attribute_not_exists(#pk) AND attribute_not_exists(#sk)");
+            assertThat(request.item())
+                    .containsEntry("idempotencyKey", AttributeValue.fromS(IDEM_KEY))
+                    .containsEntry("userId", AttributeValue.fromS(USER_ID))
+                    .containsEntry("status", AttributeValue.fromS("IN_PROGRESS"))
+                    .containsEntry("requestFingerprint", AttributeValue.fromS(FINGERPRINT));
         }
 
         @Test
-        @DisplayName("should return existing record for completed key")
-        void shouldReturnExistingRecordForCompletedKey() {
-            mockExistingCompletedKey();
+        void shouldReturnCompletedResponseAfterStronglyConsistentRead() {
+            rejectInitialPut();
+            given(dynamoDbClient.getItem(any(GetItemRequest.class)))
+                    .willReturn(completedItem(FINGERPRINT));
 
-            Optional<IdempotencyKeyService.IdempotencyRecord> result = 
-                    service.acquireKey(IDEM_KEY, USER_ID);
+            IdempotencyKeyService.Acquisition result =
+                    service.acquireKey(IDEM_KEY, USER_ID, FINGERPRINT);
 
-            assertThat(result).isPresent();
-            assertThat(result.get().status())
-                    .isEqualTo(IdempotencyKeyService.KeyStatus.COMPLETED);
-            assertThat(result.get().response()).isEqualTo("{\"fileId\":\"123\"}");
-            then(dynamoDbClient).should(never()).putItem(any(PutItemRequest.class));
+            assertThat(result.hasCachedResponse()).isTrue();
+            assertThat(result.cachedRecord().response()).isEqualTo("{\"fileId\":\"123\"}");
+            then(dynamoDbClient).should().getItem(getRequestCaptor.capture());
+            assertThat(getRequestCaptor.getValue().consistentRead()).isTrue();
         }
 
         @Test
-        @DisplayName("should throw IdempotencyConflictException for IN_PROGRESS key")
-        void shouldThrowIdempotencyConflictExceptionForInProgressKey() {
-            mockExistingInProgressKey(Instant.now()); // recent, not stale
+        void shouldRejectReuseForDifferentRequestFingerprint() {
+            rejectInitialPut();
+            given(dynamoDbClient.getItem(any(GetItemRequest.class)))
+                    .willReturn(completedItem("b".repeat(64)));
 
-            assertThatThrownBy(() -> service.acquireKey(IDEM_KEY, USER_ID))
+            assertThatThrownBy(() -> service.acquireKey(IDEM_KEY, USER_ID, FINGERPRINT))
+                    .isInstanceOf(IdempotencyConflictException.class)
+                    .hasMessageContaining("different request");
+        }
+
+        @Test
+        void shouldRejectRecentInProgressRequest() {
+            rejectInitialPut();
+            given(dynamoDbClient.getItem(any(GetItemRequest.class)))
+                    .willReturn(inProgressItem(Instant.now(), FINGERPRINT));
+
+            assertThatThrownBy(() -> service.acquireKey(IDEM_KEY, USER_ID, FINGERPRINT))
                     .isInstanceOf(IdempotencyConflictException.class)
                     .hasMessageContaining("already being processed");
         }
 
         @Test
-        @DisplayName("should allow retry for stale IN_PROGRESS keys (>5 min)")
-        void shouldAllowRetryForStaleInProgressKeys() {
-            Instant staleTime = Instant.now().minus(10, ChronoUnit.MINUTES);
-            mockExistingInProgressKey(staleTime);
-            given(dynamoDbClient.deleteItem(any(DeleteItemRequest.class)))
-                    .willReturn(DeleteItemResponse.builder().build());
-            given(dynamoDbClient.putItem(any(PutItemRequest.class)))
-                    .willReturn(PutItemResponse.builder().build());
-
-            Optional<IdempotencyKeyService.IdempotencyRecord> result = 
-                    service.acquireKey(IDEM_KEY, USER_ID);
-
-            assertThat(result).isEmpty(); // key acquired
-            then(dynamoDbClient).should().deleteItem(any(DeleteItemRequest.class));
-            then(dynamoDbClient).should().putItem(any(PutItemRequest.class));
-        }
-
-        @Test
-        @DisplayName("should handle race condition (ConditionalCheckFailedException)")
-        void shouldHandleRaceCondition() {
+        void shouldAtomicallyStealExpiredLeaseWithoutDeletePutRace() {
+            rejectInitialPut();
             given(dynamoDbClient.getItem(any(GetItemRequest.class)))
-                    .willReturn(GetItemResponse.builder().item(Map.of()).build())
-                    .willReturn(createCompletedItemResponse());
-            given(dynamoDbClient.putItem(any(PutItemRequest.class)))
-                    .willThrow(ConditionalCheckFailedException.builder()
-                            .message("Condition check failed").build());
-
-            Optional<IdempotencyKeyService.IdempotencyRecord> result = 
-                    service.acquireKey(IDEM_KEY, USER_ID);
-
-            assertThat(result).isPresent();
-        }
-
-        @Test
-        @DisplayName("should return empty for null idempotency key")
-        void shouldReturnEmptyForNullKey() {
-            Optional<IdempotencyKeyService.IdempotencyRecord> result = 
-                    service.acquireKey(null, USER_ID);
-
-            assertThat(result).isEmpty();
-            then(dynamoDbClient).shouldHaveNoInteractions();
-        }
-
-        @Test
-        @DisplayName("should return empty for blank idempotency key")
-        void shouldReturnEmptyForBlankKey() {
-            Optional<IdempotencyKeyService.IdempotencyRecord> result = 
-                    service.acquireKey("   ", USER_ID);
-
-            assertThat(result).isEmpty();
-            then(dynamoDbClient).shouldHaveNoInteractions();
-        }
-    }
-
-    @Nested
-    @DisplayName("completeKey")
-    class CompleteKey {
-
-        @Test
-        @DisplayName("should complete key with serialized response")
-        void shouldCompleteKeyWithSerializedResponse() {
-            String response = "{\"fileId\":\"123\",\"status\":\"uploaded\"}";
+                    .willReturn(inProgressItem(Instant.now().minus(10, ChronoUnit.MINUTES), FINGERPRINT));
             given(dynamoDbClient.updateItem(any(UpdateItemRequest.class)))
                     .willReturn(UpdateItemResponse.builder().build());
 
-            service.completeKey(IDEM_KEY, USER_ID, response);
+            IdempotencyKeyService.Acquisition result =
+                    service.acquireKey(IDEM_KEY, USER_ID, FINGERPRINT);
 
+            assertThat(result.ownerToken()).isNotBlank();
             then(dynamoDbClient).should().updateItem(updateRequestCaptor.capture());
-            UpdateItemRequest request = updateRequestCaptor.getValue();
-            assertThat(request.expressionAttributeValues())
-                    .containsEntry(":status", AttributeValue.fromS("COMPLETED"))
-                    .containsEntry(":response", AttributeValue.fromS(response));
+            assertThat(updateRequestCaptor.getValue().conditionExpression())
+                    .contains("#created = :previousCreated")
+                    .contains("#fingerprint = :fingerprint");
+            then(dynamoDbClient).should(never()).deleteItem(any(DeleteItemRequest.class));
         }
 
         @Test
-        @DisplayName("should do nothing for null key")
-        void shouldDoNothingForNullKey() {
-            service.completeKey(null, USER_ID, "response");
-
+        void shouldRejectMissingOrMalformedKeysBeforeCallingDynamoDb() {
+            assertThatThrownBy(() -> service.acquireKey(null, USER_ID, FINGERPRINT))
+                    .isInstanceOf(InvalidIdempotencyKeyException.class);
+            assertThatThrownBy(() -> service.acquireKey("contains whitespace", USER_ID, FINGERPRINT))
+                    .isInstanceOf(InvalidIdempotencyKeyException.class);
+            String oversizedKey = "x".repeat(129);
+            assertThatThrownBy(() -> service.acquireKey(oversizedKey, USER_ID, FINGERPRINT))
+                    .isInstanceOf(InvalidIdempotencyKeyException.class);
             then(dynamoDbClient).shouldHaveNoInteractions();
         }
 
-        @Test
-        @DisplayName("should do nothing for blank key")
-        void shouldDoNothingForBlankKey() {
-            service.completeKey("  ", USER_ID, "response");
-
-            then(dynamoDbClient).shouldHaveNoInteractions();
+        private void rejectInitialPut() {
+            given(dynamoDbClient.putItem(any(PutItemRequest.class)))
+                    .willThrow(ConditionalCheckFailedException.builder().message("exists").build());
         }
     }
 
-    @Nested
-    @DisplayName("failKey")
-    class FailKey {
+    @Test
+    void shouldCompleteOnlyTheLeaseOwnedByThisRequest() {
+        given(dynamoDbClient.updateItem(any(UpdateItemRequest.class)))
+                .willReturn(UpdateItemResponse.builder().build());
 
-        @Test
-        @DisplayName("should delete key on failure")
-        void shouldDeleteKeyOnFailure() {
-            given(dynamoDbClient.deleteItem(any(DeleteItemRequest.class)))
-                    .willReturn(DeleteItemResponse.builder().build());
+        service.completeKey(IDEM_KEY, USER_ID, "owner-token", "{\"status\":201}");
 
-            service.failKey(IDEM_KEY, USER_ID);
-
-            then(dynamoDbClient).should().deleteItem(deleteRequestCaptor.capture());
-            assertThat(deleteRequestCaptor.getValue().key().get("idempotencyKey").s())
-                    .isEqualTo(IDEM_KEY);
-        }
-
-        @Test
-        @DisplayName("should do nothing for null key")
-        void shouldDoNothingForNullKey() {
-            service.failKey(null, USER_ID);
-
-            then(dynamoDbClient).shouldHaveNoInteractions();
-        }
+        then(dynamoDbClient).should().updateItem(updateRequestCaptor.capture());
+        UpdateItemRequest request = updateRequestCaptor.getValue();
+        assertThat(request.conditionExpression()).isEqualTo("#status = :inProgress AND #owner = :owner");
+        assertThat(request.expressionAttributeValues())
+                .containsEntry(":completed", AttributeValue.fromS("COMPLETED"))
+                .containsEntry(":owner", AttributeValue.fromS("owner-token"))
+                .containsEntry(":response", AttributeValue.fromS("{\"status\":201}"));
     }
 
+    @Test
+    void shouldReleaseOnlyTheLeaseOwnedByThisRequest() {
+        service.failKey(IDEM_KEY, USER_ID, "owner-token");
 
-    private void mockNoExistingKey() {
-        given(dynamoDbClient.getItem(any(GetItemRequest.class)))
-                .willReturn(GetItemResponse.builder().item(Map.of()).build());
+        then(dynamoDbClient).should().deleteItem(deleteRequestCaptor.capture());
+        DeleteItemRequest request = deleteRequestCaptor.getValue();
+        assertThat(request.conditionExpression()).isEqualTo("#status = :inProgress AND #owner = :owner");
+        assertThat(request.expressionAttributeValues())
+                .containsEntry(":owner", AttributeValue.fromS("owner-token"));
     }
 
-    private void mockExistingCompletedKey() {
-        given(dynamoDbClient.getItem(any(GetItemRequest.class)))
-                .willReturn(createCompletedItemResponse());
+    private static GetItemResponse completedItem(String fingerprint) {
+        return GetItemResponse.builder().item(Map.of(
+                "idempotencyKey", AttributeValue.fromS(IDEM_KEY),
+                "userId", AttributeValue.fromS(USER_ID),
+                "status", AttributeValue.fromS("COMPLETED"),
+                "requestFingerprint", AttributeValue.fromS(fingerprint),
+                "ownerToken", AttributeValue.fromS("owner-token"),
+                "response", AttributeValue.fromS("{\"fileId\":\"123\"}"),
+                "createdAt", AttributeValue.fromS(Instant.now().toString())
+        )).build();
     }
 
-    private GetItemResponse createCompletedItemResponse() {
-        return GetItemResponse.builder()
-                .item(Map.of(
-                        "idempotencyKey", AttributeValue.builder().s(IDEM_KEY).build(),
-                        "userId", AttributeValue.builder().s(USER_ID).build(),
-                        "status", AttributeValue.builder().s("COMPLETED").build(),
-                        "response", AttributeValue.builder().s("{\"fileId\":\"123\"}").build(),
-                        "createdAt", AttributeValue.builder().s(Instant.now().toString()).build()
-                ))
-                .build();
-    }
-
-    private void mockExistingInProgressKey(Instant createdAt) {
-        given(dynamoDbClient.getItem(any(GetItemRequest.class)))
-                .willReturn(GetItemResponse.builder()
-                        .item(Map.of(
-                                "idempotencyKey", AttributeValue.builder().s(IDEM_KEY).build(),
-                                "userId", AttributeValue.builder().s(USER_ID).build(),
-                                "status", AttributeValue.builder().s("IN_PROGRESS").build(),
-                                "createdAt", AttributeValue.builder().s(createdAt.toString()).build()
-                        ))
-                        .build());
+    private static GetItemResponse inProgressItem(Instant createdAt, String fingerprint) {
+        return GetItemResponse.builder().item(Map.of(
+                "idempotencyKey", AttributeValue.fromS(IDEM_KEY),
+                "userId", AttributeValue.fromS(USER_ID),
+                "status", AttributeValue.fromS("IN_PROGRESS"),
+                "requestFingerprint", AttributeValue.fromS(fingerprint),
+                "ownerToken", AttributeValue.fromS("old-owner"),
+                "createdAt", AttributeValue.fromS(createdAt.toString())
+        )).build();
     }
 }

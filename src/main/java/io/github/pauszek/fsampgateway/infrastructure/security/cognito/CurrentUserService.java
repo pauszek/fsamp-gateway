@@ -23,15 +23,15 @@ public class CurrentUserService {
 
     public Optional<UserPrincipal> getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        
+
         if (authentication == null || !authentication.isAuthenticated()) {
             return Optional.empty();
         }
-        
+
         if (authentication instanceof JwtAuthenticationToken jwtAuth) {
             return Optional.of(extractUserPrincipal(jwtAuth.getToken()));
         }
-        
+
         log.warn("Unexpected authentication type: {}", authentication.getClass());
         return Optional.empty();
     }
@@ -72,25 +72,25 @@ public class CurrentUserService {
     @SuppressWarnings("unchecked")
     private Set<String> extractGroups(Jwt jwt) {
         Object groups = jwt.getClaim(COGNITO_GROUPS_CLAIM);
-        
+
         if (groups instanceof List<?> list) {
             return new HashSet<>((List<String>) list);
         }
-        
+
         return Set.of();
     }
 
     private Set<String> extractScopes(Jwt jwt) {
         Object scopeClaim = jwt.getClaim(SCOPE_CLAIM);
-        
+
         if (scopeClaim instanceof String scopeString) {
             return new HashSet<>(Arrays.asList(scopeString.split("\\s+")));
         }
-        
+
         if (scopeClaim instanceof List<?> scopeList) {
             return new HashSet<>((List<String>) scopeList);
         }
-        
+
         return Set.of();
     }
 }

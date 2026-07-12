@@ -13,6 +13,7 @@ import software.amazon.awssdk.services.sns.SnsClient;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sts.StsClient;
 import software.amazon.awssdk.services.cloudwatch.CloudWatchClient;
+import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -116,6 +117,16 @@ class AwsConfigTest {
             assertThat(cloudWatchClient).isNotNull();
             cloudWatchClient.close();
         }
+
+        @Test
+        void shouldCreateAsyncCloudWatchClientWithLocalStackEndpoint() {
+            AwsCredentialsProvider provider = config.awsCredentialsProvider();
+
+            CloudWatchAsyncClient cloudWatchClient = config.cloudWatchAsyncClient(provider);
+
+            assertThat(cloudWatchClient).isNotNull();
+            cloudWatchClient.close();
+        }
     }
 
     @Nested
@@ -157,15 +168,11 @@ class AwsConfigTest {
         }
 
         @Test
-        @DisplayName("should keep us-west-2 pinned even when FIPS endpoint flag is disabled")
-        void shouldKeepUsWest2PinnedWhenFipsEndpointFlagIsDisabled() {
-            var usWest2Config = new AwsConfig.ProductionAwsConfig("us-west-2", false);
-            var provider = testCredentials();
-
-            S3Client client = usWest2Config.s3Client(provider);
-
-            assertThat(client).isNotNull();
-            client.close();
+        @DisplayName("should fail closed when FIPS endpoints are disabled")
+        void shouldFailClosedWhenFipsEndpointFlagIsDisabled() {
+            assertThatThrownBy(() -> new AwsConfig.ProductionAwsConfig("us-west-2", false))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("FIPS endpoints must be enabled");
         }
 
         @Test
@@ -240,6 +247,16 @@ class AwsConfigTest {
             AwsCredentialsProvider provider = testCredentials();
 
             CloudWatchClient cloudWatchClient = config.cloudWatchClient(provider);
+
+            assertThat(cloudWatchClient).isNotNull();
+            cloudWatchClient.close();
+        }
+
+        @Test
+        void shouldCreateAsyncCloudWatchClientForProduction() {
+            AwsCredentialsProvider provider = testCredentials();
+
+            CloudWatchAsyncClient cloudWatchClient = config.cloudWatchAsyncClient(provider);
 
             assertThat(cloudWatchClient).isNotNull();
             cloudWatchClient.close();

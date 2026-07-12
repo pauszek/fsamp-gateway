@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 @Getter
 @RequiredArgsConstructor(staticName = "of")
 public final class StorageMetadata {
-    
+
     private final String correlationId;
     private final String originalFilename;
     private final String checksum;

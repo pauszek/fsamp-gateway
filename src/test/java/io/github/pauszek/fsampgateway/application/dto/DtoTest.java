@@ -208,7 +208,7 @@ class DtoTest {
         @DisplayName("should handle null tags by converting to empty array")
         void shouldHandleNullTags() {
             FileUploadRequestDto request = new FileUploadRequestDto(
-                    "a1b2c3d4e5f67890a1b2c3d4e5f67890",
+                    "a1b2c3d4-e5f6-4890-a1b2-c3d4e5f67890",
                     "Description",
                     null
             );

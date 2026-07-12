@@ -20,7 +20,7 @@ class DomainModelTest {
         void shouldGenerateUniqueIds() {
             FileId id1 = FileId.generate();
             FileId id2 = FileId.generate();
-            
+
             assertThat(id1).isNotEqualTo(id2);
         }
 
@@ -29,7 +29,7 @@ class DomainModelTest {
         void shouldCreateFromValidUuidString() {
             String uuidString = "550e8400-e29b-41d4-a716-446655440000";
             FileId fileId = FileId.of(uuidString);
-            
+
             assertThat(fileId.value()).hasToString(uuidString);
         }
 
@@ -49,7 +49,7 @@ class DomainModelTest {
         @DisplayName("should create valid filename")
         void shouldCreateValidFilename() {
             FileName fileName = FileName.of("document.pdf");
-            
+
             assertThat(fileName.value()).isEqualTo("document.pdf");
             assertThat(fileName.getExtension()).isEqualTo("pdf");
             assertThat(fileName.getBaseName()).isEqualTo("document");
@@ -87,7 +87,7 @@ class DomainModelTest {
         @DisplayName("should accept allowed MIME types")
         void shouldAcceptAllowedMimeTypes(String mimeType) {
             MimeType type = MimeType.of(mimeType);
-            
+
             assertThat(type.isAllowed()).isTrue();
         }
 
@@ -95,7 +95,7 @@ class DomainModelTest {
         @DisplayName("should reject executable MIME types")
         void shouldRejectExecutableMimeTypes() {
             MimeType type = MimeType.of("application/x-msdownload");
-            
+
             assertThat(type.isAllowed()).isFalse();
         }
     }
@@ -116,7 +116,7 @@ class DomainModelTest {
         @DisplayName("should format human readable size")
         void shouldFormatHumanReadableSize() {
             FileSize size = FileSize.of(1024 * 1024); // 1MB
-            
+
             assertThat(size.toHumanReadable()).isEqualTo("1.00 MB");
         }
 
@@ -125,7 +125,7 @@ class DomainModelTest {
         void shouldRejectZeroOrNegativeSize() {
             assertThatThrownBy(() -> FileSize.of(0))
                     .isInstanceOf(IllegalArgumentException.class);
-            
+
             assertThatThrownBy(() -> FileSize.of(-1))
                     .isInstanceOf(IllegalArgumentException.class);
         }
@@ -139,7 +139,7 @@ class DomainModelTest {
         @DisplayName("should create file in PENDING status")
         void shouldCreateFileInPendingStatus() {
             SecureFile file = createTestFile();
-            
+
             assertThat(file.getStatus()).isEqualTo(FileStatus.PENDING);
         }
 
@@ -152,9 +152,9 @@ class DomainModelTest {
             );
             EncryptionMetadata encryption = EncryptionMetadata.kmsEncrypted("alias/test-key");
             Checksum checksum = Checksum.sha256("a".repeat(64));
-            
+
             SecureFile uploadedFile = file.markAsUploaded(location, encryption, checksum);
-            
+
             assertThat(uploadedFile.getStatus()).isEqualTo(FileStatus.UPLOADED);
             assertThat(uploadedFile.getStorageLocation()).isEqualTo(location);
         }
@@ -163,7 +163,7 @@ class DomainModelTest {
         @DisplayName("should not allow invalid state transitions")
         void shouldNotAllowInvalidStateTransitions() {
             SecureFile file = createTestFile();
-            
+
             assertThatThrownBy(file::markAsCompleted)
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("Cannot complete");
@@ -173,9 +173,9 @@ class DomainModelTest {
         @DisplayName("should support UPLOADED to PROCESSING transition")
         void shouldSupportUploadedToProcessingTransition() {
             SecureFile file = createUploadedFile();
-            
+
             SecureFile processingFile = file.markAsProcessing();
-            
+
             assertThat(processingFile.getStatus()).isEqualTo(FileStatus.PROCESSING);
         }
 
@@ -183,9 +183,9 @@ class DomainModelTest {
         @DisplayName("should support failure from any active state")
         void shouldSupportFailureFromAnyActiveState() {
             SecureFile file = createTestFile();
-            
+
             SecureFile failedFile = file.markAsFailed();
-            
+
             assertThat(failedFile.getStatus()).isEqualTo(FileStatus.FAILED);
         }
 

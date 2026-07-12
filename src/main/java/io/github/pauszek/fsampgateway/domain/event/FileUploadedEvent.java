@@ -19,7 +19,7 @@ public record FileUploadedEvent(
         SecurityPayload securityContext
 ) implements DomainEvent {
 
-    public static final String SCHEMA_VERSION = "1.1.2";
+    public static final String SCHEMA_VERSION = "1.2.0";
     public static final String EVENT_TYPE = "FILE_UPLOADED";
     public static final String EVENT_SOURCE = "fsamp-gateway";
 
@@ -33,11 +33,15 @@ public record FileUploadedEvent(
     }
 
     public static FileUploadedEvent from(SecureFile file) {
+        return from(file, null);
+    }
+
+    public static FileUploadedEvent from(SecureFile file, String storageRegion) {
         return new FileUploadedEvent(
                 SCHEMA_VERSION,
                 file.getId().value(),
                 UUID.randomUUID(),
-                correlationIdToUUID(file.getCorrelationId().value()),
+                UUID.fromString(file.getCorrelationId().value()),
                 Instant.now(),
                 EVENT_SOURCE,
                 EVENT_TYPE,
@@ -49,7 +53,8 @@ public record FileUploadedEvent(
                 ),
                 StoragePayload.of(
                         file.getStorageLocation().bucketName(),
-                        file.getStorageLocation().objectKey()
+                        file.getStorageLocation().objectKey(),
+                        storageRegion
                 ),
                 SecurityPayload.of(
                         true,
@@ -57,18 +62,6 @@ public record FileUploadedEvent(
                         file.getEncryptionMetadata().kmsKeyId()
                 )
         );
-    }
-    
-    private static UUID correlationIdToUUID(String correlationId) {
-        if (correlationId.length() != 32) {
-            throw new IllegalArgumentException("Correlation ID must be 32 characters, got: " + correlationId.length());
-        }
-        String uuid = correlationId.substring(0, 8) + "-" +
-                correlationId.substring(8, 12) + "-" +
-                correlationId.substring(12, 16) + "-" +
-                correlationId.substring(16, 20) + "-" +
-                correlationId.substring(20, 32);
-        return UUID.fromString(uuid);
     }
 
     @Override

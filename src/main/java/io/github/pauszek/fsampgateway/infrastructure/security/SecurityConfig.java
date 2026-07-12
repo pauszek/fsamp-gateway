@@ -40,36 +40,39 @@ public class SecurityConfig {
     private final JwtDecoder jwtDecoder;
     private final Converter<Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter;
     private final ObjectMapper objectMapper;
-    
+
     @org.springframework.beans.factory.annotation.Value("${spring.profiles.active:local}")
     private String activeProfile;
 
     @org.springframework.beans.factory.annotation.Value("${security.cors.allowed-origins:}")
     private String configuredOrigins;
 
+    @org.springframework.beans.factory.annotation.Value("${security.cognito.allow-group-fallback:false}")
+    private boolean allowGroupFallback;
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
                 .csrf(SecurityConfig::configureCsrfForStatelessApi)
-                
-                .sessionManagement(session -> 
+
+                .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                
+
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                
+
                 .headers(headers -> headers
-                        .contentSecurityPolicy(csp -> 
+                        .contentSecurityPolicy(csp ->
                                 csp.policyDirectives("default-src 'self'; frame-ancestors 'none';"))
-                        .xssProtection(xss -> 
+                        .xssProtection(xss ->
                                 xss.headerValue(XXssProtectionHeaderWriter.HeaderValue.ENABLED_MODE_BLOCK))
                         .frameOptions(frame -> frame.deny())
-                        .referrerPolicy(referrer -> 
+                        .referrerPolicy(referrer ->
                                 referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
-                        .httpStrictTransportSecurity(hsts -> 
+                        .httpStrictTransportSecurity(hsts ->
                                 hsts.includeSubDomains(true).maxAgeInSeconds(31536000))
                         .contentTypeOptions(contentType -> {})
                 )
-                
+
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt
                                 .decoder(jwtDecoder)
@@ -78,36 +81,43 @@ public class SecurityConfig {
                         .authenticationEntryPoint(new CognitoAuthenticationEntryPoint(objectMapper))
                         .accessDeniedHandler(new CognitoAccessDeniedHandler(objectMapper))
                 )
-                
+
                 .authorizeHttpRequests(auth -> {
                         auth.requestMatchers("/actuator/health/**", "/actuator/info").permitAll();
-                        
+
                         if (isDevOrLocal()) {
                             auth.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll();
                         } else {
                             auth.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
                                     .hasRole(ROLE_ADMINS);
                         }
-                        
-                        auth.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        
-                        .requestMatchers(HttpMethod.POST, FILES_API_PATTERN)
-                                .hasAnyAuthority("SCOPE_files.write", ROLE_ADMINS_AUTHORITY, ROLE_USERS_AUTHORITY)
-                        
-                        .requestMatchers(HttpMethod.GET, FILES_API_PATTERN)
-                                .hasAnyAuthority("SCOPE_files.read", ROLE_ADMINS_AUTHORITY, ROLE_USERS_AUTHORITY)
-                        
-                        .requestMatchers(HttpMethod.DELETE, FILES_API_PATTERN)
+
+                        auth.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
+
+                        if (allowGroupFallback) {
+                            auth.requestMatchers(HttpMethod.POST, FILES_API_PATTERN)
+                                    .hasAnyAuthority("SCOPE_files.write", ROLE_USERS_AUTHORITY, ROLE_ADMINS_AUTHORITY);
+                            auth.requestMatchers(HttpMethod.GET, FILES_API_PATTERN)
+                                    .hasAnyAuthority("SCOPE_files.read", ROLE_USERS_AUTHORITY, ROLE_ADMINS_AUTHORITY);
+                            auth.requestMatchers(HttpMethod.DELETE, FILES_API_PATTERN)
+                                    .hasAnyAuthority("SCOPE_files.delete", ROLE_ADMINS_AUTHORITY);
+                        } else {
+                            auth.requestMatchers(HttpMethod.POST, FILES_API_PATTERN)
+                                    .hasAuthority("SCOPE_files.write");
+                            auth.requestMatchers(HttpMethod.GET, FILES_API_PATTERN)
+                                    .hasAuthority("SCOPE_files.read");
+                            auth.requestMatchers(HttpMethod.DELETE, FILES_API_PATTERN)
+                                    .hasAuthority("SCOPE_files.delete");
+                        }
+
+                        auth.requestMatchers("/api/v1/admin/**")
                                 .hasRole(ROLE_ADMINS)
-                        
-                        .requestMatchers("/api/v1/admin/**")
-                                .hasRole(ROLE_ADMINS)
-                        
+
                         .requestMatchers(STATELESS_API_PATTERN).authenticated()
-                        
+
                         .anyRequest().denyAll();
                 })
-                
+
                 .build();
     }
 
@@ -156,7 +166,7 @@ public class SecurityConfig {
     }
 
     private boolean isDevOrLocal() {
-        return "local".equalsIgnoreCase(activeProfile) 
+        return "local".equalsIgnoreCase(activeProfile)
                 || "dev".equalsIgnoreCase(activeProfile)
                 || "test".equalsIgnoreCase(activeProfile);
     }

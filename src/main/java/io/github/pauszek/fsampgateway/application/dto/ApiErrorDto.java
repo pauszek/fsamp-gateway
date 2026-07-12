@@ -10,32 +10,32 @@ import java.util.List;
 @Schema(description = "API error response")
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ApiErrorDto(
-        
+
         @Schema(description = "Error type URI", example = "https://api.fsamp.io/errors/validation-error")
         String type,
-        
+
         @Schema(description = "HTTP status code", example = "400")
         int status,
-        
+
         @Schema(description = "Error code for client handling", example = "VALIDATION_ERROR")
         String error,
-        
+
         @Schema(description = "Human-readable error message")
         String message,
-        
+
         @Schema(description = "Detailed error description")
         String detail,
-        
+
         @Schema(description = "Request path that caused the error", example = "/api/v1/files/upload")
         String path,
-        
+
         @Schema(description = "Correlation ID for troubleshooting")
         String correlationId,
-        
+
         @Schema(description = "Error timestamp")
         @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
         Instant timestamp,
-        
+
         @Schema(description = "Validation errors if applicable")
         List<ValidationErrorDto> validationErrors
 ) {
@@ -47,10 +47,10 @@ public record ApiErrorDto(
     public record ValidationErrorDto(
             @Schema(description = "Field name", example = "file")
             String field,
-            
+
             @Schema(description = "Error message", example = "File is required")
             String message,
-            
+
             @Schema(description = "Rejected value")
             Object rejectedValue
     ) {}
@@ -74,14 +74,14 @@ public record ApiErrorDto(
         public Builder path(String path) { this.path = path; return this; }
         public Builder correlationId(String correlationId) { this.correlationId = correlationId; return this; }
         public Builder timestamp(Instant timestamp) { this.timestamp = timestamp; return this; }
-        public Builder validationErrors(List<ValidationErrorDto> validationErrors) { 
-            this.validationErrors = validationErrors; 
-            return this; 
+        public Builder validationErrors(List<ValidationErrorDto> validationErrors) {
+            this.validationErrors = validationErrors;
+            return this;
         }
 
         public ApiErrorDto build() {
             return new ApiErrorDto(
-                    type, status, error, message, detail, 
+                    type, status, error, message, detail,
                     path, correlationId, timestamp, validationErrors
             );
         }

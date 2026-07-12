@@ -3,6 +3,7 @@ package io.github.pauszek.fsampgateway.adapter.in.web;
 import io.github.pauszek.fsampgateway.application.dto.FileUploadResponseDto;
 import io.github.pauszek.fsampgateway.application.mapper.FileMapper;
 import io.github.pauszek.fsampgateway.domain.command.UploadFileCommand;
+import io.github.pauszek.fsampgateway.domain.exception.FileValidationException;
 import io.github.pauszek.fsampgateway.domain.model.*;
 import io.github.pauszek.fsampgateway.domain.port.in.DeleteFileUseCase;
 import io.github.pauszek.fsampgateway.domain.port.in.GetFileUseCase;
@@ -15,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -59,14 +61,18 @@ class FileUploadRestAdapterTest {
     @DisplayName("uploadFile")
     class UploadFile {
 
+        private MockHttpServletRequest httpRequest;
+        private MockHttpServletResponse httpResponse;
+
         @BeforeEach
         void setUpRequestContext() {
-            MockHttpServletRequest request = new MockHttpServletRequest();
-            request.setRequestURI("/api/v1/files/upload");
-            request.setScheme("http");
-            request.setServerName("localhost");
-            request.setServerPort(8080);
-            RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+            httpRequest = new MockHttpServletRequest();
+            httpResponse = new MockHttpServletResponse();
+            httpRequest.setRequestURI("/api/v1/files/upload");
+            httpRequest.setScheme("http");
+            httpRequest.setServerName("localhost");
+            httpRequest.setServerPort(8080);
+            RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(httpRequest));
         }
 
         @AfterEach
@@ -89,7 +95,8 @@ class FileUploadRestAdapterTest {
             given(uploadFileUseCase.execute(any())).willReturn(createUploadedFile());
             given(fileMapper.toResponseDto(any())).willReturn(createResponseDto());
 
-            ResponseEntity<FileUploadResponseDto> response = adapter.uploadFile(file, null);
+            ResponseEntity<FileUploadResponseDto> response =
+                    adapter.uploadFile(file, null, httpRequest, httpResponse);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
             assertThat(response.getBody()).isNotNull();
@@ -111,7 +118,7 @@ class FileUploadRestAdapterTest {
             given(uploadFileUseCase.execute(any())).willReturn(createUploadedFile());
             given(fileMapper.toResponseDto(any())).willReturn(createResponseDto());
 
-            adapter.uploadFile(file, null);
+            adapter.uploadFile(file, null, httpRequest, httpResponse);
 
             then(uploadFileUseCase).should().execute(commandCaptor.capture());
             UploadFileCommand command = commandCaptor.getValue();
@@ -133,7 +140,7 @@ class FileUploadRestAdapterTest {
 
             given(currentUserService.getCurrentUser()).willReturn(Optional.empty());
 
-            assertThatThrownBy(() -> adapter.uploadFile(file, null))
+            assertThatThrownBy(() -> adapter.uploadFile(file, null, httpRequest, httpResponse))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("User not found");
         }
@@ -148,7 +155,7 @@ class FileUploadRestAdapterTest {
                     "content".getBytes()
             );
             var request = new io.github.pauszek.fsampgateway.application.dto.FileUploadRequestDto(
-                    "custom-corr-id", null, null
+                    "b1c2d3e4-f5a6-4890-b1c2-d3e4f5a67890", null, null
             );
 
             given(currentUserService.getCurrentUser())
@@ -156,10 +163,49 @@ class FileUploadRestAdapterTest {
             given(uploadFileUseCase.execute(any())).willReturn(createUploadedFile());
             given(fileMapper.toResponseDto(any())).willReturn(createResponseDto());
 
-            adapter.uploadFile(file, request);
+            adapter.uploadFile(file, request, httpRequest, httpResponse);
 
             then(uploadFileUseCase).should().execute(commandCaptor.capture());
-            assertThat(commandCaptor.getValue().getCorrelationId()).isEqualTo("custom-corr-id");
+            assertThat(commandCaptor.getValue().getCorrelationId())
+                    .isEqualTo("b1c2d3e4-f5a6-4890-b1c2-d3e4f5a67890");
+        }
+
+        @Test
+        void shouldRejectMalformedMultipartCorrelationId() {
+            MockMultipartFile file = new MockMultipartFile(
+                    "file", "test.pdf", "application/pdf", "content".getBytes()
+            );
+            var metadata = new io.github.pauszek.fsampgateway.application.dto.FileUploadRequestDto(
+                    "not-a-uuid", null, null
+            );
+            given(currentUserService.getCurrentUser()).willReturn(Optional.of(createTestUser()));
+
+            assertThatThrownBy(() -> adapter.uploadFile(file, metadata, httpRequest, httpResponse))
+                    .isInstanceOf(FileValidationException.class)
+                    .hasMessageContaining("UUID v4");
+            then(uploadFileUseCase).shouldHaveNoInteractions();
+        }
+
+        @Test
+        void shouldRejectConflictingHeaderAndMultipartCorrelationIds() {
+            String headerCorrelationId = "a1b2c3d4-e5f6-4890-a1b2-c3d4e5f67890";
+            MockMultipartFile file = new MockMultipartFile(
+                    "file", "test.pdf", "application/pdf", "content".getBytes()
+            );
+            var metadata = new io.github.pauszek.fsampgateway.application.dto.FileUploadRequestDto(
+                    "b1c2d3e4-f5a6-4890-b1c2-d3e4f5a67890", null, null
+            );
+            httpRequest.addHeader("X-Correlation-ID", headerCorrelationId);
+            httpRequest.setAttribute(
+                    "io.github.pauszek.fsampgateway.infrastructure.security.CorrelationIdFilter.correlationId",
+                    headerCorrelationId
+            );
+            given(currentUserService.getCurrentUser()).willReturn(Optional.of(createTestUser()));
+
+            assertThatThrownBy(() -> adapter.uploadFile(file, metadata, httpRequest, httpResponse))
+                    .isInstanceOf(FileValidationException.class)
+                    .hasMessageContaining("must match");
+            then(uploadFileUseCase).shouldHaveNoInteractions();
         }
     }
 
@@ -240,7 +286,7 @@ class FileUploadRestAdapterTest {
                 FileName.of("test-document.pdf"),
                 MimeType.of("application/pdf"),
                 FileSize.of(1024L),
-                CorrelationId.of("a1b2c3d4e5f67890a1b2c3d4e5f67890"),
+                CorrelationId.of("a1b2c3d4-e5f6-4890-a1b2-c3d4e5f67890"),
                 createdBy
         ).markAsUploaded(
                 StorageLocation.of("bucket", "key"),
@@ -283,7 +329,7 @@ class FileUploadRestAdapterTest {
                 .sizeBytes(1024L)
                 .sizeHuman("1.00 KB")
                 .status("UPLOADED")
-                .correlationId("a1b2c3d4e5f67890a1b2c3d4e5f67890")
+                .correlationId("a1b2c3d4-e5f6-4890-a1b2-c3d4e5f67890")
                 .uploadedAt(Instant.now())
                 .message("File uploaded successfully")
                 .build();

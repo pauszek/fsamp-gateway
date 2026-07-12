@@ -40,11 +40,11 @@ class CognitoJwtConfigTest {
     }
 
     @Test
-    @DisplayName("should accept ID token audience")
-    void shouldAcceptIdTokenAudience() {
+    @DisplayName("should reject ID token audience")
+    void shouldRejectIdTokenAudience() {
         var result = config.cognitoClientValidator().validate(jwt("id", null, List.of(CLIENT_ID)));
 
-        assertThat(result.hasErrors()).isFalse();
+        assertThat(result.hasErrors()).isTrue();
     }
 
     @Test

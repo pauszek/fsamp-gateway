@@ -14,6 +14,7 @@ import org.slf4j.MDC;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -48,7 +49,7 @@ class FileUploadDomainServiceTest {
     private static final String TEST_CONTENT_TYPE = "application/pdf";
     private static final byte[] TEST_CONTENT = "PDF content".getBytes();
     private static final String TEST_USER = "user-123";
-    private static final String TEST_CORRELATION_ID = "a1b2c3d4e5f67890a1b2c3d4e5f67890";
+    private static final String TEST_CORRELATION_ID = "a1b2c3d4-e5f6-4890-a1b2-c3d4e5f67890";
     private static final String TEST_MESSAGE_ID = "msg-123";
 
     @BeforeEach
@@ -133,6 +134,16 @@ class FileUploadDomainServiceTest {
         @Test
         @DisplayName("should publish FileUploadedEvent with correct data")
         void shouldPublishFileUploadedEvent() {
+            service = new FileUploadDomainService(
+                    contentValidator,
+                    fileStorage,
+                    eventPublisher,
+                    fileRepository,
+                    MimeType.ALLOWED_TYPES,
+                    FileSize.MAX_SIZE,
+                    false,
+                    "us-west-2"
+            );
             var command = createValidCommand();
             mockSuccessfulValidation();
             mockSuccessfulStorage();
@@ -147,6 +158,7 @@ class FileUploadDomainServiceTest {
             assertThat(event.eventId()).isNotNull();
             assertThat(event.fileMetadata().getOriginalFilename()).isEqualTo(TEST_FILENAME);
             assertThat(event.fileMetadata().getMimeType()).isEqualTo(TEST_CONTENT_TYPE);
+            assertThat(event.storageLocation().getRegion()).isEqualTo("us-west-2");
         }
 
         @Test
@@ -191,13 +203,36 @@ class FileUploadDomainServiceTest {
         }
 
         @Test
+        void shouldRelyOnDurableOutboxWhenLocalDirectPublishFails() {
+            var localFallbackService = new FileUploadDomainService(
+                    contentValidator,
+                    fileStorage,
+                    eventPublisher,
+                    fileRepository,
+                    true
+            );
+            mockSuccessfulValidation();
+            mockSuccessfulStorage();
+            given(fileRepository.supportsTransactionalOutbox()).willReturn(true);
+            given(fileRepository.saveWithOutbox(any(), any()))
+                    .willAnswer(invocation -> invocation.getArgument(0));
+            given(eventPublisher.publish(any())).willThrow(new RuntimeException("SNS unavailable"));
+
+            SecureFile result = localFallbackService.execute(createValidCommand());
+
+            assertThat(result.getStatus()).isEqualTo(FileStatus.UPLOADED);
+            then(fileRepository).should(never()).delete(any());
+            then(fileStorage).should(never()).delete(any());
+        }
+
+        @Test
         @DisplayName("should set MDC correlationId during processing")
         void shouldSetMdcCorrelationIdDuringProcessing() {
             var command = createValidCommand();
             mockSuccessfulValidation();
             mockSuccessfulStorage();
             mockSuccessfulEventPublish();
-            
+
             given(fileRepository.save(any())).willAnswer(invocation -> {
                 assertThat(MDC.get("correlationId")).isEqualTo(TEST_CORRELATION_ID);
                 return invocation.getArgument(0);
@@ -206,6 +241,19 @@ class FileUploadDomainServiceTest {
             service.execute(command);
 
             assertThat(MDC.get("correlationId")).isNull();
+        }
+
+        @Test
+        void shouldRestorePreviousMdcCorrelationId() {
+            MDC.put("correlationId", "previous-correlation-id");
+            mockSuccessfulValidation();
+            mockSuccessfulStorage();
+            mockSuccessfulRepository();
+            mockSuccessfulEventPublish();
+
+            service.execute(createValidCommand());
+
+            assertThat(MDC.get("correlationId")).isEqualTo("previous-correlation-id");
         }
     }
 
@@ -242,6 +290,40 @@ class FileUploadDomainServiceTest {
                     .hasMessageContaining("not allowed");
 
             then(fileStorage).shouldHaveNoInteractions();
+        }
+
+        @Test
+        void shouldRejectMissingContentType() {
+            var command = UploadFileCommand.builder()
+                    .fileName(TEST_FILENAME)
+                    .size(TEST_CONTENT.length)
+                    .content(new ByteArrayInputStream(TEST_CONTENT))
+                    .correlationId(TEST_CORRELATION_ID)
+                    .uploadedBy(TEST_USER)
+                    .build();
+
+            assertThatThrownBy(() -> service.execute(command))
+                    .isInstanceOf(FileValidationException.class)
+                    .hasMessageContaining("Content type is required");
+            then(contentValidator).shouldHaveNoInteractions();
+        }
+
+        @Test
+        void shouldRejectConfiguredFileSizeLimit() {
+            var limitedService = new FileUploadDomainService(
+                    contentValidator,
+                    fileStorage,
+                    eventPublisher,
+                    fileRepository,
+                    Set.of(TEST_CONTENT_TYPE),
+                    5,
+                    false
+            );
+
+            assertThatThrownBy(() -> limitedService.execute(createValidCommand()))
+                    .isInstanceOf(FileValidationException.class)
+                    .hasMessageContaining("exceeds limit");
+            then(contentValidator).shouldHaveNoInteractions();
         }
 
         @Test
@@ -290,7 +372,7 @@ class FileUploadDomainServiceTest {
         void shouldPropagateStorageException() {
             var command = createValidCommand();
             mockSuccessfulValidation();
-            
+
             given(fileStorage.store(any(), any(), any(), any(), any()))
                     .willThrow(new io.github.pauszek.fsampgateway.domain.exception.StorageException("S3 error"));
 
@@ -313,13 +395,34 @@ class FileUploadDomainServiceTest {
             mockSuccessfulValidation();
             mockSuccessfulStorage();
             mockSuccessfulRepository();
-            
+
             given(eventPublisher.publish(any()))
                     .willThrow(new io.github.pauszek.fsampgateway.domain.exception.EventPublishException("SNS error"));
 
             assertThatThrownBy(() -> service.execute(command))
                     .isInstanceOf(io.github.pauszek.fsampgateway.domain.exception.EventPublishException.class)
                     .hasMessageContaining("SNS error");
+        }
+
+        @Test
+        void shouldPreserveCleanupFailuresAsSuppressedExceptions() {
+            mockSuccessfulValidation();
+            mockSuccessfulStorage();
+            mockSuccessfulRepository();
+            var publishFailure = new io.github.pauszek.fsampgateway.domain.exception.EventPublishException(
+                    "SNS error"
+            );
+            var metadataCleanupFailure = new RuntimeException("DynamoDB cleanup failed");
+            var storageCleanupFailure = new RuntimeException("S3 cleanup failed");
+            given(eventPublisher.publish(any())).willThrow(publishFailure);
+            willThrow(metadataCleanupFailure).given(fileRepository).delete(any());
+            willThrow(storageCleanupFailure).given(fileStorage).delete(any());
+
+            Throwable thrown = catchThrowable(() -> service.execute(createValidCommand()));
+
+            assertThat(thrown).isSameAs(publishFailure);
+            assertThat(thrown.getSuppressed())
+                    .containsExactly(metadataCleanupFailure, storageCleanupFailure);
         }
     }
 

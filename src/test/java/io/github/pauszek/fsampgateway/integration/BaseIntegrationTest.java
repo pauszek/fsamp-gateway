@@ -35,7 +35,7 @@ public abstract class BaseIntegrationTest {
     protected static final String TEST_IDEMPOTENCY_TABLE = "fsamp-idempotency-keys";
     protected static final String TEST_KMS_ALIAS = "alias/fsamp-integration-key";
 
-    private static final DockerImageName LOCALSTACK_IMAGE = 
+    private static final DockerImageName LOCALSTACK_IMAGE =
             DockerImageName.parse("localstack/localstack-pro:4.14.0");
 
     protected static final LocalStackContainer LOCALSTACK;

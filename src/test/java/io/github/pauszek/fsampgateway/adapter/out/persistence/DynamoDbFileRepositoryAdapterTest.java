@@ -30,7 +30,7 @@ class DynamoDbFileRepositoryAdapterTest {
     private ArgumentCaptor<PutItemRequest> putRequestCaptor;
 
     @Captor
-    private ArgumentCaptor<QueryRequest> queryRequestCaptor;
+    private ArgumentCaptor<GetItemRequest> getItemRequestCaptor;
 
     @Captor
     private ArgumentCaptor<DeleteItemRequest> deleteRequestCaptor;
@@ -65,10 +65,11 @@ class DynamoDbFileRepositoryAdapterTest {
 
             Map<String, AttributeValue> item = request.item();
             assertThat(item.get("PK").s()).isEqualTo("FILE#" + file.getId());
-            assertThat(item.get("SK").s()).isEqualTo("TS#" + file.getAuditInfo().createdAt());
+            assertThat(item.get("SK").s()).isEqualTo("METADATA");
+            assertThat(item.get("entityType").s()).isEqualTo("FILE_METADATA");
             assertThat(item.get("fileId").s()).isEqualTo(file.getId().toString());
             assertThat(item.get("correlationId").s()).isEqualTo(file.getCorrelationId().value());
-            assertThat(item.get("fileName").s()).isEqualTo(file.getFileName().value());
+            assertThat(item.get("originalFilename").s()).isEqualTo(file.getFileName().value());
             assertThat(item.get("mimeType").s()).isEqualTo(file.getMimeType().value());
             assertThat(item.get("fileSizeBytes").n()).isEqualTo(String.valueOf(file.getSize().bytes()));
             assertThat(item.get("status").s()).isEqualTo("PENDING");
@@ -97,7 +98,7 @@ class DynamoDbFileRepositoryAdapterTest {
             assertThat(item.get("bucketName").s()).isEqualTo("test-bucket");
             assertThat(item.get("objectKey").s()).isEqualTo("test-key");
             assertThat(item.get("kmsKeyId").s()).isEqualTo("alias/test-kms-key");
-            assertThat(item.get("encryptionAlgorithm").s()).isEqualTo("AES_256_GCM");
+            assertThat(item.get("encryptionAlgorithm").s()).isEqualTo("AES/GCM/NoPadding");
             assertThat(item.get("isEncrypted").bool()).isTrue();
         }
 
@@ -143,7 +144,12 @@ class DynamoDbFileRepositoryAdapterTest {
             Put outboxPut = request.transactItems().get(1).put();
             assertThat(outboxPut.tableName()).isEqualTo("test-outbox");
             assertThat(outboxPut.conditionExpression()).isEqualTo("attribute_not_exists(PK) AND attribute_not_exists(SK)");
-            assertThat(outboxPut.item().get("PK").s()).isEqualTo("OUTBOX#FileUpload");
+            assertThat(outboxPut.item().get("PK").s())
+                    .isEqualTo("OUTBOX#FileUpload#" + file.getId());
+            assertThat(outboxPut.item().get("SK").s()).startsWith("EVENT#");
+            assertThat(outboxPut.item().get("entityType").s()).isEqualTo("OUTBOX_EVENT");
+            assertThat(outboxPut.item().get("outboxShard").s()).matches("[0-9a-f]{2}");
+            assertThat(outboxPut.item().get("GSI1PK").s()).matches("STATUS#PENDING#[0-9a-f]{2}");
             assertThat(outboxPut.item().get("eventType").s()).isEqualTo("FILE_UPLOADED");
             assertThat(outboxPut.item().get("aggregateId").s()).isEqualTo(file.getId().toString());
             assertThat(outboxPut.item().get("status").s()).isEqualTo("PENDING");
@@ -158,7 +164,7 @@ class DynamoDbFileRepositoryAdapterTest {
         @DisplayName("should return file when found in DynamoDB")
         void shouldReturnFileWhenFound() {
             SecureFile original = createUploadedFile();
-            mockQueryReturning(original);
+            mockGetReturning(original);
 
             Optional<SecureFile> result = adapter.findById(original.getId());
 
@@ -174,8 +180,8 @@ class DynamoDbFileRepositoryAdapterTest {
         @Test
         @DisplayName("should return empty when not found")
         void shouldReturnEmptyWhenNotFound() {
-            given(dynamoDbClient.query(any(QueryRequest.class)))
-                    .willReturn(QueryResponse.builder().items(List.of()).build());
+            given(dynamoDbClient.getItem(any(GetItemRequest.class)))
+                    .willReturn(GetItemResponse.builder().item(Map.of()).build());
 
             Optional<SecureFile> result = adapter.findById(FileId.generate());
 
@@ -183,31 +189,28 @@ class DynamoDbFileRepositoryAdapterTest {
         }
 
         @Test
-        @DisplayName("should query with correct key condition and descending sort")
-        void shouldQueryWithCorrectParameters() {
+        @DisplayName("should get the canonical current-state item consistently")
+        void shouldGetWithCorrectParameters() {
             FileId fileId = FileId.generate();
-            given(dynamoDbClient.query(any(QueryRequest.class)))
-                    .willReturn(QueryResponse.builder().items(List.of()).build());
+            given(dynamoDbClient.getItem(any(GetItemRequest.class)))
+                    .willReturn(GetItemResponse.builder().item(Map.of()).build());
 
             adapter.findById(fileId);
 
-            then(dynamoDbClient).should().query(queryRequestCaptor.capture());
-            QueryRequest request = queryRequestCaptor.getValue();
+            then(dynamoDbClient).should().getItem(getItemRequestCaptor.capture());
+            GetItemRequest request = getItemRequestCaptor.getValue();
 
             assertThat(request.tableName()).isEqualTo(TABLE_NAME);
-            assertThat(request.keyConditionExpression()).isEqualTo("#pk = :pkVal");
-            assertThat(request.expressionAttributeNames()).containsEntry("#pk", "PK");
-            assertThat(request.expressionAttributeValues())
-                    .containsEntry(":pkVal", AttributeValue.fromS("FILE#" + fileId));
-            assertThat(request.scanIndexForward()).isFalse();
-            assertThat(request.limit()).isEqualTo(1);
+            assertThat(request.key()).containsEntry("PK", AttributeValue.fromS("FILE#" + fileId));
+            assertThat(request.key()).containsEntry("SK", AttributeValue.fromS("METADATA"));
+            assertThat(request.consistentRead()).isTrue();
         }
 
         @Test
         @DisplayName("should deserialize pending file without optional fields")
         void shouldDeserializePendingFileWithoutOptionalFields() {
             SecureFile pendingFile = createPendingFile();
-            mockQueryReturning(pendingFile);
+            mockGetReturning(pendingFile);
 
             Optional<SecureFile> result = adapter.findById(pendingFile.getId());
 
@@ -223,7 +226,7 @@ class DynamoDbFileRepositoryAdapterTest {
         @DisplayName("should deserialize uploaded file with all optional fields")
         void shouldDeserializeUploadedFileWithAllFields() {
             SecureFile uploadedFile = createUploadedFile();
-            mockQueryReturning(uploadedFile);
+            mockGetReturning(uploadedFile);
 
             Optional<SecureFile> result = adapter.findById(uploadedFile.getId());
 
@@ -244,34 +247,20 @@ class DynamoDbFileRepositoryAdapterTest {
     class Delete {
 
         @Test
-        @DisplayName("should find file and delete by PK+SK")
-        void shouldFindAndDeleteByPkSk() {
+        @DisplayName("should delete the canonical current-state item")
+        void shouldDeleteByPkSk() {
             SecureFile file = createPendingFile();
-            mockQueryReturning(file);
             given(dynamoDbClient.deleteItem(any(DeleteItemRequest.class)))
                     .willReturn(DeleteItemResponse.builder().build());
 
             adapter.delete(file.getId());
 
-            then(dynamoDbClient).should().query(any(QueryRequest.class));
             then(dynamoDbClient).should().deleteItem(deleteRequestCaptor.capture());
 
             DeleteItemRequest request = deleteRequestCaptor.getValue();
             assertThat(request.tableName()).isEqualTo(TABLE_NAME);
             assertThat(request.key().get("PK").s()).isEqualTo("FILE#" + file.getId());
-            assertThat(request.key().get("SK").s())
-                    .isEqualTo("TS#" + file.getAuditInfo().createdAt());
-        }
-
-        @Test
-        @DisplayName("should not call deleteItem when file not found")
-        void shouldNotDeleteWhenNotFound() {
-            given(dynamoDbClient.query(any(QueryRequest.class)))
-                    .willReturn(QueryResponse.builder().items(List.of()).build());
-
-            adapter.delete(FileId.generate());
-
-            then(dynamoDbClient).should(never()).deleteItem(any(DeleteItemRequest.class));
+            assertThat(request.key().get("SK").s()).isEqualTo("METADATA");
         }
     }
     @Nested
@@ -279,10 +268,12 @@ class DynamoDbFileRepositoryAdapterTest {
     class Exists {
 
         @Test
-        @DisplayName("should return true when count > 0")
-        void shouldReturnTrueWhenCountGreaterThanZero() {
-            given(dynamoDbClient.query(any(QueryRequest.class)))
-                    .willReturn(QueryResponse.builder().count(1).build());
+        @DisplayName("should return true when the item exists")
+        void shouldReturnTrueWhenItemExists() {
+            given(dynamoDbClient.getItem(any(GetItemRequest.class)))
+                    .willReturn(GetItemResponse.builder()
+                            .item(Map.of("PK", s("FILE#present")))
+                            .build());
 
             boolean result = adapter.exists(FileId.generate());
 
@@ -290,10 +281,10 @@ class DynamoDbFileRepositoryAdapterTest {
         }
 
         @Test
-        @DisplayName("should return false when count is 0")
-        void shouldReturnFalseWhenCountIsZero() {
-            given(dynamoDbClient.query(any(QueryRequest.class)))
-                    .willReturn(QueryResponse.builder().count(0).build());
+        @DisplayName("should return false when the item is absent")
+        void shouldReturnFalseWhenItemIsAbsent() {
+            given(dynamoDbClient.getItem(any(GetItemRequest.class)))
+                    .willReturn(GetItemResponse.builder().item(Map.of()).build());
 
             boolean result = adapter.exists(FileId.generate());
 
@@ -301,16 +292,18 @@ class DynamoDbFileRepositoryAdapterTest {
         }
 
         @Test
-        @DisplayName("should use SELECT COUNT for efficiency")
-        void shouldUseSelectCount() {
-            given(dynamoDbClient.query(any(QueryRequest.class)))
-                    .willReturn(QueryResponse.builder().count(0).build());
+        @DisplayName("should project only the partition key")
+        void shouldUseAKeyProjection() {
+            FileId fileId = FileId.generate();
+            given(dynamoDbClient.getItem(any(GetItemRequest.class)))
+                    .willReturn(GetItemResponse.builder().item(Map.of()).build());
 
-            adapter.exists(FileId.generate());
+            adapter.exists(fileId);
 
-            then(dynamoDbClient).should().query(queryRequestCaptor.capture());
-            assertThat(queryRequestCaptor.getValue().select()).isEqualTo(Select.COUNT);
-            assertThat(queryRequestCaptor.getValue().limit()).isEqualTo(1);
+            then(dynamoDbClient).should().getItem(getItemRequestCaptor.capture());
+            assertThat(getItemRequestCaptor.getValue().projectionExpression()).isEqualTo("PK");
+            assertThat(getItemRequestCaptor.getValue().key())
+                    .containsEntry("SK", AttributeValue.fromS("METADATA"));
         }
     }
     private SecureFile createPendingFile() {
@@ -332,15 +325,16 @@ class DynamoDbFileRepositoryAdapterTest {
         );
     }
 
-    private void mockQueryReturning(SecureFile file) {
+    private void mockGetReturning(SecureFile file) {
         Map<String, AttributeValue> item = new HashMap<>();
 
         item.put("PK", s("FILE#" + file.getId()));
-        item.put("SK", s("TS#" + file.getAuditInfo().createdAt()));
+        item.put("SK", s("METADATA"));
+        item.put("entityType", s("FILE_METADATA"));
         item.put("fileId", s(file.getId().toString()));
 
         item.put("correlationId", s(file.getCorrelationId().value()));
-        item.put("fileName", s(file.getFileName().value()));
+        item.put("originalFilename", s(file.getFileName().value()));
         item.put("mimeType", s(file.getMimeType().value()));
         item.put("fileSizeBytes", n(file.getSize().bytes()));
         item.put("status", s(file.getStatus().name()));
@@ -364,8 +358,8 @@ class DynamoDbFileRepositoryAdapterTest {
             item.put("isEncrypted", AttributeValue.builder().bool(file.getEncryptionMetadata().encrypted()).build());
         }
 
-        given(dynamoDbClient.query(any(QueryRequest.class)))
-                .willReturn(QueryResponse.builder().items(List.of(item)).build());
+        given(dynamoDbClient.getItem(any(GetItemRequest.class)))
+                .willReturn(GetItemResponse.builder().item(item).build());
     }
 
     private static AttributeValue s(String value) {

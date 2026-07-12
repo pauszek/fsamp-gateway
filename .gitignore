@@ -40,3 +40,5 @@ build/
 
 # Downloaded schema (fetched from fsamp-event-schema)
 schema/
+!schema/
+!schema/event.schema.json

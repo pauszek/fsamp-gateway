@@ -59,7 +59,7 @@ class CurrentUserServiceTest {
     void shouldReturnEmptyWhenAuthenticationIsNotJwt() {
         Authentication auth = mock(Authentication.class);
         when(auth.isAuthenticated()).thenReturn(true);
-        
+
         SecurityContext context = mock(SecurityContext.class);
         when(context.getAuthentication()).thenReturn(auth);
         SecurityContextHolder.setContext(context);
@@ -223,7 +223,7 @@ class CurrentUserServiceTest {
     private Jwt createJwt(Map<String, Object> claims) {
         Map<String, Object> allClaims = new HashMap<>(claims);
         String subject = (String) allClaims.getOrDefault("sub", "default-user");
-        
+
         return Jwt.withTokenValue("test-token")
                 .header("alg", "RS256")
                 .header("typ", "JWT")

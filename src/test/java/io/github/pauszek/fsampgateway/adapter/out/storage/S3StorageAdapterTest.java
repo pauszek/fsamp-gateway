@@ -9,6 +9,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.kms.KmsClient;
+import software.amazon.awssdk.services.kms.model.DescribeKeyRequest;
+import software.amazon.awssdk.services.kms.model.DescribeKeyResponse;
+import software.amazon.awssdk.services.kms.model.KeyMetadata;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 
@@ -26,12 +30,17 @@ class S3StorageAdapterTest {
     @Mock
     private S3Client s3Client;
 
+    @Mock
+    private KmsClient kmsClient;
+
     private S3StorageProperties properties;
 
     private S3StorageAdapter adapter;
 
     private static final String BUCKET_NAME = "test-bucket";
     private static final String KMS_KEY_ID = "alias/test-key";
+    private static final String KMS_KEY_ARN =
+            "arn:aws:kms:us-west-2:123456789012:key/12345678-1234-4234-8234-123456789012";
     private static final byte[] TEST_CONTENT = "Test file content".getBytes();
 
     @BeforeEach
@@ -39,7 +48,11 @@ class S3StorageAdapterTest {
         properties = new S3StorageProperties();
         properties.setBucketName(BUCKET_NAME);
         properties.setKmsKeyId(KMS_KEY_ID);
-        adapter = new S3StorageAdapter(s3Client, properties);
+        lenient().when(kmsClient.describeKey(any(DescribeKeyRequest.class)))
+                .thenReturn(DescribeKeyResponse.builder()
+                        .keyMetadata(KeyMetadata.builder().arn(KMS_KEY_ARN).build())
+                        .build());
+        adapter = new S3StorageAdapter(s3Client, properties, kmsClient);
     }
 
     @Nested
@@ -56,7 +69,7 @@ class S3StorageAdapterTest {
             InputStream content = new ByteArrayInputStream(TEST_CONTENT);
             FileSize size = FileSize.of(TEST_CONTENT.length);
             MimeType mimeType = MimeType.of("application/pdf");
-            StorageMetadata metadata = StorageMetadata.of("a1b2c3d4e5f67890a1b2c3d4e5f67890", "test.pdf", "checksum123");
+            StorageMetadata metadata = StorageMetadata.of("a1b2c3d4-e5f6-4890-a1b2-c3d4e5f67890", "test.pdf", "checksum123");
 
             given(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
                     .willReturn(PutObjectResponse.builder().eTag("etag-123").build());
@@ -68,7 +81,7 @@ class S3StorageAdapterTest {
 
             assertThat(request.bucket()).isEqualTo(BUCKET_NAME);
             assertThat(request.serverSideEncryption()).isEqualTo(ServerSideEncryption.AWS_KMS);
-            assertThat(request.ssekmsKeyId()).isEqualTo(KMS_KEY_ID);
+            assertThat(request.ssekmsKeyId()).isEqualTo(KMS_KEY_ARN);
             assertThat(request.contentType()).isEqualTo("application/pdf");
         }
 
@@ -79,7 +92,7 @@ class S3StorageAdapterTest {
             InputStream content = new ByteArrayInputStream(TEST_CONTENT);
             FileSize size = FileSize.of(TEST_CONTENT.length);
             MimeType mimeType = MimeType.of("application/pdf");
-            StorageMetadata metadata = StorageMetadata.of("a1b2c3d4e5f67890a1b2c3d4e5f67890", "test-file.pdf", "sha256hash");
+            StorageMetadata metadata = StorageMetadata.of("a1b2c3d4-e5f6-4890-a1b2-c3d4e5f67890", "test-file.pdf", "sha256hash");
 
             given(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
                     .willReturn(PutObjectResponse.builder().eTag("etag-123").build());
@@ -90,7 +103,7 @@ class S3StorageAdapterTest {
             var s3Metadata = requestCaptor.getValue().metadata();
 
             assertThat(s3Metadata)
-                    .containsEntry("correlation-id", "a1b2c3d4e5f67890a1b2c3d4e5f67890")
+                    .containsEntry("correlation-id", "a1b2c3d4-e5f6-4890-a1b2-c3d4e5f67890")
                     .containsEntry("original-filename", "test-file.pdf")
                     .containsEntry("checksum-sha256", "sha256hash");
         }
@@ -102,7 +115,7 @@ class S3StorageAdapterTest {
             InputStream content = new ByteArrayInputStream(TEST_CONTENT);
             FileSize size = FileSize.of(TEST_CONTENT.length);
             MimeType mimeType = MimeType.of("application/pdf");
-            StorageMetadata metadata = StorageMetadata.of("b1c2d3e4f5a67890b1c2d3e4f5a67890", "test.pdf", null);
+            StorageMetadata metadata = StorageMetadata.of("b1c2d3e4-f5a6-4890-b1c2-d3e4f5a67890", "test.pdf", null);
 
             given(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
                     .willReturn(PutObjectResponse.builder().eTag("etag-123").build());
@@ -134,7 +147,7 @@ class S3StorageAdapterTest {
             assertThat(result)
                     .satisfies(storageResult -> {
                         assertThat(storageResult.getLocation().bucketName()).isEqualTo(BUCKET_NAME);
-                        assertThat(storageResult.getEncryptionMetadata().kmsKeyId()).isEqualTo(KMS_KEY_ID);
+                        assertThat(storageResult.getEncryptionMetadata().kmsKeyId()).isEqualTo(KMS_KEY_ARN);
                         assertThat(storageResult.getEtag()).isEqualTo("\"etag-123\"");
                     });
         }
@@ -163,7 +176,7 @@ class S3StorageAdapterTest {
             InputStream content = new ByteArrayInputStream(TEST_CONTENT);
             FileSize size = FileSize.of(TEST_CONTENT.length);
             MimeType mimeType = MimeType.of("application/pdf");
-            StorageMetadata metadata = StorageMetadata.of("a1b2c3d4e5f67890a1b2c3d4e5f67890", "plik-żółć.pdf", null);
+            StorageMetadata metadata = StorageMetadata.of("a1b2c3d4-e5f6-4890-a1b2-c3d4e5f67890", "plik-żółć.pdf", null);
 
             given(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
                     .willReturn(PutObjectResponse.builder().eTag("etag-123").build());
@@ -183,7 +196,7 @@ class S3StorageAdapterTest {
             InputStream content = new ByteArrayInputStream(TEST_CONTENT);
             FileSize size = FileSize.of(TEST_CONTENT.length);
             MimeType mimeType = MimeType.of("application/pdf");
-            StorageMetadata metadata = StorageMetadata.of("a1b2c3d4e5f67890a1b2c3d4e5f67890", null, null);
+            StorageMetadata metadata = StorageMetadata.of("a1b2c3d4-e5f6-4890-a1b2-c3d4e5f67890", null, null);
 
             given(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
                     .willReturn(PutObjectResponse.builder().eTag("etag-123").build());
@@ -201,13 +214,13 @@ class S3StorageAdapterTest {
             S3StorageProperties noKeyProps = new S3StorageProperties();
             noKeyProps.setBucketName(BUCKET_NAME);
 
-            S3StorageAdapter adapterWithoutKey = new S3StorageAdapter(s3Client, noKeyProps);
+            S3StorageAdapter adapterWithoutKey = new S3StorageAdapter(s3Client, noKeyProps, kmsClient);
 
             FileId fileId = FileId.generate();
             InputStream content = new ByteArrayInputStream(TEST_CONTENT);
             FileSize size = FileSize.of(TEST_CONTENT.length);
             MimeType mimeType = MimeType.of("application/pdf");
-            StorageMetadata metadata = StorageMetadata.of("a1b2c3d4e5f67890a1b2c3d4e5f67890", "test.pdf", null);
+            StorageMetadata metadata = StorageMetadata.of("a1b2c3d4-e5f6-4890-a1b2-c3d4e5f67890", "test.pdf", null);
 
             assertThatThrownBy(() -> adapterWithoutKey.store(fileId, content, size, mimeType, metadata))
                     .isInstanceOf(StorageConfigurationException.class)
@@ -220,8 +233,8 @@ class S3StorageAdapterTest {
             S3StorageProperties nullKeyProps = new S3StorageProperties();
             nullKeyProps.setBucketName(BUCKET_NAME);
             nullKeyProps.setKmsKeyId(null);
-            
-            S3StorageAdapter adapterWithNullKey = new S3StorageAdapter(s3Client, nullKeyProps);
+
+            S3StorageAdapter adapterWithNullKey = new S3StorageAdapter(s3Client, nullKeyProps, kmsClient);
             org.springframework.test.util.ReflectionTestUtils.setField(
                     adapterWithNullKey, "fallbackKmsKeyId", "alias/fallback-key");
 
@@ -229,7 +242,7 @@ class S3StorageAdapterTest {
             InputStream content = new ByteArrayInputStream(TEST_CONTENT);
             FileSize size = FileSize.of(TEST_CONTENT.length);
             MimeType mimeType = MimeType.of("application/pdf");
-            StorageMetadata metadata = StorageMetadata.of("a1b2c3d4e5f67890a1b2c3d4e5f67890", "test.pdf", null);
+            StorageMetadata metadata = StorageMetadata.of("a1b2c3d4-e5f6-4890-a1b2-c3d4e5f67890", "test.pdf", null);
 
             given(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
                     .willReturn(PutObjectResponse.builder().eTag("etag-123").build());
@@ -237,7 +250,7 @@ class S3StorageAdapterTest {
             adapterWithNullKey.store(fileId, content, size, mimeType, metadata);
 
             then(s3Client).should().putObject(requestCaptor.capture(), any(RequestBody.class));
-            assertThat(requestCaptor.getValue().ssekmsKeyId()).isEqualTo("alias/fallback-key");
+            assertThat(requestCaptor.getValue().ssekmsKeyId()).isEqualTo(KMS_KEY_ARN);
         }
 
         @Test
@@ -246,8 +259,8 @@ class S3StorageAdapterTest {
             S3StorageProperties blankKeyProps = new S3StorageProperties();
             blankKeyProps.setBucketName(BUCKET_NAME);
             blankKeyProps.setKmsKeyId("   ");
-            
-            S3StorageAdapter adapterWithBlankKey = new S3StorageAdapter(s3Client, blankKeyProps);
+
+            S3StorageAdapter adapterWithBlankKey = new S3StorageAdapter(s3Client, blankKeyProps, kmsClient);
             org.springframework.test.util.ReflectionTestUtils.setField(
                     adapterWithBlankKey, "fallbackKmsKeyId", "alias/fallback-key");
 
@@ -255,7 +268,7 @@ class S3StorageAdapterTest {
             InputStream content = new ByteArrayInputStream(TEST_CONTENT);
             FileSize size = FileSize.of(TEST_CONTENT.length);
             MimeType mimeType = MimeType.of("application/pdf");
-            StorageMetadata metadata = StorageMetadata.of("a1b2c3d4e5f67890a1b2c3d4e5f67890", "test.pdf", null);
+            StorageMetadata metadata = StorageMetadata.of("a1b2c3d4-e5f6-4890-a1b2-c3d4e5f67890", "test.pdf", null);
 
             given(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
                     .willReturn(PutObjectResponse.builder().eTag("etag-123").build());
@@ -263,7 +276,7 @@ class S3StorageAdapterTest {
             adapterWithBlankKey.store(fileId, content, size, mimeType, metadata);
 
             then(s3Client).should().putObject(requestCaptor.capture(), any(RequestBody.class));
-            assertThat(requestCaptor.getValue().ssekmsKeyId()).isEqualTo("alias/fallback-key");
+            assertThat(requestCaptor.getValue().ssekmsKeyId()).isEqualTo(KMS_KEY_ARN);
         }
     }
 

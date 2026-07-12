@@ -26,14 +26,14 @@ public class CognitoAccessDeniedHandler implements AccessDeniedHandler {
     public void handle(HttpServletRequest request,
                        HttpServletResponse response,
                        AccessDeniedException accessDeniedException) throws IOException {
-        
-        log.warn("Access denied for request to {}: {}", 
-                request.getRequestURI(), 
+
+        log.warn("Access denied for request to {}: {}",
+                request.getRequestURI(),
                 accessDeniedException.getMessage());
 
         response.setStatus(HttpStatus.FORBIDDEN.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        
+
         Map<String, Object> errorResponse = Map.of(
                 "type", "https://datatracker.ietf.org/doc/html/rfc7231#section-6.5.3",
                 "title", "Forbidden",
@@ -43,11 +43,11 @@ public class CognitoAccessDeniedHandler implements AccessDeniedHandler {
                 "error", "insufficient_scope",
                 "timestamp", Instant.now().toString()
         );
-        
-        response.setHeader("WWW-Authenticate", 
+
+        response.setHeader("WWW-Authenticate",
                 "Bearer error=\"insufficient_scope\", " +
                 "error_description=\"The access token lacks required scope\"");
-        
+
         objectMapper.writeValue(response.getOutputStream(), errorResponse);
     }
 }

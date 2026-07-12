@@ -43,7 +43,7 @@ class FipsCryptoConfigTest {
         @DisplayName("ACCP should be installed as highest-priority provider (position 1)")
         void shouldInstallACCPAtPosition1() {
             Provider[] providers = Security.getProviders();
-            
+
             assertThat(providers).isNotEmpty();
             assertThat(providers[0].getName())
                     .as("ACCP must be the first (highest priority) security provider")
@@ -54,7 +54,7 @@ class FipsCryptoConfigTest {
         @DisplayName("BouncyCastle FIPS should be registered at position 2")
         void shouldInstallBCFIPSAtPosition2() {
             Provider bcFips = Security.getProvider(BouncyCastleFipsProvider.PROVIDER_NAME);
-            
+
             assertThat(bcFips)
                     .as("BouncyCastle FIPS provider must be registered")
                     .isNotNull();
@@ -99,7 +99,7 @@ class FipsCryptoConfigTest {
         @DisplayName("BouncyCastle approved-only mode should be enabled")
         void shouldEnableApprovedOnlyMode() {
             String approvedOnly = System.getProperty("org.bouncycastle.fips.approved_only");
-            
+
             assertThat(approvedOnly)
                     .as("BC-FIPS approved-only mode must be set to 'true'")
                     .isEqualTo("true");
