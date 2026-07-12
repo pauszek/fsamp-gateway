@@ -63,6 +63,10 @@ logging:
     root: INFO
     io.github.pauszek: DEBUG
     software.amazon.awssdk: WARN
+  pattern:
+    # Keep the AU-3 audit trail in every log line: the business correlation id
+    # (X-Correlation-ID, propagated through SNS/SQS) plus the Micrometer trace.
+    correlation: "[%X{correlationId:-}] [%X{traceId:-}-%X{spanId:-}] "
 
 resilience4j:
   circuitbreaker:

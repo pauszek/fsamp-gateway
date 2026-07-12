@@ -168,7 +168,7 @@ public class FileUploadRestAdapter {
                 .description(request != null ? request.description() : null)
                 .tags(request == null
                         ? java.util.Set.of()
-                        : java.util.Arrays.stream(request.tags())
+                        : request.tags().stream()
                                 .map(String::trim)
                                 .collect(java.util.stream.Collectors.toUnmodifiableSet()))
                 .build();

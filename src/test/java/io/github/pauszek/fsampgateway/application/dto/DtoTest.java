@@ -196,7 +196,7 @@ class DtoTest {
             FileUploadRequestDto request = new FileUploadRequestDto(
                     "corr-123",
                     "Test document",
-                    new String[]{"tag1", "tag2"}
+                    java.util.List.of("tag1", "tag2")
             );
 
             assertThat(request.correlationId()).isEqualTo("corr-123");
@@ -205,7 +205,7 @@ class DtoTest {
         }
 
         @Test
-        @DisplayName("should handle null tags by converting to empty array")
+        @DisplayName("should handle null tags by converting to empty list")
         void shouldHandleNullTags() {
             FileUploadRequestDto request = new FileUploadRequestDto(
                     "a1b2c3d4-e5f6-4890-a1b2-c3d4e5f67890",
@@ -219,14 +219,14 @@ class DtoTest {
         @Test
         @DisplayName("should defensively copy tags")
         void shouldDefensivelyCopyTags() {
-            String[] tags = {"report", "finance"};
+            java.util.List<String> tags = new java.util.ArrayList<>(java.util.List.of("report", "finance"));
             FileUploadRequestDto request = new FileUploadRequestDto("corr-123", "Document", tags);
 
-            tags[0] = "changed";
-            String[] returnedTags = request.tags();
-            returnedTags[1] = "changed";
+            tags.set(0, "changed");
 
             assertThat(request.tags()).containsExactly("report", "finance");
+            assertThatThrownBy(() -> request.tags().set(1, "changed"))
+                    .isInstanceOf(UnsupportedOperationException.class);
         }
 
         @Test
@@ -235,17 +235,17 @@ class DtoTest {
             FileUploadRequestDto first = new FileUploadRequestDto(
                     "corr-123",
                     "Document",
-                    new String[]{"report", "finance"}
+                    java.util.List.of("report", "finance")
             );
             FileUploadRequestDto second = new FileUploadRequestDto(
                     "corr-123",
                     "Document",
-                    new String[]{"report", "finance"}
+                    java.util.List.of("report", "finance")
             );
             FileUploadRequestDto different = new FileUploadRequestDto(
                     "corr-123",
                     "Document",
-                    new String[]{"report"}
+                    java.util.List.of("report")
             );
             boolean sameInstanceEquals = first.equals(first);
 
