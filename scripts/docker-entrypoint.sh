@@ -123,7 +123,7 @@ main() {
     log "Starting FSAMP Gateway entrypoint..."
     log "Environment: ${SPRING_PROFILES_ACTIVE:-default}"
 
-    if [ "$SPRING_PROFILES_ACTIVE" = "local" ] || [ "$SPRING_PROFILES_ACTIVE" = "e2e" ]; then
+    if [ "$SPRING_PROFILES_ACTIVE" = "local" ]; then
         if ! load_config_file; then
             wait_for_localstack
             use_configured_cognito || discover_cognito
@@ -136,7 +136,7 @@ main() {
     log "  COGNITO_USER_POOL_ID: ${COGNITO_USER_POOL_ID:-not set}"
     log "  COGNITO_CLIENT_ID: ${COGNITO_CLIENT_ID:-not set}"
 
-    if [ "$SPRING_PROFILES_ACTIVE" = "local" ] || [ "$SPRING_PROFILES_ACTIVE" = "e2e" ]; then
+    if [ "$SPRING_PROFILES_ACTIVE" = "local" ]; then
         log "Disabling FIPS mode for local development"
         export JAVA_OPTS="${JAVA_OPTS} -Dorg.bouncycastle.fips.approved_only=false"
     fi

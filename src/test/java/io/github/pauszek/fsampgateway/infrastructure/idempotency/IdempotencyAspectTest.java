@@ -139,7 +139,7 @@ class IdempotencyAspectTest {
                         "application/pdf",
                         "content".getBytes()
                 ),
-                new FileUploadRequestDto(null, "report", new String[]{"audit"})
+                new FileUploadRequestDto(null, "report", java.util.List.of("audit"))
         });
         ResponseEntity<String> response = ResponseEntity.status(HttpStatus.CREATED).body("created");
         when(joinPoint.proceed()).thenReturn(response);
