@@ -11,6 +11,7 @@ COPY pom.xml .
 RUN chmod +x mvnw && ./mvnw dependency:go-offline -B
 
 COPY src src
+COPY schema schema
 RUN ./mvnw package -DskipTests -B
 
 FROM amazoncorretto:21-al2023-headless

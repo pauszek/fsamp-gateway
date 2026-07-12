@@ -208,6 +208,24 @@ class ValueObjectsTest {
         }
 
         @Test
+        void shouldNormalizeCompactUuid() {
+            CorrelationId id = CorrelationId.of("a1b2c3d4e5f64890a1b2c3d4e5f67890");
+
+            assertThat(id.value()).isEqualTo("a1b2c3d4-e5f6-4890-a1b2-c3d4e5f67890");
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {
+                "a1b2c3d4-e5f6-1890-a1b2-c3d4e5f67890",
+                "a1b2c3d4-e5f6-4890-01b2-c3d4e5f67890"
+        })
+        void shouldRejectNonV4OrNonRfc4122Uuid(String value) {
+            assertThatThrownBy(() -> CorrelationId.of(value))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("UUID v4");
+        }
+
+        @Test
         @DisplayName("should generate new ID for null input")
         void shouldGenerateNewIdForNull() {
             CorrelationId id = CorrelationId.of(null);

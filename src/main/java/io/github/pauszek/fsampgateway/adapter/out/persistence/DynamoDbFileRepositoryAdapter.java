@@ -21,7 +21,6 @@ import io.github.pauszek.fsampgateway.domain.port.out.FileRepositoryPort;
 import io.github.pauszek.fsampgateway.infrastructure.security.Sha256Digest;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
-import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -353,7 +352,10 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
 
     private static String requiredNumber(Map<String, AttributeValue> item, String name) {
         AttributeValue value = item.get(name);
-        return requireValue(value == null ? null : value.n(), name);
+        if (value == null || value.n() == null) {
+            throw new IllegalStateException("Missing DynamoDB attribute: " + name);
+        }
+        return value.n();
     }
 
     private static String requireValue(String value, String name) {

@@ -35,6 +35,9 @@ public class IdempotencyKeyService {
     private static final String OWNER_TOKEN_ATTR = "ownerToken";
     private static final String CREATED_AT_ATTR = "createdAt";
     private static final String TTL_ATTR = "ttl";
+    private static final String STATUS_NAME = "#status";
+    private static final String OWNER_NAME = "#owner";
+    private static final String IN_PROGRESS_VALUE = ":inProgress";
     private static final int TTL_HOURS = 24;
     private static final Duration PROCESSING_LEASE = Duration.ofMinutes(5);
     private static final Pattern VALID_KEY = Pattern.compile("^[A-Za-z0-9._:-]{1,128}$");
@@ -70,8 +73,8 @@ public class IdempotencyKeyService {
             return new Acquisition(ownerToken, null);
         }
 
-        static Acquisition cached(IdempotencyRecord record) {
-            return new Acquisition(null, record);
+        static Acquisition cached(IdempotencyRecord cachedRecord) {
+            return new Acquisition(null, cachedRecord);
         }
 
         public boolean hasCachedResponse() {
@@ -120,14 +123,14 @@ public class IdempotencyKeyService {
                 .updateExpression("SET #status = :completed, #response = :response, #ttl = :ttl")
                 .conditionExpression("#status = :inProgress AND #owner = :owner")
                 .expressionAttributeNames(Map.of(
-                        "#status", STATUS_ATTR,
+                        STATUS_NAME, STATUS_ATTR,
                         "#response", RESPONSE_ATTR,
                         "#ttl", TTL_ATTR,
-                        "#owner", OWNER_TOKEN_ATTR
+                        OWNER_NAME, OWNER_TOKEN_ATTR
                 ))
                 .expressionAttributeValues(Map.of(
                         ":completed", s(KeyStatus.COMPLETED.name()),
-                        ":inProgress", s(KeyStatus.IN_PROGRESS.name()),
+                        IN_PROGRESS_VALUE, s(KeyStatus.IN_PROGRESS.name()),
                         ":response", s(response),
                         ":ttl", n(now.plus(TTL_HOURS, ChronoUnit.HOURS).getEpochSecond()),
                         ":owner", s(ownerToken)
@@ -142,11 +145,11 @@ public class IdempotencyKeyService {
                     .key(key(idempotencyKey, userId))
                     .conditionExpression("#status = :inProgress AND #owner = :owner")
                     .expressionAttributeNames(Map.of(
-                            "#status", STATUS_ATTR,
-                            "#owner", OWNER_TOKEN_ATTR
+                            STATUS_NAME, STATUS_ATTR,
+                            OWNER_NAME, OWNER_TOKEN_ATTR
                     ))
                     .expressionAttributeValues(Map.of(
-                            ":inProgress", s(KeyStatus.IN_PROGRESS.name()),
+                            IN_PROGRESS_VALUE, s(KeyStatus.IN_PROGRESS.name()),
                             ":owner", s(ownerToken)
                     ))
                     .build());
@@ -190,19 +193,19 @@ public class IdempotencyKeyService {
                     .updateExpression("SET #owner = :newOwner, #created = :now, #fingerprint = :fingerprint, #ttl = :ttl REMOVE #response")
                     .conditionExpression("#status = :inProgress AND #created = :previousCreated AND #fingerprint = :fingerprint")
                     .expressionAttributeNames(Map.of(
-                            "#owner", OWNER_TOKEN_ATTR,
+                            OWNER_NAME, OWNER_TOKEN_ATTR,
                             "#created", CREATED_AT_ATTR,
                             "#fingerprint", FINGERPRINT_ATTR,
                             "#ttl", TTL_ATTR,
                             "#response", RESPONSE_ATTR,
-                            "#status", STATUS_ATTR
+                            STATUS_NAME, STATUS_ATTR
                     ))
                     .expressionAttributeValues(Map.of(
                             ":newOwner", s(newOwnerToken),
                             ":now", s(now.toString()),
                             ":fingerprint", s(requestFingerprint),
                             ":ttl", n(now.plus(TTL_HOURS, ChronoUnit.HOURS).getEpochSecond()),
-                            ":inProgress", s(KeyStatus.IN_PROGRESS.name()),
+                            IN_PROGRESS_VALUE, s(KeyStatus.IN_PROGRESS.name()),
                             ":previousCreated", s(existing.createdAt().toString())
                     ))
                     .build());

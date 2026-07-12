@@ -32,6 +32,7 @@ public final class UploadFileCommand {
         this(fileName, contentType, size, content, correlationId, uploadedBy, null, Set.of());
     }
 
+    @SuppressWarnings("java:S107")
     public UploadFileCommand(
             String fileName,
             String contentType,

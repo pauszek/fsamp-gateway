@@ -13,6 +13,7 @@ import software.amazon.awssdk.services.sns.SnsClient;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sts.StsClient;
 import software.amazon.awssdk.services.cloudwatch.CloudWatchClient;
+import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -112,6 +113,16 @@ class AwsConfigTest {
             AwsCredentialsProvider provider = config.awsCredentialsProvider();
 
             CloudWatchClient cloudWatchClient = config.cloudWatchClient(provider);
+
+            assertThat(cloudWatchClient).isNotNull();
+            cloudWatchClient.close();
+        }
+
+        @Test
+        void shouldCreateAsyncCloudWatchClientWithLocalStackEndpoint() {
+            AwsCredentialsProvider provider = config.awsCredentialsProvider();
+
+            CloudWatchAsyncClient cloudWatchClient = config.cloudWatchAsyncClient(provider);
 
             assertThat(cloudWatchClient).isNotNull();
             cloudWatchClient.close();
@@ -236,6 +247,16 @@ class AwsConfigTest {
             AwsCredentialsProvider provider = testCredentials();
 
             CloudWatchClient cloudWatchClient = config.cloudWatchClient(provider);
+
+            assertThat(cloudWatchClient).isNotNull();
+            cloudWatchClient.close();
+        }
+
+        @Test
+        void shouldCreateAsyncCloudWatchClientForProduction() {
+            AwsCredentialsProvider provider = testCredentials();
+
+            CloudWatchAsyncClient cloudWatchClient = config.cloudWatchAsyncClient(provider);
 
             assertThat(cloudWatchClient).isNotNull();
             cloudWatchClient.close();

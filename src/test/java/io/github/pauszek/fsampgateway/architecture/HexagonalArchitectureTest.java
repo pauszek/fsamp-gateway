@@ -190,6 +190,7 @@ class HexagonalArchitectureTest {
         void domainServicesShouldFollowNamingConvention() {
             classes()
                     .that().resideInAPackage("..domain.service..")
+                    .and().areNotMemberClasses()
                     .should().haveSimpleNameEndingWith("DomainService")
                     .because("Domain services should follow naming convention")
                     .check(classes);

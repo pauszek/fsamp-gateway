@@ -64,25 +64,43 @@ public class IdempotencyAspect {
         try {
             Object result = joinPoint.proceed();
             if (result instanceof ResponseEntity<?> responseEntity) {
-                try {
-                    idempotencyKeyService.completeKey(
-                            idempotencyKey,
-                            userId,
-                            acquisition.ownerToken(),
-                            serializeResponse(responseEntity)
-                    );
-                } catch (RuntimeException cacheFailure) {
-                    log.error("Request succeeded but its idempotent response could not be persisted", cacheFailure);
-                }
+                cacheSuccessfulResponse(idempotencyKey, userId, acquisition.ownerToken(), responseEntity);
             }
             return result;
         } catch (Throwable failure) {
-            try {
-                idempotencyKeyService.failKey(idempotencyKey, userId, acquisition.ownerToken());
-            } catch (RuntimeException releaseFailure) {
-                failure.addSuppressed(releaseFailure);
-            }
+            releaseKeyAfterFailure(idempotencyKey, userId, acquisition.ownerToken(), failure);
             throw failure;
+        }
+    }
+
+    private void cacheSuccessfulResponse(
+            String idempotencyKey,
+            String userId,
+            String ownerToken,
+            ResponseEntity<?> responseEntity
+    ) {
+        try {
+            idempotencyKeyService.completeKey(
+                    idempotencyKey,
+                    userId,
+                    ownerToken,
+                    serializeResponse(responseEntity)
+            );
+        } catch (RuntimeException cacheFailure) {
+            log.error("Request succeeded but its idempotent response could not be persisted", cacheFailure);
+        }
+    }
+
+    private void releaseKeyAfterFailure(
+            String idempotencyKey,
+            String userId,
+            String ownerToken,
+            Throwable failure
+    ) {
+        try {
+            idempotencyKeyService.failKey(idempotencyKey, userId, ownerToken);
+        } catch (RuntimeException releaseFailure) {
+            failure.addSuppressed(releaseFailure);
         }
     }
 

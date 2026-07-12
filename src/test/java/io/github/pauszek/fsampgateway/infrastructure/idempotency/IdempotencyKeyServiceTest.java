@@ -149,7 +149,8 @@ class IdempotencyKeyServiceTest {
                     .isInstanceOf(InvalidIdempotencyKeyException.class);
             assertThatThrownBy(() -> service.acquireKey("contains whitespace", USER_ID, FINGERPRINT))
                     .isInstanceOf(InvalidIdempotencyKeyException.class);
-            assertThatThrownBy(() -> service.acquireKey("x".repeat(129), USER_ID, FINGERPRINT))
+            String oversizedKey = "x".repeat(129);
+            assertThatThrownBy(() -> service.acquireKey(oversizedKey, USER_ID, FINGERPRINT))
                     .isInstanceOf(InvalidIdempotencyKeyException.class);
             then(dynamoDbClient).shouldHaveNoInteractions();
         }

@@ -1,6 +1,7 @@
 package io.github.pauszek.fsampgateway.infrastructure.idempotency;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.pauszek.fsampgateway.application.dto.FileUploadRequestDto;
 import io.github.pauszek.fsampgateway.infrastructure.security.cognito.CurrentUserService;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.junit.jupiter.api.AfterEach;
@@ -10,6 +11,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -19,10 +21,12 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -75,7 +79,7 @@ class IdempotencyAspectTest {
         assertThat(result).isInstanceOfSatisfying(ResponseEntity.class, response -> {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
             assertThat(response.getBody()).isEqualTo(Map.of("status", "accepted"));
-            assertThat(response.getHeaders().get("X-Test")).isEqualTo(List.of("cached"));
+            assertThat(response.getHeaders()).containsEntry("X-Test", List.of("cached"));
         });
         verify(joinPoint, never()).proceed();
         verify(idempotencyKeyService, never()).completeKey(any(), any(), any(), any());
@@ -104,6 +108,102 @@ class IdempotencyAspectTest {
                 eq("owner-token"),
                 org.mockito.ArgumentMatchers.contains("Location")
         );
+    }
+
+    @Test
+    void shouldProceedWithoutIdempotencyHeaderOrRequestContext() throws Throwable {
+        ProceedingJoinPoint joinPoint = mock(ProceedingJoinPoint.class);
+        when(joinPoint.proceed()).thenReturn("result");
+
+        Object result = aspect.handleIdempotency(joinPoint, mock(Idempotent.class));
+
+        assertThat(result).isEqualTo("result");
+        verify(currentUserService, never()).getCurrentUserId();
+        verify(idempotencyKeyService, never()).acquireKey(any(), any(), any());
+    }
+
+    @Test
+    void shouldFingerprintMultipartContentAndKeepSuccessfulResponseWhenCachingFails() throws Throwable {
+        installRequest("idem-upload");
+        when(currentUserService.getCurrentUserId()).thenReturn(Optional.of("user-upload"));
+        when(idempotencyKeyService.acquireKey(eq("idem-upload"), eq("user-upload"), anyString()))
+                .thenReturn(IdempotencyKeyService.Acquisition.acquired("owner-upload"));
+        doThrow(new IllegalStateException("DynamoDB unavailable"))
+                .when(idempotencyKeyService)
+                .completeKey(any(), any(), any(), any());
+        ProceedingJoinPoint joinPoint = mock(ProceedingJoinPoint.class);
+        when(joinPoint.getArgs()).thenReturn(new Object[]{
+                new MockMultipartFile(
+                        "file",
+                        "report.pdf",
+                        "application/pdf",
+                        "content".getBytes()
+                ),
+                new FileUploadRequestDto(null, "report", new String[]{"audit"})
+        });
+        ResponseEntity<String> response = ResponseEntity.status(HttpStatus.CREATED).body("created");
+        when(joinPoint.proceed()).thenReturn(response);
+
+        Object result = aspect.handleIdempotency(joinPoint, mock(Idempotent.class));
+
+        assertThat(result).isSameAs(response);
+        verify(idempotencyKeyService).completeKey(
+                eq("idem-upload"),
+                eq("user-upload"),
+                eq("owner-upload"),
+                anyString()
+        );
+    }
+
+    @Test
+    void shouldReleaseLeaseAndPreserveReleaseFailureWhenRequestFails() throws Throwable {
+        installRequest("idem-failure");
+        when(currentUserService.getCurrentUserId()).thenReturn(Optional.of("user-failure"));
+        when(idempotencyKeyService.acquireKey(eq("idem-failure"), eq("user-failure"), anyString()))
+                .thenReturn(IdempotencyKeyService.Acquisition.acquired("owner-failure"));
+        IllegalStateException requestFailure = new IllegalStateException("request failed");
+        IllegalStateException releaseFailure = new IllegalStateException("release failed");
+        ProceedingJoinPoint joinPoint = mock(ProceedingJoinPoint.class);
+        when(joinPoint.getArgs()).thenReturn(new Object[0]);
+        when(joinPoint.proceed()).thenThrow(requestFailure);
+        doThrow(releaseFailure).when(idempotencyKeyService)
+                .failKey("idem-failure", "user-failure", "owner-failure");
+
+        Throwable thrown = catchThrowable(
+                () -> aspect.handleIdempotency(joinPoint, mock(Idempotent.class))
+        );
+
+        assertThat(thrown).isSameAs(requestFailure);
+        assertThat(thrown.getSuppressed()).containsExactly(releaseFailure);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldRejectCorruptCachedResponse() throws Throwable {
+        installRequest("idem-corrupt");
+        when(currentUserService.getCurrentUserId()).thenReturn(Optional.of("user-corrupt"));
+        when(idempotencyKeyService.acquireKey(eq("idem-corrupt"), eq("user-corrupt"), anyString()))
+                .thenReturn(IdempotencyKeyService.Acquisition.cached(
+                        new IdempotencyKeyService.IdempotencyRecord(
+                                "idem-corrupt",
+                                "user-corrupt",
+                                IdempotencyKeyService.KeyStatus.COMPLETED,
+                                "fingerprint",
+                                "owner-corrupt",
+                                "not-json",
+                                Instant.now()
+                        )
+                ));
+        ProceedingJoinPoint joinPoint = mock(ProceedingJoinPoint.class);
+        when(joinPoint.getArgs()).thenReturn(new Object[0]);
+        Idempotent idempotent = mock(Idempotent.class);
+        when(idempotent.responseType()).thenReturn((Class) Map.class);
+
+        Throwable thrown = catchThrowable(() -> aspect.handleIdempotency(joinPoint, idempotent));
+
+        assertThat(thrown)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("deserialize");
     }
 
     private static void installRequest(String idempotencyKey) {

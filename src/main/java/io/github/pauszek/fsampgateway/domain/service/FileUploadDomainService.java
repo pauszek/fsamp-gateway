@@ -24,6 +24,7 @@ import java.util.Set;
 public class FileUploadDomainService implements UploadFileUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(FileUploadDomainService.class);
+    private static final String CORRELATION_ID_MDC_KEY = "correlationId";
     private static final String UPLOAD_TEMP_DIR_NAME = "fsamp-gateway-uploads";
     private static final Set<PosixFilePermission> OWNER_ONLY_DIRECTORY_PERMISSIONS =
             PosixFilePermissions.fromString("rwx------");
@@ -84,8 +85,8 @@ public class FileUploadDomainService implements UploadFileUseCase {
     @Override
     public SecureFile execute(UploadFileCommand command) {
         CorrelationId correlationId = command.getCorrelationIdOrGenerate();
-        String previousCorrelationId = MDC.get("correlationId");
-        MDC.put("correlationId", correlationId.value());
+        String previousCorrelationId = MDC.get(CORRELATION_ID_MDC_KEY);
+        MDC.put(CORRELATION_ID_MDC_KEY, correlationId.value());
 
         Path tempFile = null;
         SecureFile file = null;
@@ -97,40 +98,12 @@ public class FileUploadDomainService implements UploadFileUseCase {
                 log.info("Starting file upload: fileName={}, size={}, correlationId={}",
                         FileName.safeForLogs(command.getFileName()), command.getSize(), correlationId);
             }
-            FileSize validatedSize;
-            try {
-                validatedSize = FileSize.ofWithLimit(command.getSize(), maxFileSizeBytes);
-            } catch (IllegalArgumentException e) {
-                throw new FileValidationException(e.getMessage(), e);
-            }
+            FileSize validatedSize = validateFileSize(command.getSize());
             tempFile = bufferToTempFile(command);
-            FileName fileName = FileName.of(command.getFileName());
-            if (command.getContentType() == null || command.getContentType().isBlank()) {
-                throw new FileValidationException("Content type is required");
-            }
-            MimeType declaredType = MimeType.of(command.getContentType());
-
-            ValidationResult validationResult;
-            try (InputStream is = Files.newInputStream(tempFile)) {
-                validationResult = contentValidator.validate(is, declaredType, command.getFileName());
-            }
-
-            if (validationResult.isInvalid()) {
-                throw new FileValidationException(validationResult.getMessage());
-            }
-
-            MimeType validatedType = validationResult.getDetectedType();
-            if (!allowedContentTypes.contains(validatedType.value())) {
-                throw new FileValidationException(
-                        "File type '" + validatedType + "' is not allowed");
-            }
-            Checksum checksum;
-            try (InputStream is = Files.newInputStream(tempFile)) {
-                checksum = contentValidator.computeChecksum(is);
-            }
+            ValidatedContent validated = validateContent(command, tempFile);
             file = SecureFile.createPending(
-                    fileName,
-                    validatedType,
+                    validated.fileName(),
+                    validated.mimeType(),
                     validatedSize,
                     correlationId,
                     command.getUploadedBy(),
@@ -148,8 +121,8 @@ public class FileUploadDomainService implements UploadFileUseCase {
                         file.getMimeType(),
                         StorageMetadata.of(
                                 correlationId.value(),
-                                fileName.value(),
-                                checksum.value()
+                                validated.fileName().value(),
+                                validated.checksum().value()
                         )
                 );
             }
@@ -159,7 +132,7 @@ public class FileUploadDomainService implements UploadFileUseCase {
             file = file.markAsUploaded(
                     storageResult.getLocation(),
                     storageResult.getEncryptionMetadata(),
-                    checksum
+                    validated.checksum()
             );
             FileUploadedEvent event = FileUploadedEvent.from(file);
             if (fileRepository.supportsTransactionalOutbox()) {
@@ -169,14 +142,7 @@ public class FileUploadDomainService implements UploadFileUseCase {
                 log.info("File metadata and FILE_UPLOADED outbox event persisted: fileId={}, eventId={}",
                         file.getId(), event.eventId());
                 if (directPublishAfterOutbox) {
-                    try {
-                        String messageId = eventPublisher.publish(event);
-                        log.info("Published FILE_UPLOADED event directly after outbox write (local fallback): messageId={}, fileId={}",
-                                messageId, file.getId());
-                    } catch (RuntimeException e) {
-                        log.warn("Direct publish failed; durable outbox will retry: fileId={}, error={}",
-                                file.getId(), e.getMessage());
-                    }
+                    publishDirectAfterOutbox(event, file);
                 }
             } else {
                 file = fileRepository.save(file);
@@ -203,13 +169,69 @@ public class FileUploadDomainService implements UploadFileUseCase {
             throw e;
         } finally {
             deleteTempFile(tempFile);
-            if (previousCorrelationId == null) {
-                MDC.remove("correlationId");
-            } else {
-                MDC.put("correlationId", previousCorrelationId);
-            }
+            restoreCorrelationId(previousCorrelationId);
         }
     }
+
+    private FileSize validateFileSize(long size) {
+        try {
+            return FileSize.ofWithLimit(size, maxFileSizeBytes);
+        } catch (IllegalArgumentException e) {
+            throw new FileValidationException(e.getMessage(), e);
+        }
+    }
+
+    private ValidatedContent validateContent(UploadFileCommand command, Path tempFile) throws IOException {
+        FileName fileName = FileName.of(command.getFileName());
+        if (command.getContentType() == null || command.getContentType().isBlank()) {
+            throw new FileValidationException("Content type is required");
+        }
+        MimeType declaredType = MimeType.of(command.getContentType());
+        ValidationResult validationResult;
+        try (InputStream input = Files.newInputStream(tempFile)) {
+            validationResult = contentValidator.validate(input, declaredType, command.getFileName());
+        }
+        if (validationResult.isInvalid()) {
+            throw new FileValidationException(validationResult.getMessage());
+        }
+        MimeType validatedType = validationResult.getDetectedType();
+        if (!allowedContentTypes.contains(validatedType.value())) {
+            throw new FileValidationException(
+                    "File type '" + validatedType + "' is not allowed");
+        }
+        try (InputStream input = Files.newInputStream(tempFile)) {
+            return new ValidatedContent(
+                    fileName,
+                    validatedType,
+                    contentValidator.computeChecksum(input)
+            );
+        }
+    }
+
+    private void publishDirectAfterOutbox(FileUploadedEvent event, SecureFile file) {
+        try {
+            String messageId = eventPublisher.publish(event);
+            log.info("Published FILE_UPLOADED event directly after outbox write (local fallback): messageId={}, fileId={}",
+                    messageId, file.getId());
+        } catch (RuntimeException e) {
+            log.warn("Direct publish failed; durable outbox will retry: fileId={}, error={}",
+                    file.getId(), e.getMessage());
+        }
+    }
+
+    private static void restoreCorrelationId(String previousCorrelationId) {
+        if (previousCorrelationId == null) {
+            MDC.remove(CORRELATION_ID_MDC_KEY);
+        } else {
+            MDC.put(CORRELATION_ID_MDC_KEY, previousCorrelationId);
+        }
+    }
+
+    private record ValidatedContent(
+            FileName fileName,
+            MimeType mimeType,
+            Checksum checksum
+    ) {}
 
     private void compensateFailedUpload(
             SecureFile file,

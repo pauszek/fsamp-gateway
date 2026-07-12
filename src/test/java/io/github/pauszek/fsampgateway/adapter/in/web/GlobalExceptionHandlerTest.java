@@ -139,6 +139,17 @@ class GlobalExceptionHandlerTest {
             assertThat(response.getBody().validationErrors().get(0).field()).isEqualTo("fileName");
             assertThat(response.getBody().validationErrors().get(1).field()).isEqualTo("size");
         }
+
+        @Test
+        void shouldReturn400ForInvalidRequestArgument() {
+            var ex = new IllegalArgumentException("invalid correlation id");
+
+            ResponseEntity<ApiErrorDto> response = handler.handleInvalidArgument(ex, webRequest);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+            assertThat(response.getBody().error()).isEqualTo("INVALID_ARGUMENT");
+            assertThat(response.getBody().message()).isEqualTo("invalid correlation id");
+        }
     }
 
     @Nested

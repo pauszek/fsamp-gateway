@@ -157,7 +157,8 @@ class FileQueryDomainServiceTest {
             willThrow(new RuntimeException("S3 unavailable"))
                     .given(fileStorage).delete(any(StorageLocation.class));
 
-            assertThatThrownBy(() -> service.execute(uploadedFile.getId()))
+            FileId fileId = uploadedFile.getId();
+            assertThatThrownBy(() -> service.execute(fileId))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("S3 unavailable");
 

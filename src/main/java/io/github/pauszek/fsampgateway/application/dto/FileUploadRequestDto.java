@@ -32,6 +32,7 @@ public record FileUploadRequestDto(
     }
 
     @Override
+    @SuppressWarnings("java:S6878")
     public boolean equals(Object other) {
         if (this == other) {
             return true;

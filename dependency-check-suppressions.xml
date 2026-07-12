@@ -13,4 +13,16 @@
         <cve>CVE-2026-39882</cve>
         <cve>CVE-2026-39883</cve>
     </suppress>
+    <suppress until="2026-10-12Z">
+        <notes><![CDATA[
+            False positives from broad Apache HttpComponents Core CPE matching.
+            The Apache CVE records identify the affected Maven packages as
+            org.apache.httpcomponents.core5:httpcore5 and httpcore5-h2 through
+            5.4.2 (plus 5.5 pre-releases), not the legacy AWS SDK dependency
+            org.apache.httpcomponents:httpcore 4.4.16. Review by 2026-10-12.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.apache\.httpcomponents/httpcore@4\.4\.16$</packageUrl>
+        <cve>CVE-2026-54399</cve>
+        <cve>CVE-2026-54428</cve>
+    </suppress>
 </suppressions>

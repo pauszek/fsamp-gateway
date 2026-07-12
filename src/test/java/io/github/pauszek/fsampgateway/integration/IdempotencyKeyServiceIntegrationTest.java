@@ -63,8 +63,9 @@ class IdempotencyKeyServiceIntegrationTest extends BaseIntegrationTest {
 
         @Test
         void shouldRejectInvalidKeys() {
+            String user = uniqueUser();
             assertThatThrownBy(() ->
-                    idempotencyKeyService.acquireKey("contains whitespace", uniqueUser(), FINGERPRINT))
+                    idempotencyKeyService.acquireKey("contains whitespace", user, FINGERPRINT))
                     .isInstanceOf(InvalidIdempotencyKeyException.class);
         }
     }

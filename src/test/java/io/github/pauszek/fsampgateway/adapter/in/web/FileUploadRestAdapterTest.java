@@ -3,6 +3,7 @@ package io.github.pauszek.fsampgateway.adapter.in.web;
 import io.github.pauszek.fsampgateway.application.dto.FileUploadResponseDto;
 import io.github.pauszek.fsampgateway.application.mapper.FileMapper;
 import io.github.pauszek.fsampgateway.domain.command.UploadFileCommand;
+import io.github.pauszek.fsampgateway.domain.exception.FileValidationException;
 import io.github.pauszek.fsampgateway.domain.model.*;
 import io.github.pauszek.fsampgateway.domain.port.in.DeleteFileUseCase;
 import io.github.pauszek.fsampgateway.domain.port.in.GetFileUseCase;
@@ -167,6 +168,44 @@ class FileUploadRestAdapterTest {
             then(uploadFileUseCase).should().execute(commandCaptor.capture());
             assertThat(commandCaptor.getValue().getCorrelationId())
                     .isEqualTo("b1c2d3e4-f5a6-4890-b1c2-d3e4f5a67890");
+        }
+
+        @Test
+        void shouldRejectMalformedMultipartCorrelationId() {
+            MockMultipartFile file = new MockMultipartFile(
+                    "file", "test.pdf", "application/pdf", "content".getBytes()
+            );
+            var metadata = new io.github.pauszek.fsampgateway.application.dto.FileUploadRequestDto(
+                    "not-a-uuid", null, null
+            );
+            given(currentUserService.getCurrentUser()).willReturn(Optional.of(createTestUser()));
+
+            assertThatThrownBy(() -> adapter.uploadFile(file, metadata, httpRequest, httpResponse))
+                    .isInstanceOf(FileValidationException.class)
+                    .hasMessageContaining("UUID v4");
+            then(uploadFileUseCase).shouldHaveNoInteractions();
+        }
+
+        @Test
+        void shouldRejectConflictingHeaderAndMultipartCorrelationIds() {
+            String headerCorrelationId = "a1b2c3d4-e5f6-4890-a1b2-c3d4e5f67890";
+            MockMultipartFile file = new MockMultipartFile(
+                    "file", "test.pdf", "application/pdf", "content".getBytes()
+            );
+            var metadata = new io.github.pauszek.fsampgateway.application.dto.FileUploadRequestDto(
+                    "b1c2d3e4-f5a6-4890-b1c2-d3e4f5a67890", null, null
+            );
+            httpRequest.addHeader("X-Correlation-ID", headerCorrelationId);
+            httpRequest.setAttribute(
+                    "io.github.pauszek.fsampgateway.infrastructure.security.CorrelationIdFilter.correlationId",
+                    headerCorrelationId
+            );
+            given(currentUserService.getCurrentUser()).willReturn(Optional.of(createTestUser()));
+
+            assertThatThrownBy(() -> adapter.uploadFile(file, metadata, httpRequest, httpResponse))
+                    .isInstanceOf(FileValidationException.class)
+                    .hasMessageContaining("must match");
+            then(uploadFileUseCase).shouldHaveNoInteractions();
         }
     }
 
