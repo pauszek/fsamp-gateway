@@ -73,7 +73,7 @@ public final class SecureFile {
         );
     }
 
-    @SuppressWarnings("java:S107") // Compatibility overload for callers supplying an idempotency key.
+    @SuppressWarnings("java:S107") // Idempotent retries require the pre-reserved file ID.
     public static SecureFile createPending(
             FileId fileId,
             FileName fileName,
