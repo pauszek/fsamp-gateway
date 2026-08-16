@@ -20,11 +20,12 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class CurrentUserServiceTest {
 
+    private static final String RESOURCE_SERVER = "https://fsamp-test-api";
     private CurrentUserService currentUserService;
 
     @BeforeEach
     void setUp() {
-        currentUserService = new CurrentUserService();
+        currentUserService = new CurrentUserService(new CognitoScopeNormalizer(RESOURCE_SERVER));
     }
 
     @AfterEach
@@ -186,6 +187,21 @@ class CurrentUserServiceTest {
 
         assertThat(result).isPresent();
         assertThat(result.get().scopes()).containsExactlyInAnyOrder("openid", "profile");
+    }
+
+    @Test
+    @DisplayName("should expose normalized resource server scopes")
+    void shouldExposeNormalizedResourceServerScopes() {
+        Jwt jwt = createJwt(Map.of(
+                "sub", "service-123",
+                "scope", RESOURCE_SERVER + "/files.read " + RESOURCE_SERVER + "/files.write"
+        ));
+        setJwtAuthentication(jwt);
+
+        UserPrincipal user = currentUserService.getCurrentUser().orElseThrow();
+
+        assertThat(user.scopes()).containsExactlyInAnyOrder("files.read", "files.write");
+        assertThat(currentUserService.hasScope("files.write")).isTrue();
     }
 
     @Test

@@ -11,6 +11,7 @@ cognito:
   region: ${COGNITO_REGION:us-west-2}
   user-pool-id: ${COGNITO_USER_POOL_ID:}
   client-id: ${COGNITO_CLIENT_ID:}
+  resource-server-identifier: ${COGNITO_RESOURCE_SERVER_IDENTIFIER:https://fsamp-local-api}
   client-secret: ${COGNITO_CLIENT_SECRET:}
   jwks-endpoint: ${COGNITO_JWKS_ENDPOINT:}
   issuer-uri: ${COGNITO_ISSUER_URI:}

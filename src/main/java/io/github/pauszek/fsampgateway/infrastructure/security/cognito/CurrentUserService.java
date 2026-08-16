@@ -1,6 +1,7 @@
 package io.github.pauszek.fsampgateway.infrastructure.security.cognito;
 
 import io.github.pauszek.fsampgateway.domain.model.UserPrincipal;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -9,10 +10,14 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class CurrentUserService {
 
     private static final String COGNITO_GROUPS_CLAIM = "cognito:groups";
@@ -20,6 +25,7 @@ public class CurrentUserService {
     private static final String EMAIL_CLAIM = "email";
     private static final String NAME_CLAIM = "name";
     private static final String TENANT_ID_CLAIM = "custom:tenant_id";
+    private final CognitoScopeNormalizer scopeNormalizer;
 
     public Optional<UserPrincipal> getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -69,28 +75,21 @@ public class CurrentUserService {
                 .build();
     }
 
-    @SuppressWarnings("unchecked")
     private Set<String> extractGroups(Jwt jwt) {
         Object groups = jwt.getClaim(COGNITO_GROUPS_CLAIM);
 
         if (groups instanceof List<?> list) {
-            return new HashSet<>((List<String>) list);
+            return list.stream()
+                    .filter(String.class::isInstance)
+                    .map(String.class::cast)
+                    .filter(group -> !group.isBlank())
+                    .collect(Collectors.toUnmodifiableSet());
         }
 
         return Set.of();
     }
 
     private Set<String> extractScopes(Jwt jwt) {
-        Object scopeClaim = jwt.getClaim(SCOPE_CLAIM);
-
-        if (scopeClaim instanceof String scopeString) {
-            return new HashSet<>(Arrays.asList(scopeString.split("\\s+")));
-        }
-
-        if (scopeClaim instanceof List<?> scopeList) {
-            return new HashSet<>((List<String>) scopeList);
-        }
-
-        return Set.of();
+        return scopeNormalizer.extractScopes(jwt.getClaim(SCOPE_CLAIM));
     }
 }

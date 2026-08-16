@@ -14,6 +14,7 @@ import io.github.pauszek.fsampgateway.domain.port.in.DeleteFileUseCase;
 import io.github.pauszek.fsampgateway.domain.port.in.GetFileUseCase;
 import io.github.pauszek.fsampgateway.domain.port.in.UploadFileUseCase;
 import io.github.pauszek.fsampgateway.infrastructure.idempotency.Idempotent;
+import io.github.pauszek.fsampgateway.infrastructure.idempotency.IdempotencyAspect;
 import io.github.pauszek.fsampgateway.infrastructure.security.cognito.CurrentUserService;
 import io.github.resilience4j.bulkhead.annotation.Bulkhead;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
@@ -171,6 +172,7 @@ public class FileUploadRestAdapter {
                         : request.tags().stream()
                                 .map(String::trim)
                                 .collect(java.util.stream.Collectors.toUnmodifiableSet()))
+                .fileId(resolveReservedFileId(httpRequest))
                 .build();
 
         SecureFile uploadedFile = uploadFileUseCase.execute(command);
@@ -276,8 +278,7 @@ public class FileUploadRestAdapter {
             content = @Content(schema = @Schema(implementation = ApiErrorDto.class))
     )
     @DeleteMapping("/{fileId}")
-    @PreAuthorize("hasAuthority('SCOPE_files.delete') or "
-            + "(@authorizationPolicy.isGroupFallbackAllowed() and hasRole('ADMINS'))")
+    @PreAuthorize("hasRole('ADMINS')")
     @Timed(value = "file.delete", description = "Time taken to delete a file")
     public ResponseEntity<Void> deleteFile(
             @Parameter(description = "File ID", required = true)
@@ -313,6 +314,17 @@ public class FileUploadRestAdapter {
                     "Correlation ID in multipart metadata must match X-Correlation-ID");
         }
         return formCorrelation;
+    }
+
+    private static FileId resolveReservedFileId(HttpServletRequest request) {
+        Object operationId = request.getAttribute(IdempotencyAspect.OPERATION_ID_ATTRIBUTE);
+        if (operationId == null) {
+            return null;
+        }
+        if (operationId instanceof String value) {
+            return FileId.of(value);
+        }
+        throw new IllegalStateException("Invalid internal idempotency operation identifier");
     }
 
 }

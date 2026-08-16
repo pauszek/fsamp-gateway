@@ -38,6 +38,7 @@ class IdempotencyKeyServiceTest {
     private static final String IDEM_KEY = "idem-key-123";
     private static final String USER_ID = "user-123";
     private static final String FINGERPRINT = "a".repeat(64);
+    private static final String OPERATION_ID = "550e8400-e29b-41d4-a716-446655440000";
     private static final String TABLE = "test-idempotency";
 
     @Mock
@@ -76,6 +77,7 @@ class IdempotencyKeyServiceTest {
 
             assertThat(result.hasCachedResponse()).isFalse();
             assertThat(result.ownerToken()).isNotBlank();
+            assertThat(result.operationId()).isNotBlank();
             then(dynamoDbClient).should().putItem(putRequestCaptor.capture());
             PutItemRequest request = putRequestCaptor.getValue();
             assertThat(request.conditionExpression())
@@ -84,7 +86,8 @@ class IdempotencyKeyServiceTest {
                     .containsEntry("idempotencyKey", AttributeValue.fromS(IDEM_KEY))
                     .containsEntry("userId", AttributeValue.fromS(USER_ID))
                     .containsEntry("status", AttributeValue.fromS("IN_PROGRESS"))
-                    .containsEntry("requestFingerprint", AttributeValue.fromS(FINGERPRINT));
+                    .containsEntry("requestFingerprint", AttributeValue.fromS(FINGERPRINT))
+                    .containsEntry("operationId", AttributeValue.fromS(result.operationId()));
         }
 
         @Test
@@ -136,11 +139,30 @@ class IdempotencyKeyServiceTest {
                     service.acquireKey(IDEM_KEY, USER_ID, FINGERPRINT);
 
             assertThat(result.ownerToken()).isNotBlank();
+            assertThat(result.operationId()).isEqualTo(OPERATION_ID);
             then(dynamoDbClient).should().updateItem(updateRequestCaptor.capture());
             assertThat(updateRequestCaptor.getValue().conditionExpression())
                     .contains("#created = :previousCreated")
                     .contains("#fingerprint = :fingerprint");
+            assertThat(updateRequestCaptor.getValue().updateExpression())
+                    .doesNotContain("operationId");
             then(dynamoDbClient).should(never()).deleteItem(any(DeleteItemRequest.class));
+        }
+
+        @Test
+        void shouldNotTakeOverLegacyLeaseWithoutAStableOperationId() {
+            rejectInitialPut();
+            given(dynamoDbClient.getItem(any(GetItemRequest.class)))
+                    .willReturn(inProgressItemWithoutOperationId(
+                            Instant.now().minus(10, ChronoUnit.MINUTES),
+                            FINGERPRINT
+                    ));
+
+            assertThatThrownBy(() -> service.acquireKey(IDEM_KEY, USER_ID, FINGERPRINT))
+                    .isInstanceOf(IdempotencyConflictException.class)
+                    .hasMessageContaining("stable operation identifier");
+
+            then(dynamoDbClient).should(never()).updateItem(any(UpdateItemRequest.class));
         }
 
         @Test
@@ -194,6 +216,7 @@ class IdempotencyKeyServiceTest {
                 "userId", AttributeValue.fromS(USER_ID),
                 "status", AttributeValue.fromS("COMPLETED"),
                 "requestFingerprint", AttributeValue.fromS(fingerprint),
+                "operationId", AttributeValue.fromS(OPERATION_ID),
                 "ownerToken", AttributeValue.fromS("owner-token"),
                 "response", AttributeValue.fromS("{\"fileId\":\"123\"}"),
                 "createdAt", AttributeValue.fromS(Instant.now().toString())
@@ -201,6 +224,21 @@ class IdempotencyKeyServiceTest {
     }
 
     private static GetItemResponse inProgressItem(Instant createdAt, String fingerprint) {
+        return GetItemResponse.builder().item(Map.of(
+                "idempotencyKey", AttributeValue.fromS(IDEM_KEY),
+                "userId", AttributeValue.fromS(USER_ID),
+                "status", AttributeValue.fromS("IN_PROGRESS"),
+                "requestFingerprint", AttributeValue.fromS(fingerprint),
+                "operationId", AttributeValue.fromS(OPERATION_ID),
+                "ownerToken", AttributeValue.fromS("old-owner"),
+                "createdAt", AttributeValue.fromS(createdAt.toString())
+        )).build();
+    }
+
+    private static GetItemResponse inProgressItemWithoutOperationId(
+            Instant createdAt,
+            String fingerprint
+    ) {
         return GetItemResponse.builder().item(Map.of(
                 "idempotencyKey", AttributeValue.fromS(IDEM_KEY),
                 "userId", AttributeValue.fromS(USER_ID),

@@ -29,17 +29,20 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
 import software.amazon.awssdk.services.dynamodb.model.DeleteItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.GetItemResponse;
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
+import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -118,11 +121,16 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
     @CircuitBreaker(name = "dynamoDb")
     @Retry(name = "dynamoDb")
     public SecureFile save(SecureFile file) {
-        dynamoDbClient.putItem(PutItemRequest.builder()
-                .tableName(tableName)
-                .item(toItem(file))
-                .build());
-        return file;
+        try {
+            dynamoDbClient.putItem(PutItemRequest.builder()
+                    .tableName(tableName)
+                    .item(toItem(file))
+                    .conditionExpression("attribute_not_exists(PK) AND attribute_not_exists(SK)")
+                    .build());
+            return file;
+        } catch (ConditionalCheckFailedException e) {
+            return recoverCommittedUpload(file, e);
+        }
     }
 
     @Override
@@ -159,8 +167,12 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
                 )
                 .build();
 
-        dynamoDbClient.transactWriteItems(request);
-        return file;
+        try {
+            dynamoDbClient.transactWriteItems(request);
+            return file;
+        } catch (TransactionCanceledException e) {
+            return recoverCommittedUploadWithOutbox(file, event, e);
+        }
     }
 
     @Override
@@ -317,6 +329,66 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
         if (eventContractValidator != null) {
             eventContractValidator.validate(event);
         }
+    }
+
+    private SecureFile recoverCommittedUpload(SecureFile attempted, RuntimeException failure) {
+        Optional<SecureFile> existing = findById(attempted.getId());
+        if (existing.filter(file -> representsSameUpload(file, attempted)).isPresent()) {
+            LoggerFactory.getLogger(getClass()).info(
+                    "Recovered previously committed idempotent upload: fileId={}",
+                    attempted.getId()
+            );
+            return existing.orElseThrow();
+        }
+        throw failure;
+    }
+
+    private SecureFile recoverCommittedUploadWithOutbox(
+            SecureFile attempted,
+            DomainEvent event,
+            RuntimeException failure
+    ) {
+        Optional<SecureFile> existing = findById(attempted.getId());
+        if (existing.filter(file -> representsSameUpload(file, attempted)).isEmpty()
+                || !hasMatchingOutboxEvent(attempted, event)) {
+            throw failure;
+        }
+        LoggerFactory.getLogger(getClass()).info(
+                "Recovered previously committed idempotent upload transaction: fileId={}, eventId={}",
+                attempted.getId(),
+                eventId(event)
+        );
+        return existing.orElseThrow();
+    }
+
+    private boolean hasMatchingOutboxEvent(SecureFile file, DomainEvent event) {
+        String expectedEventId = eventId(event);
+        GetItemResponse response = dynamoDbClient.getItem(GetItemRequest.builder()
+                .tableName(outboxTableName)
+                .key(Map.of(
+                        PK, s("OUTBOX#FileUpload#" + file.getId()),
+                        SK, s("EVENT#" + expectedEventId)
+                ))
+                .consistentRead(true)
+                .build());
+        return response.hasItem()
+                && OUTBOX_ENTITY_TYPE.equals(stringValue(response.item(), ATTR_ENTITY_TYPE))
+                && expectedEventId.equals(stringValue(response.item(), "eventId"))
+                && file.getId().toString().equals(stringValue(response.item(), "aggregateId"))
+                && event.getEventType().equals(stringValue(response.item(), "eventType"));
+    }
+
+    private static boolean representsSameUpload(SecureFile existing, SecureFile attempted) {
+        return existing.getId().equals(attempted.getId())
+                && existing.getCorrelationId().equals(attempted.getCorrelationId())
+                && existing.getFileName().equals(attempted.getFileName())
+                && existing.getMimeType().equals(attempted.getMimeType())
+                && existing.getSize().equals(attempted.getSize())
+                && Objects.equals(existing.getChecksum(), attempted.getChecksum())
+                && Objects.equals(existing.getDescription(), attempted.getDescription())
+                && existing.getTags().equals(attempted.getTags())
+                && existing.getAuditInfo().createdBy()
+                        .equals(attempted.getAuditInfo().createdBy());
     }
 
     private static Map<String, AttributeValue> currentStateKey(FileId fileId) {

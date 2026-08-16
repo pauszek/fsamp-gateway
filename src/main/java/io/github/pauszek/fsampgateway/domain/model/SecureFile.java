@@ -40,7 +40,16 @@ public final class SecureFile {
             CorrelationId correlationId,
             String uploadedBy
     ) {
-        return createPending(fileName, mimeType, size, correlationId, uploadedBy, null, Set.of());
+        return createPending(
+                FileId.generate(),
+                fileName,
+                mimeType,
+                size,
+                correlationId,
+                uploadedBy,
+                null,
+                Set.of()
+        );
     }
 
     public static SecureFile createPending(
@@ -52,8 +61,30 @@ public final class SecureFile {
             String description,
             Set<String> tags
     ) {
+        return createPending(
+                FileId.generate(),
+                fileName,
+                mimeType,
+                size,
+                correlationId,
+                uploadedBy,
+                description,
+                tags
+        );
+    }
+
+    public static SecureFile createPending(
+            FileId fileId,
+            FileName fileName,
+            MimeType mimeType,
+            FileSize size,
+            CorrelationId correlationId,
+            String uploadedBy,
+            String description,
+            Set<String> tags
+    ) {
         return builder()
-                .id(FileId.generate())
+                .id(fileId)
                 .correlationId(correlationId)
                 .fileName(fileName)
                 .description(description)

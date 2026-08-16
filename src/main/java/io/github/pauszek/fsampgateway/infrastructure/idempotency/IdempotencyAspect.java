@@ -34,6 +34,8 @@ import java.util.Map;
 public class IdempotencyAspect {
 
     public static final String IDEMPOTENCY_KEY_HEADER = "X-Idempotency-Key";
+    public static final String OPERATION_ID_ATTRIBUTE =
+            IdempotencyAspect.class.getName() + ".operationId";
 
     private final IdempotencyKeyService idempotencyKeyService;
     private final CurrentUserService currentUserService;
@@ -60,6 +62,7 @@ public class IdempotencyAspect {
         if (acquisition.hasCachedResponse()) {
             return deserializeResponse(acquisition.cachedRecord().response(), idempotent.responseType());
         }
+        request.setAttribute(OPERATION_ID_ATTRIBUTE, acquisition.operationId());
 
         try {
             Object result = joinPoint.proceed();

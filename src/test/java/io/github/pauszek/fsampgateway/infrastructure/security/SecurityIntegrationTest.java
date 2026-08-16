@@ -70,6 +70,21 @@ class SecurityIntegrationTest {
     }
 
     @Test
+    @DisplayName("should allow the Terraform-shaped Cognito resource server scope")
+    void shouldAllowConfiguredResourceServerScope() throws Exception {
+        Jwt jwt = createJwt(
+                "service-123",
+                List.of(),
+                "https://fsamp-test-api/files.read"
+        );
+        when(jwtDecoder.decode(anyString())).thenReturn(jwt);
+
+        mockMvc.perform(get("/api/v1/files/" + java.util.UUID.randomUUID())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     @DisplayName("should allow user with ROLE_USERS to access files")
     void shouldAllowUserWithRoleUsers() throws Exception {
         Jwt jwt = createJwt("user-123", List.of("users"), "openid");
@@ -87,6 +102,17 @@ class SecurityIntegrationTest {
         when(jwtDecoder.decode(anyString())).thenReturn(jwt);
 
         mockMvc.perform(delete("/api/v1/files/123")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("should deny delete scope without the admins group")
+    void shouldDenyDeleteScopeForNonAdmin() throws Exception {
+        Jwt jwt = createJwt("user-123", List.of("users"), "openid files.delete");
+        when(jwtDecoder.decode(anyString())).thenReturn(jwt);
+
+        mockMvc.perform(delete("/api/v1/files/" + java.util.UUID.randomUUID())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN))
                 .andExpect(status().isForbidden());
     }

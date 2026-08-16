@@ -1,6 +1,7 @@
 package io.github.pauszek.fsampgateway.domain.command;
 
 import io.github.pauszek.fsampgateway.domain.model.CorrelationId;
+import io.github.pauszek.fsampgateway.domain.model.FileId;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -20,6 +21,7 @@ public final class UploadFileCommand {
     private final String uploadedBy;
     private final String description;
     private final Set<String> tags;
+    private final FileId fileId;
 
     public UploadFileCommand(
             String fileName,
@@ -29,7 +31,7 @@ public final class UploadFileCommand {
             String correlationId,
             String uploadedBy
     ) {
-        this(fileName, contentType, size, content, correlationId, uploadedBy, null, Set.of());
+        this(fileName, contentType, size, content, correlationId, uploadedBy, null, Set.of(), null);
     }
 
     @SuppressWarnings("java:S107")
@@ -41,7 +43,8 @@ public final class UploadFileCommand {
             String correlationId,
             String uploadedBy,
             String description,
-            Set<String> tags
+            Set<String> tags,
+            FileId fileId
     ) {
         this.fileName = Objects.requireNonNull(fileName, "File name is required");
         this.contentType = contentType;
@@ -51,9 +54,14 @@ public final class UploadFileCommand {
         this.uploadedBy = uploadedBy;
         this.description = description;
         this.tags = tags == null ? Set.of() : Set.copyOf(tags);
+        this.fileId = fileId;
     }
 
     public CorrelationId getCorrelationIdOrGenerate() {
         return CorrelationId.of(correlationId);
+    }
+
+    public FileId getFileIdOrGenerate() {
+        return fileId == null ? FileId.generate() : fileId;
     }
 }

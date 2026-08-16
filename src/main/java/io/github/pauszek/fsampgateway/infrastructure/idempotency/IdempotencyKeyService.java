@@ -32,6 +32,7 @@ public class IdempotencyKeyService {
     private static final String STATUS_ATTR = "status";
     private static final String RESPONSE_ATTR = "response";
     private static final String FINGERPRINT_ATTR = "requestFingerprint";
+    private static final String OPERATION_ID_ATTR = "operationId";
     private static final String OWNER_TOKEN_ATTR = "ownerToken";
     private static final String CREATED_AT_ATTR = "createdAt";
     private static final String TTL_ATTR = "ttl";
@@ -63,18 +64,23 @@ public class IdempotencyKeyService {
             String userId,
             KeyStatus status,
             String requestFingerprint,
+            String operationId,
             String ownerToken,
             String response,
             Instant createdAt
     ) {}
 
-    public record Acquisition(String ownerToken, IdempotencyRecord cachedRecord) {
-        static Acquisition acquired(String ownerToken) {
-            return new Acquisition(ownerToken, null);
+    public record Acquisition(
+            String ownerToken,
+            String operationId,
+            IdempotencyRecord cachedRecord
+    ) {
+        static Acquisition acquired(String ownerToken, String operationId) {
+            return new Acquisition(ownerToken, operationId, null);
         }
 
         static Acquisition cached(IdempotencyRecord cachedRecord) {
-            return new Acquisition(null, cachedRecord);
+            return new Acquisition(null, cachedRecord.operationId(), cachedRecord);
         }
 
         public boolean hasCachedResponse() {
@@ -92,16 +98,24 @@ public class IdempotencyKeyService {
         }
 
         String ownerToken = UUID.randomUUID().toString();
+        String operationId = UUID.randomUUID().toString();
         Instant now = Instant.now();
         try {
             dynamoDbClient.putItem(PutItemRequest.builder()
                     .tableName(tableName)
-                    .item(newInProgressItem(idempotencyKey, userId, requestFingerprint, ownerToken, now))
+                    .item(newInProgressItem(
+                            idempotencyKey,
+                            userId,
+                            requestFingerprint,
+                            operationId,
+                            ownerToken,
+                            now
+                    ))
                     .conditionExpression("attribute_not_exists(#pk) AND attribute_not_exists(#sk)")
                     .expressionAttributeNames(Map.of("#pk", PK, "#sk", SK))
                     .build());
             log.info("Acquired idempotency key: keyHash={}", keyHash(idempotencyKey));
-            return Acquisition.acquired(ownerToken);
+            return Acquisition.acquired(ownerToken, operationId);
         } catch (ConditionalCheckFailedException e) {
             return resolveExisting(idempotencyKey, userId, requestFingerprint, ownerToken, now);
         }
@@ -185,6 +199,10 @@ public class IdempotencyKeyService {
             throw new IdempotencyConflictException(
                     "Request with this idempotency key is already being processed");
         }
+        if (existing.operationId() == null || existing.operationId().isBlank()) {
+            throw new IdempotencyConflictException(
+                    "Expired idempotency record has no stable operation identifier");
+        }
 
         try {
             dynamoDbClient.updateItem(UpdateItemRequest.builder()
@@ -209,7 +227,7 @@ public class IdempotencyKeyService {
                             ":previousCreated", s(existing.createdAt().toString())
                     ))
                     .build());
-            return Acquisition.acquired(newOwnerToken);
+            return Acquisition.acquired(newOwnerToken, existing.operationId());
         } catch (ConditionalCheckFailedException e) {
             throw new IdempotencyConflictException(
                     "Another request acquired the expired idempotency lease");
@@ -231,6 +249,7 @@ public class IdempotencyKeyService {
                 item.get(SK).s(),
                 KeyStatus.valueOf(item.get(STATUS_ATTR).s()),
                 item.containsKey(FINGERPRINT_ATTR) ? item.get(FINGERPRINT_ATTR).s() : null,
+                item.containsKey(OPERATION_ID_ATTR) ? item.get(OPERATION_ID_ATTR).s() : null,
                 item.containsKey(OWNER_TOKEN_ATTR) ? item.get(OWNER_TOKEN_ATTR).s() : null,
                 item.containsKey(RESPONSE_ATTR) ? item.get(RESPONSE_ATTR).s() : null,
                 Instant.parse(item.get(CREATED_AT_ATTR).s())
@@ -241,6 +260,7 @@ public class IdempotencyKeyService {
             String idempotencyKey,
             String userId,
             String fingerprint,
+            String operationId,
             String ownerToken,
             Instant now
     ) {
@@ -249,6 +269,7 @@ public class IdempotencyKeyService {
                 SK, s(userId),
                 STATUS_ATTR, s(KeyStatus.IN_PROGRESS.name()),
                 FINGERPRINT_ATTR, s(fingerprint),
+                OPERATION_ID_ATTR, s(operationId),
                 OWNER_TOKEN_ATTR, s(ownerToken),
                 CREATED_AT_ATTR, s(now.toString()),
                 TTL_ATTR, n(now.plus(TTL_HOURS, ChronoUnit.HOURS).getEpochSecond())

@@ -1,6 +1,7 @@
 package io.github.pauszek.fsampgateway.domain.command;
 
 import io.github.pauszek.fsampgateway.domain.model.CorrelationId;
+import io.github.pauszek.fsampgateway.domain.model.FileId;
 import org.junit.jupiter.api.*;
 
 import java.io.ByteArrayInputStream;
@@ -60,6 +61,33 @@ class UploadFileCommandTest {
             assertThatThrownBy(builder::build)
                     .isInstanceOf(NullPointerException.class)
                     .hasMessageContaining("Content is required");
+        }
+    }
+
+    @Nested
+    @DisplayName("getFileIdOrGenerate")
+    class GetFileIdOrGenerate {
+
+        @Test
+        void shouldUseReservedIdempotencyOperationId() {
+            FileId reserved = FileId.generate();
+            UploadFileCommand command = UploadFileCommand.builder()
+                    .fileName("test.pdf")
+                    .content(new ByteArrayInputStream("content".getBytes()))
+                    .fileId(reserved)
+                    .build();
+
+            assertThat(command.getFileIdOrGenerate()).isEqualTo(reserved);
+        }
+
+        @Test
+        void shouldGenerateFileIdWhenRequestIsNotIdempotent() {
+            UploadFileCommand command = UploadFileCommand.builder()
+                    .fileName("test.pdf")
+                    .content(new ByteArrayInputStream("content".getBytes()))
+                    .build();
+
+            assertThat(command.getFileIdOrGenerate()).isNotNull();
         }
     }
 

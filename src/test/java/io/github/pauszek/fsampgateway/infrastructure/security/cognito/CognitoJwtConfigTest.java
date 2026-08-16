@@ -20,6 +20,7 @@ class CognitoJwtConfigTest {
             "us-west-2",
             "us-west-2_testpool",
             CLIENT_ID,
+            "https://fsamp-test-api",
             null,
             "http://localhost:4566/us-west-2_testpool/.well-known/jwks.json",
             "http://localhost:4566/us-west-2_testpool"

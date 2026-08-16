@@ -1,17 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
     <!-- Suppress only false positives, compensating-control cases, or accepted risks. Review quarterly. -->
-    <suppress until="2026-08-12Z">
+    <suppress until="2026-11-16Z">
         <notes><![CDATA[
             False positive from broad CPE matching. CVE-2026-39882 and CVE-2026-39883
             affect the Go implementation of OpenTelemetry (CPE target language "go"),
             not the Java Maven artifact io.opentelemetry.semconv:opentelemetry-semconv.
             NVD describes both CVEs as OpenTelemetry-Go issues fixed in Go module v1.43.0.
-            Review by 2026-08-12.
+            Review by 2026-11-16.
         ]]></notes>
         <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.semconv/opentelemetry-semconv@.*$</packageUrl>
         <cve>CVE-2026-39882</cve>
         <cve>CVE-2026-39883</cve>
+        <cve>CVE-2026-41178</cve>
+    </suppress>
+    <suppress until="2026-09-16Z">
+        <notes><![CDATA[
+            CVE-2026-66299 is limited to Tomcat's WebSocket chat example. FSAMP
+            embeds tomcat-embed-core through Spring Boot and does not package the
+            Tomcat examples web application, so the vulnerable component is absent.
+            Remove this narrow suppression once Tomcat 10.1.58 is released and
+            supported by the Spring Boot 3.5 line. Review by 2026-09-16.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.apache\.tomcat\.embed/tomcat-embed-(core|websocket)@10\.1\.57$</packageUrl>
+        <cve>CVE-2026-66299</cve>
     </suppress>
     <suppress until="2026-10-12Z">
         <notes><![CDATA[

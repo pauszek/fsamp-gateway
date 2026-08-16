@@ -155,6 +155,84 @@ class DynamoDbFileRepositoryAdapterTest {
             assertThat(outboxPut.item().get("status").s()).isEqualTo("PENDING");
             assertThat(outboxPut.item().get("payload").s()).contains("\"fileId\":\"" + file.getId() + "\"");
         }
+
+        @Test
+        void shouldReturnTheCommittedUploadAfterAnUnknownTransactionOutcome() {
+            SecureFile file = createUploadedFile();
+            FileUploadedEvent event = FileUploadedEvent.from(file);
+            DynamoDbFileRepositoryAdapter outboxAdapter =
+                    new DynamoDbFileRepositoryAdapter(dynamoDbClient, objectMapper(), TABLE_NAME, "test-outbox");
+            given(dynamoDbClient.transactWriteItems(any(TransactWriteItemsRequest.class)))
+                    .willThrow(TransactionCanceledException.builder().message("already committed").build());
+            mockGetReturningWithOutbox(file, event);
+
+            SecureFile result = outboxAdapter.saveWithOutbox(file, event);
+
+            assertThat(result.getId()).isEqualTo(file.getId());
+            assertThat(result.getChecksum()).isEqualTo(file.getChecksum());
+        }
+
+        @Test
+        void shouldNotReportDurabilityWhenTheOutboxEventIsMissing() {
+            SecureFile file = createUploadedFile();
+            FileUploadedEvent event = FileUploadedEvent.from(file);
+            DynamoDbFileRepositoryAdapter outboxAdapter =
+                    new DynamoDbFileRepositoryAdapter(dynamoDbClient, objectMapper(), TABLE_NAME, "test-outbox");
+            TransactionCanceledException cancellation = TransactionCanceledException.builder()
+                    .message("metadata exists without outbox")
+                    .build();
+            given(dynamoDbClient.transactWriteItems(any(TransactWriteItemsRequest.class)))
+                    .willThrow(cancellation);
+            given(dynamoDbClient.getItem(any(GetItemRequest.class))).willAnswer(invocation -> {
+                GetItemRequest request = invocation.getArgument(0);
+                return GetItemResponse.builder()
+                        .item(TABLE_NAME.equals(request.tableName()) ? metadataItem(file) : Map.of())
+                        .build();
+            });
+
+            assertThatThrownBy(() -> outboxAdapter.saveWithOutbox(file, event))
+                    .isSameAs(cancellation);
+        }
+
+        @Test
+        void shouldNotHideAConflictingUploadWithTheSameFileId() {
+            SecureFile file = createUploadedFile();
+            SecureFile conflicting = file.toBuilder()
+                    .checksum(Checksum.sha256("b".repeat(64)))
+                    .build();
+            FileUploadedEvent event = FileUploadedEvent.from(file);
+            DynamoDbFileRepositoryAdapter outboxAdapter =
+                    new DynamoDbFileRepositoryAdapter(dynamoDbClient, objectMapper(), TABLE_NAME, "test-outbox");
+            TransactionCanceledException cancellation = TransactionCanceledException.builder()
+                    .message("conflict")
+                    .build();
+            given(dynamoDbClient.transactWriteItems(any(TransactWriteItemsRequest.class)))
+                    .willThrow(cancellation);
+            mockGetReturningWithOutbox(conflicting, event);
+
+            assertThatThrownBy(() -> outboxAdapter.saveWithOutbox(file, event))
+                    .isSameAs(cancellation);
+        }
+
+        @Test
+        void shouldNotRecoverAnUploadWithADifferentCorrelationId() {
+            SecureFile file = createUploadedFile();
+            SecureFile conflicting = file.toBuilder()
+                    .correlationId(CorrelationId.generate())
+                    .build();
+            FileUploadedEvent event = FileUploadedEvent.from(file);
+            DynamoDbFileRepositoryAdapter outboxAdapter =
+                    new DynamoDbFileRepositoryAdapter(dynamoDbClient, objectMapper(), TABLE_NAME, "test-outbox");
+            TransactionCanceledException cancellation = TransactionCanceledException.builder()
+                    .message("conflict")
+                    .build();
+            given(dynamoDbClient.transactWriteItems(any(TransactWriteItemsRequest.class)))
+                    .willThrow(cancellation);
+            mockGetReturningWithOutbox(conflicting, event);
+
+            assertThatThrownBy(() -> outboxAdapter.saveWithOutbox(file, event))
+                    .isSameAs(cancellation);
+        }
     }
     @Nested
     @DisplayName("findById")
@@ -326,6 +404,28 @@ class DynamoDbFileRepositoryAdapterTest {
     }
 
     private void mockGetReturning(SecureFile file) {
+        given(dynamoDbClient.getItem(any(GetItemRequest.class)))
+                .willReturn(GetItemResponse.builder().item(metadataItem(file)).build());
+    }
+
+    private void mockGetReturningWithOutbox(SecureFile file, FileUploadedEvent event) {
+        given(dynamoDbClient.getItem(any(GetItemRequest.class))).willAnswer(invocation -> {
+            GetItemRequest request = invocation.getArgument(0);
+            if (TABLE_NAME.equals(request.tableName())) {
+                return GetItemResponse.builder().item(metadataItem(file)).build();
+            }
+            return GetItemResponse.builder().item(Map.of(
+                    "PK", s("OUTBOX#FileUpload#" + file.getId()),
+                    "SK", s("EVENT#" + event.eventId()),
+                    "entityType", s("OUTBOX_EVENT"),
+                    "eventId", s(event.eventId().toString()),
+                    "aggregateId", s(file.getId().toString()),
+                    "eventType", s(event.getEventType())
+            )).build();
+        });
+    }
+
+    private static Map<String, AttributeValue> metadataItem(SecureFile file) {
         Map<String, AttributeValue> item = new HashMap<>();
 
         item.put("PK", s("FILE#" + file.getId()));
@@ -358,8 +458,7 @@ class DynamoDbFileRepositoryAdapterTest {
             item.put("isEncrypted", AttributeValue.builder().bool(file.getEncryptionMetadata().encrypted()).build());
         }
 
-        given(dynamoDbClient.getItem(any(GetItemRequest.class)))
-                .willReturn(GetItemResponse.builder().item(item).build());
+        return item;
     }
 
     private static AttributeValue s(String value) {

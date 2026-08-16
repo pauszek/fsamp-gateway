@@ -96,7 +96,14 @@ public class CognitoJwtConfig {
     }
 
     @Bean
-    public CognitoJwtRoleConverter cognitoJwtRoleConverter() {
-        return new CognitoJwtRoleConverter();
+    public CognitoScopeNormalizer cognitoScopeNormalizer() {
+        return new CognitoScopeNormalizer(cognitoProperties.resourceServerIdentifier());
+    }
+
+    @Bean
+    public CognitoJwtRoleConverter cognitoJwtRoleConverter(
+            CognitoScopeNormalizer cognitoScopeNormalizer
+    ) {
+        return new CognitoJwtRoleConverter(cognitoScopeNormalizer);
     }
 }
