@@ -2,6 +2,9 @@ FROM amazoncorretto:21-al2023 AS builder
 
 WORKDIR /app
 
+# Builder packages intentionally follow the AL2023 repositories from the pinned
+# base image so rebuilds receive current security fixes.
+# hadolint ignore=DL3041
 RUN dnf install -y findutils tar gzip && dnf clean all
 
 COPY mvnw .
@@ -19,6 +22,8 @@ FROM amazoncorretto:21-al2023-headless
 # AL2023 pins repositories to the base image's release snapshot. Upgrade the
 # complete runtime against the latest AL2023 release so newly disclosed fixes
 # are not limited to a manually maintained package list.
+# Runtime packages intentionally follow the current AL2023 security channel.
+# hadolint ignore=DL3041
 RUN dnf --refresh --releasever=latest upgrade -y && \
     dnf install -y --allowerasing curl shadow-utils && \
     dnf clean all && \
