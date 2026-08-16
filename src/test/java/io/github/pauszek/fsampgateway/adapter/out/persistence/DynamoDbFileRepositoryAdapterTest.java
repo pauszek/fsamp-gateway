@@ -62,6 +62,8 @@ class DynamoDbFileRepositoryAdapterTest {
 
             PutItemRequest request = putRequestCaptor.getValue();
             assertThat(request.tableName()).isEqualTo(TABLE_NAME);
+            assertThat(request.conditionExpression())
+                    .isEqualTo("attribute_not_exists(PK) AND attribute_not_exists(SK)");
 
             Map<String, AttributeValue> item = request.item();
             assertThat(item.get("PK").s()).isEqualTo("FILE#" + file.getId());
@@ -113,6 +115,34 @@ class DynamoDbFileRepositoryAdapterTest {
             assertThatThrownBy(() -> adapter.save(file))
                     .isInstanceOf(DynamoDbException.class)
                     .hasMessageContaining("Provisioned throughput exceeded");
+        }
+
+        @Test
+        void shouldReturnTheCommittedUploadAfterAnUnknownPutOutcome() {
+            SecureFile file = createUploadedFile();
+            given(dynamoDbClient.putItem(any(PutItemRequest.class)))
+                    .willThrow(ConditionalCheckFailedException.builder().message("already committed").build());
+            mockGetReturning(file);
+
+            SecureFile result = adapter.save(file);
+
+            assertThat(result.getId()).isEqualTo(file.getId());
+            assertThat(result.getChecksum()).isEqualTo(file.getChecksum());
+        }
+
+        @Test
+        void shouldNotHideAConflictingCommittedUpload() {
+            SecureFile file = createUploadedFile();
+            SecureFile conflicting = file.toBuilder()
+                    .correlationId(CorrelationId.generate())
+                    .build();
+            ConditionalCheckFailedException failure = ConditionalCheckFailedException.builder()
+                    .message("conflict")
+                    .build();
+            given(dynamoDbClient.putItem(any(PutItemRequest.class))).willThrow(failure);
+            mockGetReturning(conflicting);
+
+            assertThatThrownBy(() -> adapter.save(file)).isSameAs(failure);
         }
     }
     @Nested
@@ -318,6 +348,32 @@ class DynamoDbFileRepositoryAdapterTest {
             assertThat(found.getEncryptionMetadata()).isNotNull();
             assertThat(found.getEncryptionMetadata().kmsKeyId()).isEqualTo("alias/test-kms-key");
             assertThat(found.getEncryptionMetadata().encrypted()).isTrue();
+        }
+
+        @Test
+        void shouldReadTheLegacyFileNameAttribute() {
+            SecureFile file = createPendingFile();
+            Map<String, AttributeValue> item = metadataItem(file);
+            item.put("fileName", item.remove("originalFilename"));
+            given(dynamoDbClient.getItem(any(GetItemRequest.class)))
+                    .willReturn(GetItemResponse.builder().item(item).build());
+
+            SecureFile result = adapter.findById(file.getId()).orElseThrow();
+
+            assertThat(result.getFileName()).isEqualTo(file.getFileName());
+        }
+
+        @Test
+        void shouldRejectMetadataWithoutAFileName() {
+            SecureFile file = createPendingFile();
+            Map<String, AttributeValue> item = metadataItem(file);
+            item.remove("originalFilename");
+            given(dynamoDbClient.getItem(any(GetItemRequest.class)))
+                    .willReturn(GetItemResponse.builder().item(item).build());
+
+            assertThatThrownBy(() -> adapter.findById(file.getId()))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("Missing DynamoDB attribute: originalFilename");
         }
     }
     @Nested

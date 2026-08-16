@@ -21,6 +21,7 @@ import io.github.pauszek.fsampgateway.domain.port.out.FileRepositoryPort;
 import io.github.pauszek.fsampgateway.infrastructure.security.Sha256Digest;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -51,10 +52,13 @@ import java.util.Set;
 @Profile("!test")
 public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
 
+    private static final Logger log = LoggerFactory.getLogger(DynamoDbFileRepositoryAdapter.class);
     static final String CURRENT_STATE_SK = "METADATA";
     static final String FILE_METADATA_ENTITY_TYPE = "FILE_METADATA";
     private static final String OUTBOX_ENTITY_TYPE = "OUTBOX_EVENT";
     private static final String OUTBOX_STATUS_PENDING = "PENDING";
+    private static final String ITEM_NOT_EXISTS_CONDITION =
+            "attribute_not_exists(PK) AND attribute_not_exists(SK)";
     private static final int OUTBOX_SHARD_COUNT = 16;
 
     private static final String PK = "PK";
@@ -101,7 +105,7 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
         this.eventContractValidator = eventContractValidator;
         this.tableName = tableName;
         this.outboxTableName = outboxTableName;
-        LoggerFactory.getLogger(getClass()).info(
+        log.info(
                 "DynamoDB file repository initialized: table={}, outboxEnabled={}",
                 tableName,
                 supportsTransactionalOutbox()
@@ -125,7 +129,7 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
             dynamoDbClient.putItem(PutItemRequest.builder()
                     .tableName(tableName)
                     .item(toItem(file))
-                    .conditionExpression("attribute_not_exists(PK) AND attribute_not_exists(SK)")
+                    .conditionExpression(ITEM_NOT_EXISTS_CONDITION)
                     .build());
             return file;
         } catch (ConditionalCheckFailedException e) {
@@ -156,13 +160,13 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
                                 .put(put -> put
                                         .tableName(tableName)
                                         .item(metadataItem)
-                                        .conditionExpression("attribute_not_exists(PK) AND attribute_not_exists(SK)"))
+                                        .conditionExpression(ITEM_NOT_EXISTS_CONDITION))
                                 .build(),
                         TransactWriteItem.builder()
                                 .put(put -> put
                                         .tableName(outboxTableName)
                                         .item(outboxItem)
-                                        .conditionExpression("attribute_not_exists(PK) AND attribute_not_exists(SK)"))
+                                        .conditionExpression(ITEM_NOT_EXISTS_CONDITION))
                                 .build()
                 )
                 .build();
@@ -286,10 +290,13 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
             throw new IllegalStateException("Unexpected DynamoDB entity type: " + entityType);
         }
         String originalFilename = firstString(item, ATTR_ORIGINAL_FILENAME, LEGACY_ATTR_FILE_NAME);
+        if (originalFilename == null) {
+            throw new IllegalStateException("Missing DynamoDB attribute: " + ATTR_ORIGINAL_FILENAME);
+        }
         SecureFile.Builder builder = SecureFile.builder()
                 .id(FileId.of(readFileId(item)))
                 .correlationId(CorrelationId.of(requiredString(item, ATTR_CORRELATION_ID)))
-                .fileName(FileName.of(requireValue(originalFilename, ATTR_ORIGINAL_FILENAME)))
+                .fileName(FileName.of(originalFilename))
                 .description(stringValue(item, ATTR_DESCRIPTION))
                 .tags(stringSet(item, ATTR_TAGS))
                 .mimeType(MimeType.of(requiredString(item, ATTR_MIME_TYPE)))
@@ -334,7 +341,7 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
     private SecureFile recoverCommittedUpload(SecureFile attempted, RuntimeException failure) {
         Optional<SecureFile> existing = findById(attempted.getId());
         if (existing.filter(file -> representsSameUpload(file, attempted)).isPresent()) {
-            LoggerFactory.getLogger(getClass()).info(
+            log.info(
                     "Recovered previously committed idempotent upload: fileId={}",
                     attempted.getId()
             );
@@ -349,20 +356,20 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
             RuntimeException failure
     ) {
         Optional<SecureFile> existing = findById(attempted.getId());
+        String expectedEventId = eventId(event);
         if (existing.filter(file -> representsSameUpload(file, attempted)).isEmpty()
-                || !hasMatchingOutboxEvent(attempted, event)) {
+                || !hasMatchingOutboxEvent(attempted, event.getEventType(), expectedEventId)) {
             throw failure;
         }
-        LoggerFactory.getLogger(getClass()).info(
+        log.info(
                 "Recovered previously committed idempotent upload transaction: fileId={}, eventId={}",
                 attempted.getId(),
-                eventId(event)
+                expectedEventId
         );
         return existing.orElseThrow();
     }
 
-    private boolean hasMatchingOutboxEvent(SecureFile file, DomainEvent event) {
-        String expectedEventId = eventId(event);
+    private boolean hasMatchingOutboxEvent(SecureFile file, String eventType, String expectedEventId) {
         GetItemResponse response = dynamoDbClient.getItem(GetItemRequest.builder()
                 .tableName(outboxTableName)
                 .key(Map.of(
@@ -375,7 +382,7 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
                 && OUTBOX_ENTITY_TYPE.equals(stringValue(response.item(), ATTR_ENTITY_TYPE))
                 && expectedEventId.equals(stringValue(response.item(), "eventId"))
                 && file.getId().toString().equals(stringValue(response.item(), "aggregateId"))
-                && event.getEventType().equals(stringValue(response.item(), "eventType"));
+                && eventType.equals(stringValue(response.item(), "eventType"));
     }
 
     private static boolean representsSameUpload(SecureFile existing, SecureFile attempted) {
@@ -419,7 +426,11 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
     }
 
     private static String requiredString(Map<String, AttributeValue> item, String name) {
-        return requireValue(stringValue(item, name), name);
+        String value = stringValue(item, name);
+        if (value == null) {
+            throw new IllegalStateException("Missing DynamoDB attribute: " + name);
+        }
+        return value;
     }
 
     private static String requiredNumber(Map<String, AttributeValue> item, String name) {
@@ -428,13 +439,6 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
             throw new IllegalStateException("Missing DynamoDB attribute: " + name);
         }
         return value.n();
-    }
-
-    private static String requireValue(String value, String name) {
-        if (value == null) {
-            throw new IllegalStateException("Missing DynamoDB attribute: " + name);
-        }
-        return value;
     }
 
     private static String firstString(Map<String, AttributeValue> item, String... names) {
