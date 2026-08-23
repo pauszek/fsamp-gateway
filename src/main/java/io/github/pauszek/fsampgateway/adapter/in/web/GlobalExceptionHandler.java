@@ -13,11 +13,13 @@ import org.slf4j.MDC;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.sns.model.SnsException;
 
@@ -90,6 +92,30 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(
                 buildError(HttpStatus.PAYLOAD_TOO_LARGE, "FILE_TOO_LARGE",
                         "File size exceeds maximum allowed limit", request)
+        );
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiErrorDto> handleUnsupportedMediaType(
+            HttpMediaTypeNotSupportedException ex, WebRequest request) {
+
+        log.warn("Unsupported request media type: {}", ex.getContentType());
+
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(
+                buildError(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "UNSUPPORTED_MEDIA_TYPE",
+                        "Content type is not supported", request)
+        );
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ApiErrorDto> handleMissingRequestPart(
+            MissingServletRequestPartException ex, WebRequest request) {
+
+        log.warn("Required multipart request part is missing: {}", ex.getRequestPartName());
+
+        return ResponseEntity.badRequest().body(
+                buildError(HttpStatus.BAD_REQUEST, "MISSING_REQUEST_PART",
+                        "Required multipart file is missing", request)
         );
     }
 
