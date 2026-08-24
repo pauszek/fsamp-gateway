@@ -1,4 +1,4 @@
-FROM amazoncorretto:21-al2023 AS builder
+FROM amazoncorretto:26-al2023 AS builder
 
 WORKDIR /app
 
@@ -17,7 +17,7 @@ COPY src src
 COPY schema schema
 RUN ./mvnw package -DskipTests -B
 
-FROM amazoncorretto:21-al2023-headless
+FROM amazoncorretto:26-al2023-headless
 
 # AL2023 pins repositories to the base image's release snapshot. Upgrade the
 # complete runtime against the latest AL2023 release so newly disclosed fixes
