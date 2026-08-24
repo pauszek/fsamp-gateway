@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 env:
-  CODE_CI_WORKFLOW_SHA: 2c71bf26d1e87c7de3bfef881e01d13455e74708
+  CODE_CI_WORKFLOW_SHA: feb5a3a2eec515d5460f4915203652ebf5c86c31
 
 jobs:
   params:
@@ -60,7 +60,7 @@ jobs:
           echo "auto_deploy_dev=${auto_deploy_dev}" >> "$GITHUB_OUTPUT"
 
   call-java:
-    uses: pauszek/fsamp-code-ci/.github/workflows/build-java.yml@2c71bf26d1e87c7de3bfef881e01d13455e74708
+    uses: pauszek/fsamp-code-ci/.github/workflows/build-java.yml@feb5a3a2eec515d5460f4915203652ebf5c86c31
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       GABRBA_SECRET: ${{ secrets.GABRBA_SECRET }}
