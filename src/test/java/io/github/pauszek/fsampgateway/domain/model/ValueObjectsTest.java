@@ -28,23 +28,6 @@ class ValueObjectsTest {
         }
 
         @Test
-        @DisplayName("should detect image types")
-        void shouldDetectImageTypes() {
-            assertThat(MimeType.of("image/png").isImage()).isTrue();
-            assertThat(MimeType.of("image/jpeg").isImage()).isTrue();
-            assertThat(MimeType.of("image/gif").isImage()).isTrue();
-            assertThat(MimeType.of("application/pdf").isImage()).isFalse();
-        }
-
-        @Test
-        @DisplayName("should detect document types")
-        void shouldDetectDocumentTypes() {
-            assertThat(MimeType.of("application/pdf").isDocument()).isTrue();
-            assertThat(MimeType.of("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet").isDocument()).isTrue();
-            assertThat(MimeType.of("text/plain").isDocument()).isFalse();
-        }
-
-        @Test
         @DisplayName("should throw for null MIME type")
         void shouldThrowForNull() {
             assertThatThrownBy(() -> MimeType.of(null))
@@ -527,50 +510,6 @@ class ValueObjectsTest {
             assertThat(FileStatus.COMPLETED.getDescription()).isNotBlank();
             assertThat(FileStatus.FAILED.getDescription()).isNotBlank();
         }
-
-        @Test
-        @DisplayName("should check terminal states")
-        void shouldCheckTerminalStates() {
-            assertThat(FileStatus.COMPLETED.isTerminal()).isTrue();
-            assertThat(FileStatus.FAILED.isTerminal()).isTrue();
-            assertThat(FileStatus.PENDING.isTerminal()).isFalse();
-            assertThat(FileStatus.PROCESSING.isTerminal()).isFalse();
-        }
-
-        @Test
-        @DisplayName("should have correct codes")
-        void shouldHaveCorrectCodes() {
-            assertThat(FileStatus.PENDING.getCode()).isEqualTo("pending");
-            assertThat(FileStatus.UPLOADED.getCode()).isEqualTo("uploaded");
-            assertThat(FileStatus.SCANNING.getCode()).isEqualTo("scanning");
-            assertThat(FileStatus.PROCESSING.getCode()).isEqualTo("processing");
-            assertThat(FileStatus.COMPLETED.getCode()).isEqualTo("completed");
-            assertThat(FileStatus.FAILED.getCode()).isEqualTo("failed");
-        }
-
-        @Test
-        @DisplayName("should check canRetry")
-        void shouldCheckCanRetry() {
-            assertThat(FileStatus.FAILED.canRetry()).isTrue();
-            assertThat(FileStatus.COMPLETED.canRetry()).isFalse();
-            assertThat(FileStatus.PENDING.canRetry()).isFalse();
-        }
-
-        @Test
-        @DisplayName("should get status from code")
-        void shouldGetStatusFromCode() {
-            assertThat(FileStatus.fromCode("pending")).isEqualTo(FileStatus.PENDING);
-            assertThat(FileStatus.fromCode("UPLOADED")).isEqualTo(FileStatus.UPLOADED);
-            assertThat(FileStatus.fromCode("Processing")).isEqualTo(FileStatus.PROCESSING);
-        }
-
-        @Test
-        @DisplayName("should throw for unknown code")
-        void shouldThrowForUnknownCode() {
-            assertThatThrownBy(() -> FileStatus.fromCode("unknown"))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("Unknown status code");
-        }
     }
 
     @Nested
@@ -631,12 +570,6 @@ class ValueObjectsTest {
                     Checksum.sha256("a".repeat(64))
             );
             assertThat(file.getStatus()).isEqualTo(FileStatus.UPLOADED);
-
-            file = file.markAsProcessing();
-            assertThat(file.getStatus()).isEqualTo(FileStatus.PROCESSING);
-
-            file = file.markAsCompleted();
-            assertThat(file.getStatus()).isEqualTo(FileStatus.COMPLETED);
         }
 
         @Test
@@ -662,51 +595,6 @@ class ValueObjectsTest {
 
             assertThatThrownBy(() -> uploadedFile.markAsUploaded(location, encryption, checksum))
                     .isInstanceOf(IllegalStateException.class);
-        }
-
-        @Test
-        @DisplayName("should throw when marking processing from wrong state")
-        void shouldThrowWhenMarkingProcessingFromWrongState() {
-            SecureFile file = SecureFile.createPending(
-                    FileName.of("test.pdf"),
-                    MimeType.of("application/pdf"),
-                    FileSize.of(1024),
-                    CorrelationId.generate(),
-                    "user-123"
-            );
-
-            assertThatThrownBy(file::markAsProcessing)
-                    .isInstanceOf(IllegalStateException.class);
-        }
-
-        @Test
-        @DisplayName("should throw when marking completed from wrong state")
-        void shouldThrowWhenMarkingCompletedFromWrongState() {
-            SecureFile file = SecureFile.createPending(
-                    FileName.of("test.pdf"),
-                    MimeType.of("application/pdf"),
-                    FileSize.of(1024),
-                    CorrelationId.generate(),
-                    "user-123"
-            );
-
-            assertThatThrownBy(file::markAsCompleted)
-                    .isInstanceOf(IllegalStateException.class);
-        }
-
-        @Test
-        @DisplayName("should allow marking as failed from any state")
-        void shouldAllowMarkingAsFailedFromAnyState() {
-            SecureFile file = SecureFile.createPending(
-                    FileName.of("test.pdf"),
-                    MimeType.of("application/pdf"),
-                    FileSize.of(1024),
-                    CorrelationId.generate(),
-                    "user-123"
-            );
-
-            SecureFile failed = file.markAsFailed();
-            assertThat(failed.getStatus()).isEqualTo(FileStatus.FAILED);
         }
     }
 

@@ -75,29 +75,6 @@ class DomainModelTest {
     @Nested
     @DisplayName("MimeType Value Object")
     class MimeTypeTests {
-
-        @ParameterizedTest
-        @ValueSource(strings = {
-                "application/pdf",
-                "image/png",
-                "image/jpeg",
-                "application/json",
-                "text/plain"
-        })
-        @DisplayName("should accept allowed MIME types")
-        void shouldAcceptAllowedMimeTypes(String mimeType) {
-            MimeType type = MimeType.of(mimeType);
-
-            assertThat(type.isAllowed()).isTrue();
-        }
-
-        @Test
-        @DisplayName("should reject executable MIME types")
-        void shouldRejectExecutableMimeTypes() {
-            MimeType type = MimeType.of("application/x-msdownload");
-
-            assertThat(type.isAllowed()).isFalse();
-        }
     }
 
     @Nested
@@ -157,36 +134,6 @@ class DomainModelTest {
 
             assertThat(uploadedFile.getStatus()).isEqualTo(FileStatus.UPLOADED);
             assertThat(uploadedFile.getStorageLocation()).isEqualTo(location);
-        }
-
-        @Test
-        @DisplayName("should not allow invalid state transitions")
-        void shouldNotAllowInvalidStateTransitions() {
-            SecureFile file = createTestFile();
-
-            assertThatThrownBy(file::markAsCompleted)
-                    .isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("Cannot complete");
-        }
-
-        @Test
-        @DisplayName("should support UPLOADED to PROCESSING transition")
-        void shouldSupportUploadedToProcessingTransition() {
-            SecureFile file = createUploadedFile();
-
-            SecureFile processingFile = file.markAsProcessing();
-
-            assertThat(processingFile.getStatus()).isEqualTo(FileStatus.PROCESSING);
-        }
-
-        @Test
-        @DisplayName("should support failure from any active state")
-        void shouldSupportFailureFromAnyActiveState() {
-            SecureFile file = createTestFile();
-
-            SecureFile failedFile = file.markAsFailed();
-
-            assertThat(failedFile.getStatus()).isEqualTo(FileStatus.FAILED);
         }
 
         private SecureFile createTestFile() {

@@ -127,45 +127,6 @@ class InMemoryFileRepositoryAdapterTest {
         }
     }
 
-    @Nested
-    @DisplayName("exists")
-    class Exists {
-
-        @Test
-        @DisplayName("should return true when file exists")
-        void shouldReturnTrueWhenExists() {
-            SecureFile file = createTestFile();
-            adapter.save(file);
-
-            boolean result = adapter.exists(file.getId());
-
-            assertThat(result).isTrue();
-        }
-
-        @Test
-        @DisplayName("should return false when file does not exist")
-        void shouldReturnFalseWhenNotExists() {
-            FileId nonExistentId = FileId.generate();
-
-            boolean result = adapter.exists(nonExistentId);
-
-            assertThat(result).isFalse();
-        }
-
-        @Test
-        @DisplayName("should return false after file is deleted")
-        void shouldReturnFalseAfterDelete() {
-            SecureFile file = createTestFile();
-            adapter.save(file);
-            adapter.delete(file.getId());
-
-            boolean result = adapter.exists(file.getId());
-
-            assertThat(result).isFalse();
-        }
-    }
-
-
     private SecureFile createTestFile() {
         return SecureFile.createPending(
                 FileName.of("test-document.pdf"),

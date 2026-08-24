@@ -354,45 +354,4 @@ class S3StorageAdapterTest {
                     .hasMessageContaining("Failed to delete file from S3");
         }
     }
-
-    @Nested
-    @DisplayName("exists")
-    class Exists {
-
-        @Test
-        @DisplayName("should return true when file exists")
-        void shouldReturnTrueWhenFileExists() {
-            StorageLocation location = StorageLocation.of(BUCKET_NAME, "uploads/2024/01/01/file-id");
-            given(s3Client.headObject(any(HeadObjectRequest.class)))
-                    .willReturn(HeadObjectResponse.builder().build());
-
-            boolean result = adapter.exists(location);
-
-            assertThat(result).isTrue();
-        }
-
-        @Test
-        @DisplayName("should return false when file does not exist")
-        void shouldReturnFalseWhenFileDoesNotExist() {
-            StorageLocation location = StorageLocation.of(BUCKET_NAME, "uploads/2024/01/01/file-id");
-            given(s3Client.headObject(any(HeadObjectRequest.class)))
-                    .willThrow(NoSuchKeyException.builder().message("Key not found").build());
-
-            boolean result = adapter.exists(location);
-
-            assertThat(result).isFalse();
-        }
-
-        @Test
-        @DisplayName("should throw StorageException on other S3 errors")
-        void shouldThrowStorageExceptionOnOtherErrors() {
-            StorageLocation location = StorageLocation.of(BUCKET_NAME, "uploads/2024/01/01/file-id");
-            given(s3Client.headObject(any(HeadObjectRequest.class)))
-                    .willThrow(S3Exception.builder().message("Internal Server Error").build());
-
-            assertThatThrownBy(() -> adapter.exists(location))
-                    .isInstanceOf(StorageException.class)
-                    .hasMessageContaining("Failed to check file existence");
-        }
-    }
 }

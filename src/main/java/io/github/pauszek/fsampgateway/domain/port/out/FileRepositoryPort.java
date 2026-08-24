@@ -21,6 +21,4 @@ public interface FileRepositoryPort {
     Optional<SecureFile> findById(FileId fileId);
 
     void delete(FileId fileId);
-
-    boolean exists(FileId fileId);
 }

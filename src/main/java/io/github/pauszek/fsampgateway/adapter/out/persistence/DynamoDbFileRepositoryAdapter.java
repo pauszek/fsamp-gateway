@@ -212,17 +212,6 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
                 .build());
     }
 
-    @Override
-    public boolean exists(FileId fileId) {
-        GetItemResponse response = dynamoDbClient.getItem(GetItemRequest.builder()
-                .tableName(tableName)
-                .key(currentStateKey(fileId))
-                .consistentRead(true)
-                .projectionExpression(PK)
-                .build());
-        return response.hasItem() && !response.item().isEmpty();
-    }
-
     private Map<String, AttributeValue> toItem(SecureFile file) {
         Map<String, AttributeValue> item = new HashMap<>();
         item.putAll(currentStateKey(file.getId()));

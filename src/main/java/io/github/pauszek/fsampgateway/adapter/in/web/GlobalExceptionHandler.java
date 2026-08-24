@@ -13,6 +13,7 @@ import org.slf4j.MDC;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -24,6 +25,7 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.sns.model.SnsException;
 
 import java.util.List;
+import java.util.Locale;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -270,6 +272,20 @@ public class GlobalExceptionHandler {
         );
     }
 
+    // Denials raised inside the controller would otherwise reach handleGeneric
+    // and be reported as 500s.
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiErrorDto> handleAccessDenied(
+            AccessDeniedException ex, WebRequest request) {
+
+        log.warn("Access denied: {}", ex.getMessage());
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                buildError(HttpStatus.FORBIDDEN, "ACCESS_DENIED",
+                        "You don't have permission to access this resource", request)
+        );
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorDto> handleGeneric(
             Exception ex, WebRequest request) {
@@ -285,7 +301,7 @@ public class GlobalExceptionHandler {
     private ApiErrorDto buildError(HttpStatus status, String errorCode,
                                    String message, WebRequest request) {
         return ApiErrorDto.builder()
-                .type(ERROR_TYPE_BASE + errorCode.toLowerCase().replace('_', '-'))
+                .type(ERROR_TYPE_BASE + errorCode.toLowerCase(Locale.ROOT).replace('_', '-'))
                 .status(status.value())
                 .error(errorCode)
                 .message(message)

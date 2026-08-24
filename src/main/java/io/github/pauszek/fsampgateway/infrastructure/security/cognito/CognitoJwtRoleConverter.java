@@ -8,6 +8,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 import java.util.Collection;
+import java.util.Locale;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -44,7 +45,7 @@ public class CognitoJwtRoleConverter implements Converter<Jwt, Collection<Grante
         return groups.stream()
                 .filter(Objects::nonNull)
                 .filter(group -> !group.isBlank())
-                .map(group -> new SimpleGrantedAuthority(ROLE_PREFIX + group.toUpperCase()));
+                .map(group -> new SimpleGrantedAuthority(ROLE_PREFIX + group.toUpperCase(Locale.ROOT)));
     }
 
     private Stream<GrantedAuthority> extractScopeAuthorities(Jwt jwt) {

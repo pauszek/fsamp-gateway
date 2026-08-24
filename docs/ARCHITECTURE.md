@@ -606,8 +606,10 @@ Structured logging with correlation ID:
 ### Management Endpoints
 
 - `/actuator/health` - Health status
-- `/actuator/metrics` - Metrics
-- `/actuator/prometheus` - Prometheus format
+- `/actuator/info` - Build information
+
+Every other actuator path is denied by the security filter chain; runtime metrics
+are exported to CloudWatch.
 
 ---
 

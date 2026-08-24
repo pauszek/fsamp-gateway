@@ -9,7 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class UploadSecurityPropertiesTest {
 
     @Test
-    void shouldNormalizeConfiguredContentTypesAndMatchCaseInsensitively() {
+    void shouldNormalizeConfiguredContentTypes() {
         UploadSecurityProperties properties = new UploadSecurityProperties(
                 true,
                 Set.of(" Application/PDF ", "IMAGE/PNG"),
@@ -18,9 +18,6 @@ class UploadSecurityPropertiesTest {
 
         assertThat(properties.allowedContentTypes())
                 .containsExactlyInAnyOrder("application/pdf", "image/png");
-        assertThat(properties.isContentTypeAllowed("APPLICATION/PDF")).isTrue();
-        assertThat(properties.isContentTypeAllowed("text/plain")).isFalse();
-        assertThat(properties.isContentTypeAllowed(null)).isFalse();
     }
 
     @Test

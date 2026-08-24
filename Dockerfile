@@ -46,14 +46,11 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 
 USER fsamp
 
+# ACCP is installed programmatically by FipsCryptoConfig at startup.
 ENV JAVA_OPTS="-XX:+UseContainerSupport \
     -XX:MaxRAMPercentage=75.0 \
     -Djava.security.egd=file:/dev/./urandom \
     -Dorg.bouncycastle.fips.approved_only=true"
-# ACCP installation is performed programmatically by FipsCryptoConfig
-# at application startup (assertHealthy + Security.insertProviderAt). The
-# previous extclasses property is not part of the ACCP API and was removed
-# to avoid misleading auditors looking for the FIPS posture in flags.
 
 EXPOSE 8080
 

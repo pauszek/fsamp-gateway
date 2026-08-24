@@ -58,7 +58,11 @@ class FileUploadDomainServiceTest {
                 contentValidator,
                 fileStorage,
                 eventPublisher,
-                fileRepository
+                fileRepository,
+                MimeType.ALLOWED_TYPES,
+                FileSize.MAX_SIZE,
+                false,
+                null
         );
     }
 
@@ -231,7 +235,10 @@ class FileUploadDomainServiceTest {
                     fileStorage,
                     eventPublisher,
                     fileRepository,
-                    true
+                    MimeType.ALLOWED_TYPES,
+                    FileSize.MAX_SIZE,
+                    true,
+                    null
             );
             var command = createValidCommand();
             mockSuccessfulValidation();
@@ -253,7 +260,10 @@ class FileUploadDomainServiceTest {
                     fileStorage,
                     eventPublisher,
                     fileRepository,
-                    true
+                    MimeType.ALLOWED_TYPES,
+                    FileSize.MAX_SIZE,
+                    true,
+                    null
             );
             mockSuccessfulValidation();
             mockSuccessfulStorage();
@@ -361,7 +371,8 @@ class FileUploadDomainServiceTest {
                     fileRepository,
                     Set.of(TEST_CONTENT_TYPE),
                     5,
-                    false
+                    false,
+                    null
             );
 
             assertThatThrownBy(() -> limitedService.execute(createValidCommand()))

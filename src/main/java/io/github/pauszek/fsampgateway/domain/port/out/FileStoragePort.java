@@ -17,6 +17,4 @@ public interface FileStoragePort {
     InputStream retrieve(StorageLocation location);
 
     void delete(StorageLocation location);
-
-    boolean exists(StorageLocation location);
 }

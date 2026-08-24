@@ -52,28 +52,7 @@ public final class SecureFile {
         );
     }
 
-    public static SecureFile createPending(
-            FileName fileName,
-            MimeType mimeType,
-            FileSize size,
-            CorrelationId correlationId,
-            String uploadedBy,
-            String description,
-            Set<String> tags
-    ) {
-        return createPending(
-                FileId.generate(),
-                fileName,
-                mimeType,
-                size,
-                correlationId,
-                uploadedBy,
-                description,
-                tags
-        );
-    }
-
-    @SuppressWarnings("java:S107") // Idempotent retries require the pre-reserved file ID.
+    @SuppressWarnings("java:S107")
     public static SecureFile createPending(
             FileId fileId,
             FileName fileName,
@@ -112,37 +91,6 @@ public final class SecureFile {
                 .encryptionMetadata(encryptionMetadata)
                 .checksum(checksum)
                 .status(FileStatus.UPLOADED)
-                .auditInfo(auditInfo.update())
-                .build();
-    }
-
-    public SecureFile markAsProcessing() {
-        if (this.status != FileStatus.UPLOADED) {
-            throw new IllegalStateException(
-                    "Cannot start processing from status: " + this.status);
-        }
-
-        return toBuilder()
-                .status(FileStatus.PROCESSING)
-                .auditInfo(auditInfo.update())
-                .build();
-    }
-
-    public SecureFile markAsCompleted() {
-        if (this.status != FileStatus.PROCESSING) {
-            throw new IllegalStateException(
-                    "Cannot complete from status: " + this.status);
-        }
-
-        return toBuilder()
-                .status(FileStatus.COMPLETED)
-                .auditInfo(auditInfo.update())
-                .build();
-    }
-
-    public SecureFile markAsFailed() {
-        return toBuilder()
-                .status(FileStatus.FAILED)
                 .auditInfo(auditInfo.update())
                 .build();
     }

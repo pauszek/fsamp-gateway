@@ -23,17 +23,6 @@ public final class UploadFileCommand {
     private final Set<String> tags;
     private final FileId fileId;
 
-    public UploadFileCommand(
-            String fileName,
-            String contentType,
-            long size,
-            InputStream content,
-            String correlationId,
-            String uploadedBy
-    ) {
-        this(fileName, contentType, size, content, correlationId, uploadedBy, null, Set.of(), null);
-    }
-
     @SuppressWarnings("java:S107")
     public UploadFileCommand(
             String fileName,

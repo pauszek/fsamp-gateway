@@ -22,10 +22,13 @@ public class EventContractValidator {
 
     private final ObjectMapper objectMapper;
     private final JsonSchema schema;
+    private final String schemaVersion;
 
     public EventContractValidator(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
         this.schema = loadSchema();
+        this.schemaVersion = schema.getSchemaNode()
+                .path("properties").path("schemaVersion").path("const").asText();
     }
 
     public void validate(DomainEvent event) {
@@ -34,7 +37,7 @@ public class EventContractValidator {
             Set<ValidationMessage> violations = schema.validate(document);
             if (!violations.isEmpty()) {
                 throw new EventSerializationException(
-                        "Event violates FSAMP schema 1.2.0: " + violations,
+                        "Event violates FSAMP schema " + schemaVersion + ": " + violations,
                         null
                 );
             }

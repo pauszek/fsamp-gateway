@@ -2,6 +2,13 @@ package io.github.pauszek.fsampgateway.infrastructure.security;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import io.github.pauszek.fsampgateway.domain.model.CorrelationId;
+import io.github.pauszek.fsampgateway.domain.model.FileId;
+import io.github.pauszek.fsampgateway.domain.model.FileName;
+import io.github.pauszek.fsampgateway.domain.model.FileSize;
+import io.github.pauszek.fsampgateway.domain.model.MimeType;
+import io.github.pauszek.fsampgateway.domain.model.SecureFile;
+import io.github.pauszek.fsampgateway.domain.port.out.FileRepositoryPort;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -16,6 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -31,6 +39,9 @@ class SecurityIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private FileRepositoryPort fileRepository;
 
     @MockitoBean
     private JwtDecoder jwtDecoder;
@@ -165,6 +176,30 @@ class SecurityIntegrationTest {
         mockMvc.perform(get("/api/v1/files/123")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("should answer 403 when another user owns the file")
+    void shouldDenyMetadataAccessForNonOwner() throws Exception {
+        FileId fileId = FileId.generate();
+        fileRepository.save(SecureFile.createPending(
+                fileId,
+                FileName.of("owned.txt"),
+                MimeType.of("text/plain"),
+                FileSize.of(10L),
+                CorrelationId.generate(),
+                "owner-user",
+                null,
+                Set.of()
+        ));
+
+        Jwt jwt = createJwt("other-user", List.of("users"), "openid files.read");
+        when(jwtDecoder.decode(anyString())).thenReturn(jwt);
+
+        mockMvc.perform(get("/api/v1/files/" + fileId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("ACCESS_DENIED"));
     }
 
     @Test
