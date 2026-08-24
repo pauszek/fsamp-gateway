@@ -59,6 +59,8 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
     private static final String OUTBOX_STATUS_PENDING = "PENDING";
     private static final String ITEM_NOT_EXISTS_CONDITION =
             "attribute_not_exists(PK) AND attribute_not_exists(SK)";
+    private static final String ITEM_EXISTS_CONDITION =
+            "attribute_exists(PK) AND attribute_exists(SK)";
     private static final int OUTBOX_SHARD_COUNT = 16;
 
     private static final String PK = "PK";
@@ -125,14 +127,20 @@ public class DynamoDbFileRepositoryAdapter implements FileRepositoryPort {
     @CircuitBreaker(name = "dynamoDb")
     @Retry(name = "dynamoDb")
     public SecureFile save(SecureFile file) {
+        boolean lifecycleUpdate = file.getStatus() == FileStatus.DELETING;
         try {
             dynamoDbClient.putItem(PutItemRequest.builder()
                     .tableName(tableName)
                     .item(toItem(file))
-                    .conditionExpression(ITEM_NOT_EXISTS_CONDITION)
+                    .conditionExpression(lifecycleUpdate
+                            ? ITEM_EXISTS_CONDITION
+                            : ITEM_NOT_EXISTS_CONDITION)
                     .build());
             return file;
         } catch (ConditionalCheckFailedException e) {
+            if (lifecycleUpdate) {
+                throw e;
+            }
             return recoverCommittedUpload(file, e);
         }
     }

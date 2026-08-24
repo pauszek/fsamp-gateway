@@ -105,6 +105,37 @@ class DynamoDbFileRepositoryAdapterTest {
         }
 
         @Test
+        @DisplayName("should update an existing file when marking it for deletion")
+        void shouldUpdateExistingFileWhenMarkingItForDeletion() {
+            SecureFile deletingFile = createUploadedFile().markAsDeleting();
+            given(dynamoDbClient.putItem(any(PutItemRequest.class)))
+                    .willReturn(PutItemResponse.builder().build());
+
+            SecureFile result = adapter.save(deletingFile);
+
+            assertThat(result).isEqualTo(deletingFile);
+            then(dynamoDbClient).should().putItem(putRequestCaptor.capture());
+            PutItemRequest request = putRequestCaptor.getValue();
+            assertThat(request.conditionExpression())
+                    .isEqualTo("attribute_exists(PK) AND attribute_exists(SK)");
+            assertThat(request.item().get("status").s()).isEqualTo("DELETING");
+        }
+
+        @Test
+        @DisplayName("should fail a deletion transition when metadata no longer exists")
+        void shouldFailDeletionTransitionWhenMetadataNoLongerExists() {
+            SecureFile deletingFile = createUploadedFile().markAsDeleting();
+            ConditionalCheckFailedException failure = ConditionalCheckFailedException.builder()
+                    .message("metadata no longer exists")
+                    .build();
+            given(dynamoDbClient.putItem(any(PutItemRequest.class))).willThrow(failure);
+
+            assertThatThrownBy(() -> adapter.save(deletingFile)).isSameAs(failure);
+
+            then(dynamoDbClient).should(never()).getItem(any(GetItemRequest.class));
+        }
+
+        @Test
         @DisplayName("should propagate DynamoDB exceptions")
         void shouldPropagateDynamoDbExceptions() {
             SecureFile file = createPendingFile();
