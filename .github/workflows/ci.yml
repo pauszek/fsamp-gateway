@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 env:
-  CODE_CI_WORKFLOW_SHA: feb5a3a2eec515d5460f4915203652ebf5c86c31
+  CODE_CI_WORKFLOW_SHA: 89267d679def9b6d5f773a0f4cd76fef19c1683d
 
 jobs:
   params:
