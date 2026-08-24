@@ -26,7 +26,7 @@
         <opentelemetry.version>1.62.0</opentelemetry.version>
         <aws.sdk.version>2.44.12</aws.sdk.version>
         <bouncycastle.version>2.0.1</bouncycastle.version>
-        <testcontainers.version>1.21.0</testcontainers.version>
+        <testcontainers.version>1.21.4</testcontainers.version>
         <lombok.version>1.18.38</lombok.version>
         <resilience4j.version>2.4.0</resilience4j.version>
         <archunit.version>1.4.0</archunit.version>
