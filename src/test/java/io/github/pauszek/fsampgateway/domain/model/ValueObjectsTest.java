@@ -55,33 +55,6 @@ class ValueObjectsTest {
     class FileNameTests {
 
         @Test
-        @DisplayName("should return empty extension for file without extension")
-        void shouldReturnEmptyExtensionForFileWithoutExtension() {
-            FileName fileName = FileName.of("README");
-
-            assertThat(fileName.getExtension()).isEmpty();
-            assertThat(fileName.getBaseName()).isEqualTo("README");
-        }
-
-        @Test
-        @DisplayName("should handle file starting with dot")
-        void shouldHandleFileStartingWithDot() {
-            FileName fileName = FileName.of(".gitignore");
-
-            assertThat(fileName.getExtension()).isEmpty();
-            assertThat(fileName.getBaseName()).isEqualTo(".gitignore");
-        }
-
-        @Test
-        @DisplayName("should handle multiple dots in filename")
-        void shouldHandleMultipleDots() {
-            FileName fileName = FileName.of("archive.tar.gz");
-
-            assertThat(fileName.getExtension()).isEqualTo("gz");
-            assertThat(fileName.getBaseName()).isEqualTo("archive.tar");
-        }
-
-        @Test
         @DisplayName("should throw for null filename")
         void shouldThrowForNull() {
             assertThatThrownBy(() -> FileName.of(null))
@@ -422,21 +395,6 @@ class ValueObjectsTest {
             assertThat(updated.updatedAt()).isAfterOrEqualTo(original.createdAt());
         }
 
-        @Test
-        @DisplayName("should create system audit info")
-        void shouldCreateSystemAuditInfo() {
-            AuditInfo info = AuditInfo.system();
-
-            assertThat(info.createdBy()).isEqualTo("SYSTEM");
-        }
-
-        @Test
-        @DisplayName("should create anonymous audit info")
-        void shouldCreateAnonymousAuditInfo() {
-            AuditInfo info = AuditInfo.anonymous();
-
-            assertThat(info.createdBy()).isEqualTo("ANONYMOUS");
-        }
     }
 
     @Nested
@@ -654,20 +612,6 @@ class ValueObjectsTest {
     class FileSizeExtendedTests {
 
         @Test
-        @DisplayName("should convert to kilobytes")
-        void shouldConvertToKilobytes() {
-            FileSize size = FileSize.of(2048);
-            assertThat(size.toKilobytes()).isEqualTo(2.0);
-        }
-
-        @Test
-        @DisplayName("should convert to megabytes")
-        void shouldConvertToMegabytes() {
-            FileSize size = FileSize.of(10 * 1024 * 1024);
-            assertThat(size.toMegabytes()).isEqualTo(10.0);
-        }
-
-        @Test
         @DisplayName("should throw for zero size")
         void shouldThrowForZeroSize() {
             assertThatThrownBy(() -> FileSize.of(0))
@@ -785,30 +729,6 @@ class ValueObjectsTest {
                     TEST_EXPIRES_AT
             );
             assertThat(user.isAdmin()).isFalse();
-        }
-
-        @Test
-        @DisplayName("should check isTokenExpired")
-        void shouldCheckIsTokenExpired() {
-            UserPrincipal expiredUser = new UserPrincipal(
-                    "user-1", "user@test.com", "User",
-                    Set.of(),
-                    Set.of(),
-                    null,
-                    Instant.parse("2020-01-15T10:00:00Z"),
-                    Instant.parse("2020-01-15T11:00:00Z")
-            );
-            assertThat(expiredUser.isTokenExpired()).isTrue();
-
-            UserPrincipal validUser = new UserPrincipal(
-                    "user-2", "user2@test.com", "User2",
-                    Set.of(),
-                    Set.of(),
-                    null,
-                    Instant.parse("2999-01-15T10:00:00Z"),
-                    Instant.parse("2999-01-15T11:00:00Z")
-            );
-            assertThat(validUser.isTokenExpired()).isFalse();
         }
 
         @Test

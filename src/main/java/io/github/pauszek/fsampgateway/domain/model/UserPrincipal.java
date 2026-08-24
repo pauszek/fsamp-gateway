@@ -28,19 +28,6 @@ public record UserPrincipal(
         return hasGroup("admins");
     }
 
-    public boolean isTokenExpired() {
-        return tokenExpiresAt != null && Instant.now().isAfter(tokenExpiresAt);
-    }
-
-    public Set<String> getRoles() {
-        if (groups == null) {
-            return Set.of();
-        }
-        return groups.stream()
-                .map(g -> "ROLE_" + g.toUpperCase())
-                .collect(Collectors.toSet());
-    }
-
     public static Builder builder() {
         return new Builder();
     }

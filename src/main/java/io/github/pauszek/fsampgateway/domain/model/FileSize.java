@@ -27,14 +27,6 @@ public record FileSize(long bytes) {
         return new FileSize(bytes);
     }
 
-    public double toKilobytes() {
-        return bytes / 1024.0;
-    }
-
-    public double toMegabytes() {
-        return bytes / (1024.0 * 1024.0);
-    }
-
     public String toHumanReadable() {
         return formatBytes(bytes);
     }

@@ -51,8 +51,6 @@ class DomainModelTest {
             FileName fileName = FileName.of("document.pdf");
 
             assertThat(fileName.value()).isEqualTo("document.pdf");
-            assertThat(fileName.getExtension()).isEqualTo("pdf");
-            assertThat(fileName.getBaseName()).isEqualTo("document");
         }
 
         @Test

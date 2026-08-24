@@ -24,11 +24,4 @@ public record AuditInfo(
         return new AuditInfo(this.createdBy, this.createdAt, Instant.now());
     }
 
-    public static AuditInfo system() {
-        return create("SYSTEM");
-    }
-
-    public static AuditInfo anonymous() {
-        return create("ANONYMOUS");
-    }
 }

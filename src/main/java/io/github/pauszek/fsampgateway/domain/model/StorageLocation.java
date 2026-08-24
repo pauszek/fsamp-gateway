@@ -24,10 +24,6 @@ public record StorageLocation(String bucketName, String objectKey) {
         return "s3://" + bucketName + "/" + objectKey;
     }
 
-    public String toArn() {
-        return "arn:aws:s3:::" + bucketName + "/" + objectKey;
-    }
-
     @Override
     public String toString() {
         return toS3Uri();
