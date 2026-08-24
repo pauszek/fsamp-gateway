@@ -117,6 +117,29 @@ class FileUploadDomainServiceTest {
         }
 
         @Test
+        void shouldUseReservedFileIdForIdempotentUpload() {
+            FileId reservedFileId = FileId.generate();
+            var command = UploadFileCommand.builder()
+                    .fileName(TEST_FILENAME)
+                    .contentType(TEST_CONTENT_TYPE)
+                    .size(TEST_CONTENT.length)
+                    .content(new ByteArrayInputStream(TEST_CONTENT))
+                    .correlationId(TEST_CORRELATION_ID)
+                    .uploadedBy(TEST_USER)
+                    .fileId(reservedFileId)
+                    .build();
+            mockSuccessfulValidation();
+            mockSuccessfulStorage();
+            mockSuccessfulRepository();
+            mockSuccessfulEventPublish();
+
+            SecureFile result = service.execute(command);
+
+            assertThat(result.getId()).isEqualTo(reservedFileId);
+            then(fileStorage).should().store(eq(reservedFileId), any(), any(), any(), any());
+        }
+
+        @Test
         @DisplayName("should compute and include checksum")
         void shouldComputeAndIncludeChecksum() {
             var command = createValidCommand();
@@ -155,7 +178,9 @@ class FileUploadDomainServiceTest {
             then(eventPublisher).should().publish(eventCaptor.capture());
             FileUploadedEvent event = eventCaptor.getValue();
             assertThat(event.fileId()).isNotNull();
-            assertThat(event.eventId()).isNotNull();
+            assertThat(event.eventId())
+                    .as("one FILE_UPLOADED event identity must be stable across retries")
+                    .isEqualTo(event.fileId());
             assertThat(event.fileMetadata().getOriginalFilename()).isEqualTo(TEST_FILENAME);
             assertThat(event.fileMetadata().getMimeType()).isEqualTo(TEST_CONTENT_TYPE);
             assertThat(event.storageLocation().getRegion()).isEqualTo("us-west-2");
@@ -177,6 +202,25 @@ class FileUploadDomainServiceTest {
             assertThat(eventCaptor.getValue().fileId()).isEqualTo(fileCaptor.getValue().getId().value());
             then(eventPublisher).shouldHaveNoInteractions();
             then(fileRepository).should(never()).save(any());
+        }
+
+        @Test
+        void shouldRemoveASecondObjectAfterRecoveringAnAlreadyCommittedUpload() {
+            StorageLocation attemptedLocation = StorageLocation.of("bucket", "key");
+            StorageLocation committedLocation = StorageLocation.of("bucket", "previous-day/key");
+            mockSuccessfulValidation();
+            mockSuccessfulStorage();
+            given(fileRepository.supportsTransactionalOutbox()).willReturn(true);
+            given(fileRepository.saveWithOutbox(any(), any())).willAnswer(invocation -> {
+                SecureFile attempted = invocation.getArgument(0);
+                return attempted.toBuilder().storageLocation(committedLocation).build();
+            });
+
+            SecureFile result = service.execute(createValidCommand());
+
+            assertThat(result.getStorageLocation()).isEqualTo(committedLocation);
+            then(fileStorage).should().delete(attemptedLocation);
+            then(eventPublisher).shouldHaveNoInteractions();
         }
 
         @Test

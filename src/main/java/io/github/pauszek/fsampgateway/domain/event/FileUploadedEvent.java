@@ -40,7 +40,7 @@ public record FileUploadedEvent(
         return new FileUploadedEvent(
                 SCHEMA_VERSION,
                 file.getId().value(),
-                UUID.randomUUID(),
+                file.getId().value(),
                 UUID.fromString(file.getCorrelationId().value()),
                 Instant.now(),
                 EVENT_SOURCE,

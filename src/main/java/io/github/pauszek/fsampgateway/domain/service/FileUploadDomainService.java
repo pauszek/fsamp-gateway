@@ -119,6 +119,7 @@ public class FileUploadDomainService implements UploadFileUseCase {
             tempFile = bufferToTempFile(command);
             ValidatedContent validated = validateContent(command, tempFile);
             file = SecureFile.createPending(
+                    command.getFileIdOrGenerate(),
                     validated.fileName(),
                     validated.mimeType(),
                     validatedSize,
@@ -153,9 +154,11 @@ public class FileUploadDomainService implements UploadFileUseCase {
             );
             FileUploadedEvent event = FileUploadedEvent.from(file, storageRegion);
             if (fileRepository.supportsTransactionalOutbox()) {
+                SecureFile attemptedUpload = file;
                 file = fileRepository.saveWithOutbox(file, event);
                 metadataSaved = true;
                 durableUpload = true;
+                cleanupRedundantObject(attemptedUpload, file);
                 log.info("File metadata and FILE_UPLOADED outbox event persisted: fileId={}, eventId={}",
                         file.getId(), event.eventId());
                 if (directPublishAfterOutbox) {
@@ -233,6 +236,20 @@ public class FileUploadDomainService implements UploadFileUseCase {
         } catch (RuntimeException e) {
             log.warn("Direct publish failed; durable outbox will retry: fileId={}, error={}",
                     file.getId(), e.getMessage());
+        }
+    }
+
+    private void cleanupRedundantObject(SecureFile attemptedUpload, SecureFile persistedUpload) {
+        StorageLocation attemptedLocation = attemptedUpload.getStorageLocation();
+        StorageLocation persistedLocation = persistedUpload.getStorageLocation();
+        if (attemptedLocation == null || attemptedLocation.equals(persistedLocation)) {
+            return;
+        }
+        try {
+            fileStorage.delete(attemptedLocation);
+        } catch (RuntimeException cleanupFailure) {
+            log.error("Failed to remove redundant idempotent upload object: fileId={}, location={}",
+                    persistedUpload.getId(), attemptedLocation, cleanupFailure);
         }
     }
 

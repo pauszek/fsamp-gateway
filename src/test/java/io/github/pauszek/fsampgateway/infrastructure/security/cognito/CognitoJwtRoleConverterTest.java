@@ -15,7 +15,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("CognitoJwtRoleConverter")
 class CognitoJwtRoleConverterTest {
 
-    private final CognitoJwtRoleConverter converter = new CognitoJwtRoleConverter();
+    private static final String RESOURCE_SERVER = "https://fsamp-test-api";
+    private final CognitoJwtRoleConverter converter = new CognitoJwtRoleConverter(
+            new CognitoScopeNormalizer(RESOURCE_SERVER)
+    );
 
     @Test
     @DisplayName("should extract role authorities from cognito:groups claim")
@@ -66,6 +69,49 @@ class CognitoJwtRoleConverterTest {
         assertThat(authorities)
                 .extracting(GrantedAuthority::getAuthority)
                 .contains("SCOPE_openid", "SCOPE_files.read");
+    }
+
+    @Test
+    @DisplayName("should normalize scopes from the configured Cognito resource server")
+    void shouldNormalizeConfiguredResourceServerScopes() {
+        Jwt jwt = createJwt(Map.of(
+                "scope", RESOURCE_SERVER + "/files.read " + RESOURCE_SERVER + "/files.write",
+                "sub", "service-123"
+        ));
+
+        Collection<GrantedAuthority> authorities = converter.convert(jwt);
+
+        assertThat(authorities)
+                .extracting(GrantedAuthority::getAuthority)
+                .containsExactlyInAnyOrder("SCOPE_files.read", "SCOPE_files.write");
+    }
+
+    @Test
+    @DisplayName("should ignore the resource server identifier without a scope name")
+    void shouldIgnoreResourceServerIdentifierWithoutScopeName() {
+        Jwt jwt = createJwt(Map.of(
+                "scope", RESOURCE_SERVER + "/",
+                "sub", "service-123"
+        ));
+
+        Collection<GrantedAuthority> authorities = converter.convert(jwt);
+
+        assertThat(authorities).isEmpty();
+    }
+
+    @Test
+    @DisplayName("should not normalize scopes from another resource server")
+    void shouldNotNormalizeAnotherResourceServerScopes() {
+        Jwt jwt = createJwt(Map.of(
+                "scope", "https://other-api/files.write",
+                "sub", "service-123"
+        ));
+
+        Collection<GrantedAuthority> authorities = converter.convert(jwt);
+
+        assertThat(authorities)
+                .extracting(GrantedAuthority::getAuthority)
+                .containsExactly("SCOPE_https://other-api/files.write");
     }
 
     @Test

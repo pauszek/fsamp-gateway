@@ -1,22 +1,28 @@
 package io.github.pauszek.fsampgateway.infrastructure.security.cognito;
 
 import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Slf4j
+@RequiredArgsConstructor
 public class CognitoJwtRoleConverter implements Converter<Jwt, Collection<GrantedAuthority>> {
 
     private static final String COGNITO_GROUPS_CLAIM = "cognito:groups";
     private static final String SCOPE_CLAIM = "scope";
     private static final String ROLE_PREFIX = "ROLE_";
     private static final String SCOPE_PREFIX = "SCOPE_";
+    private final CognitoScopeNormalizer scopeNormalizer;
 
     @Override
     public Collection<GrantedAuthority> convert(Jwt jwt) {
@@ -42,24 +48,7 @@ public class CognitoJwtRoleConverter implements Converter<Jwt, Collection<Grante
     }
 
     private Stream<GrantedAuthority> extractScopeAuthorities(Jwt jwt) {
-        Object scopeClaim = jwt.getClaim(SCOPE_CLAIM);
-
-        Collection<String> scopes = switch (scopeClaim) {
-            case null -> Collections.emptyList();
-            case String scopeString -> Arrays.asList(scopeString.split("\\s+"));
-            case Collection<?> scopeCollection -> scopeCollection.stream()
-                    .filter(String.class::isInstance)
-                    .map(String.class::cast)
-                    .toList();
-            default -> {
-                log.warn("Unexpected scope claim type: {}", scopeClaim.getClass());
-                yield Collections.emptyList();
-            }
-        };
-
-        return scopes.stream()
-                .filter(Objects::nonNull)
-                .filter(scope -> !scope.isBlank())
+        return scopeNormalizer.extractScopes(jwt.getClaim(SCOPE_CLAIM)).stream()
                 .map(scope -> new SimpleGrantedAuthority(SCOPE_PREFIX + scope));
     }
 

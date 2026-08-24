@@ -2,9 +2,8 @@ package io.github.pauszek.fsampgateway.infrastructure.config;
 
 import org.bouncycastle.jcajce.provider.BouncyCastleFipsProvider;
 import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.condition.EnabledIf;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -16,24 +15,17 @@ import java.security.Security;
 
 import static org.assertj.core.api.Assertions.*;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("fips-test")
+@SpringJUnitConfig(FipsCryptoConfig.class)
+@TestPropertySource(properties = {
+        "fsamp.security.fips-mode=true",
+        "security.fips.approved-only=true"
+})
 @Tag("fips")
 @DisplayName("FIPS 140-3 Crypto Provider Tests")
-@EnabledIf("isACCPAvailable")
 class FipsCryptoConfigTest {
 
     private static final String ACCP_PROVIDER_NAME = "AmazonCorrettoCryptoProvider";
     private static final String ACCP_CLASS = "com.amazon.corretto.crypto.provider.AmazonCorrettoCryptoProvider";
-
-    static boolean isACCPAvailable() {
-        try {
-            Class.forName(ACCP_CLASS);
-            return true;
-        } catch (ClassNotFoundException e) {
-            return false;
-        }
-    }
 
     @Nested
     @DisplayName("Provider Registration")

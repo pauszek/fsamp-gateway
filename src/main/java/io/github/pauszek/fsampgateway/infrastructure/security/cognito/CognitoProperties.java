@@ -17,6 +17,9 @@ public record CognitoProperties(
         @NotBlank(message = "Cognito clientId is required")
         String clientId,
 
+        @NotBlank(message = "Cognito resourceServerIdentifier is required")
+        String resourceServerIdentifier,
+
         String clientSecret,
 
         String jwksEndpoint,

@@ -138,10 +138,12 @@ src/main/java/io/github/pauszek/fsampgateway/
 | `KMS_KEY_ID` | KMS key ID/alias | `alias/fsamp-files-key` |
 | `SNS_TOPIC_ARN` | SNS topic for events | - |
 | `COGNITO_USER_POOL_ID` | Cognito User Pool ID | - |
+| `COGNITO_RESOURCE_SERVER_IDENTIFIER` | Cognito custom resource-server identifier | `https://fsamp-local-api` |
 
-Non-local profiles accept Cognito access tokens with `files.read`,
-`files.write`, or `files.delete` scopes. Group fallback is restricted to
-local/dev/test profiles.
+Non-local profiles accept Cognito access tokens with the configured resource
+server's `files.read` or `files.write` scopes. File deletion always requires
+membership in the `admins` group. Group fallback for read/write operations is
+restricted to local/dev/test profiles.
 
 ### Profiles
 

@@ -7,7 +7,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,6 +37,7 @@ class IdempotencyKeyServiceIntegrationTest extends BaseIntegrationTest {
             IdempotencyKeyService.Acquisition first =
                     idempotencyKeyService.acquireKey(key, user, FINGERPRINT);
             assertThat(first.hasCachedResponse()).isFalse();
+            assertThat(first.operationId()).isNotBlank();
 
             idempotencyKeyService.completeKey(
                     key,
@@ -46,6 +52,7 @@ class IdempotencyKeyServiceIntegrationTest extends BaseIntegrationTest {
             assertThat(retry.cachedRecord().status())
                     .isEqualTo(IdempotencyKeyService.KeyStatus.COMPLETED);
             assertThat(retry.cachedRecord().requestFingerprint()).isEqualTo(FINGERPRINT);
+            assertThat(retry.operationId()).isEqualTo(first.operationId());
         }
 
         @Test
@@ -86,6 +93,35 @@ class IdempotencyKeyServiceIntegrationTest extends BaseIntegrationTest {
 
             assertThat(second.hasCachedResponse()).isFalse();
             assertThat(second.ownerToken()).isNotEqualTo(first.ownerToken());
+            assertThat(second.operationId()).isNotEqualTo(first.operationId());
+        }
+
+        @Test
+        void shouldKeepOperationIdWhenAnExpiredLeaseIsTakenOver() {
+            String key = uniqueKey("takeover");
+            String user = uniqueUser();
+            IdempotencyKeyService.Acquisition first =
+                    idempotencyKeyService.acquireKey(key, user, FINGERPRINT);
+            dynamoDbClient.updateItem(UpdateItemRequest.builder()
+                    .tableName(TEST_IDEMPOTENCY_TABLE)
+                    .key(Map.of(
+                            "idempotencyKey", AttributeValue.fromS(key),
+                            "userId", AttributeValue.fromS(user)
+                    ))
+                    .updateExpression("SET createdAt = :expired")
+                    .expressionAttributeValues(Map.of(
+                            ":expired",
+                            AttributeValue.fromS(
+                                    Instant.now().minus(10, ChronoUnit.MINUTES).toString()
+                            )
+                    ))
+                    .build());
+
+            IdempotencyKeyService.Acquisition takeover =
+                    idempotencyKeyService.acquireKey(key, user, FINGERPRINT);
+
+            assertThat(takeover.ownerToken()).isNotEqualTo(first.ownerToken());
+            assertThat(takeover.operationId()).isEqualTo(first.operationId());
         }
     }
 

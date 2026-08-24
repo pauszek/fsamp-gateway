@@ -34,6 +34,8 @@ import static org.mockito.Mockito.when;
 @DisplayName("IdempotencyAspect")
 class IdempotencyAspectTest {
 
+    private static final String OPERATION_ID = "550e8400-e29b-41d4-a716-446655440000";
+
     private final IdempotencyKeyService idempotencyKeyService = mock(IdempotencyKeyService.class);
     private final CurrentUserService currentUserService = mock(CurrentUserService.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -65,6 +67,7 @@ class IdempotencyAspectTest {
                                 "user-123",
                                 IdempotencyKeyService.KeyStatus.COMPLETED,
                                 "fingerprint",
+                                OPERATION_ID,
                                 "owner-token",
                                 cachedResponse,
                                 Instant.now()
@@ -90,13 +93,18 @@ class IdempotencyAspectTest {
         installRequest("idem-456");
         when(currentUserService.getCurrentUserId()).thenReturn(Optional.of("user-456"));
         when(idempotencyKeyService.acquireKey(eq("idem-456"), eq("user-456"), anyString()))
-                .thenReturn(IdempotencyKeyService.Acquisition.acquired("owner-token"));
+                .thenReturn(IdempotencyKeyService.Acquisition.acquired("owner-token", OPERATION_ID));
         ProceedingJoinPoint joinPoint = mock(ProceedingJoinPoint.class);
         when(joinPoint.getArgs()).thenReturn(new Object[0]);
         ResponseEntity<Map<String, String>> original = ResponseEntity.status(HttpStatus.CREATED)
                 .header(HttpHeaders.LOCATION, "/api/v1/files/123")
                 .body(Map.of("fileId", "123"));
-        when(joinPoint.proceed()).thenReturn(original);
+        when(joinPoint.proceed()).thenAnswer(invocation -> {
+            MockHttpServletRequest request = currentRequest();
+            assertThat(request.getAttribute(IdempotencyAspect.OPERATION_ID_ATTRIBUTE))
+                    .isEqualTo(OPERATION_ID);
+            return original;
+        });
         Idempotent idempotent = mock(Idempotent.class);
 
         Object result = aspect.handleIdempotency(joinPoint, idempotent);
@@ -127,7 +135,7 @@ class IdempotencyAspectTest {
         installRequest("idem-upload");
         when(currentUserService.getCurrentUserId()).thenReturn(Optional.of("user-upload"));
         when(idempotencyKeyService.acquireKey(eq("idem-upload"), eq("user-upload"), anyString()))
-                .thenReturn(IdempotencyKeyService.Acquisition.acquired("owner-upload"));
+                .thenReturn(IdempotencyKeyService.Acquisition.acquired("owner-upload", OPERATION_ID));
         doThrow(new IllegalStateException("DynamoDB unavailable"))
                 .when(idempotencyKeyService)
                 .completeKey(any(), any(), any(), any());
@@ -160,7 +168,7 @@ class IdempotencyAspectTest {
         installRequest("idem-failure");
         when(currentUserService.getCurrentUserId()).thenReturn(Optional.of("user-failure"));
         when(idempotencyKeyService.acquireKey(eq("idem-failure"), eq("user-failure"), anyString()))
-                .thenReturn(IdempotencyKeyService.Acquisition.acquired("owner-failure"));
+                .thenReturn(IdempotencyKeyService.Acquisition.acquired("owner-failure", OPERATION_ID));
         IllegalStateException requestFailure = new IllegalStateException("request failed");
         IllegalStateException releaseFailure = new IllegalStateException("release failed");
         ProceedingJoinPoint joinPoint = mock(ProceedingJoinPoint.class);
@@ -189,6 +197,7 @@ class IdempotencyAspectTest {
                                 "user-corrupt",
                                 IdempotencyKeyService.KeyStatus.COMPLETED,
                                 "fingerprint",
+                                OPERATION_ID,
                                 "owner-corrupt",
                                 "not-json",
                                 Instant.now()
@@ -210,5 +219,10 @@ class IdempotencyAspectTest {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/files/upload");
         request.addHeader(IdempotencyAspect.IDEMPOTENCY_KEY_HEADER, idempotencyKey);
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+    }
+
+    private static MockHttpServletRequest currentRequest() {
+        return (MockHttpServletRequest) ((ServletRequestAttributes)
+                RequestContextHolder.currentRequestAttributes()).getRequest();
     }
 }

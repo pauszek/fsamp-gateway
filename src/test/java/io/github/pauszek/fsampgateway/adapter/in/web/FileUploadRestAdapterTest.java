@@ -9,6 +9,7 @@ import io.github.pauszek.fsampgateway.domain.port.in.DeleteFileUseCase;
 import io.github.pauszek.fsampgateway.domain.port.in.GetFileUseCase;
 import io.github.pauszek.fsampgateway.domain.port.in.UploadFileUseCase;
 import io.github.pauszek.fsampgateway.infrastructure.security.cognito.CurrentUserService;
+import io.github.pauszek.fsampgateway.infrastructure.idempotency.IdempotencyAspect;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
@@ -126,6 +127,26 @@ class FileUploadRestAdapterTest {
             assertThat(command.getContentType()).isEqualTo("application/pdf");
             assertThat(command.getSize()).isEqualTo("Report content".getBytes().length);
             assertThat(command.getUploadedBy()).isEqualTo(USER_ID);
+        }
+
+        @Test
+        void shouldPassReservedIdempotencyOperationIdToTheUpload() throws Exception {
+            FileId reservedFileId = FileId.generate();
+            httpRequest.setAttribute(
+                    IdempotencyAspect.OPERATION_ID_ATTRIBUTE,
+                    reservedFileId.toString()
+            );
+            MockMultipartFile file = new MockMultipartFile(
+                    "file", "report.pdf", "application/pdf", "Report content".getBytes()
+            );
+            given(currentUserService.getCurrentUser()).willReturn(Optional.of(createTestUser()));
+            given(uploadFileUseCase.execute(any())).willReturn(createUploadedFile());
+            given(fileMapper.toResponseDto(any())).willReturn(createResponseDto());
+
+            adapter.uploadFile(file, null, httpRequest, httpResponse);
+
+            then(uploadFileUseCase).should().execute(commandCaptor.capture());
+            assertThat(commandCaptor.getValue().getFileIdOrGenerate()).isEqualTo(reservedFileId);
         }
 
         @Test

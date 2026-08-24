@@ -7,6 +7,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.ActiveProfiles;
@@ -51,6 +52,14 @@ class SecurityIntegrationTest {
     }
 
     @Test
+    @DisplayName("should serve the Swagger UI without authentication")
+    void shouldServeSwaggerUiWithoutAuth() throws Exception {
+        mockMvc.perform(get("/swagger-ui/index.html"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML));
+    }
+
+    @Test
     @DisplayName("should reject unauthenticated request to API endpoint")
     void shouldRejectUnauthenticatedRequest() throws Exception {
         mockMvc.perform(get("/api/v1/files/123"))
@@ -67,6 +76,21 @@ class SecurityIntegrationTest {
         mockMvc.perform(get("/api/v1/files/" + java.util.UUID.randomUUID())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN))
                 .andExpect(status().isNotFound()); // File doesn't exist, but auth passed
+    }
+
+    @Test
+    @DisplayName("should allow the Terraform-shaped Cognito resource server scope")
+    void shouldAllowConfiguredResourceServerScope() throws Exception {
+        Jwt jwt = createJwt(
+                "service-123",
+                List.of(),
+                "https://fsamp-test-api/files.read"
+        );
+        when(jwtDecoder.decode(anyString())).thenReturn(jwt);
+
+        mockMvc.perform(get("/api/v1/files/" + java.util.UUID.randomUUID())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -87,6 +111,17 @@ class SecurityIntegrationTest {
         when(jwtDecoder.decode(anyString())).thenReturn(jwt);
 
         mockMvc.perform(delete("/api/v1/files/123")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("should deny delete scope without the admins group")
+    void shouldDenyDeleteScopeForNonAdmin() throws Exception {
+        Jwt jwt = createJwt("user-123", List.of("users"), "openid files.delete");
+        when(jwtDecoder.decode(anyString())).thenReturn(jwt);
+
+        mockMvc.perform(delete("/api/v1/files/" + java.util.UUID.randomUUID())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN))
                 .andExpect(status().isForbidden());
     }
@@ -130,6 +165,32 @@ class SecurityIntegrationTest {
         mockMvc.perform(get("/api/v1/files/123")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("should reject non-multipart upload as unsupported media")
+    void shouldRejectNonMultipartUpload() throws Exception {
+        Jwt jwt = createJwt("user-123", List.of("users"), "openid files.write");
+        when(jwtDecoder.decode(anyString())).thenReturn(jwt);
+
+        mockMvc.perform(post("/api/v1/files/upload")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"invalid\":true}"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.error").value("UNSUPPORTED_MEDIA_TYPE"));
+    }
+
+    @Test
+    @DisplayName("should reject multipart upload without a file")
+    void shouldRejectMultipartWithoutFile() throws Exception {
+        Jwt jwt = createJwt("user-123", List.of("users"), "openid files.write");
+        when(jwtDecoder.decode(anyString())).thenReturn(jwt);
+
+        mockMvc.perform(multipart("/api/v1/files/upload")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("MISSING_REQUEST_PART"));
     }
 
     @Test

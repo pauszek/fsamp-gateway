@@ -99,16 +99,15 @@ public class SecurityConfig {
                                     .hasAnyAuthority("SCOPE_files.write", ROLE_USERS_AUTHORITY, ROLE_ADMINS_AUTHORITY);
                             auth.requestMatchers(HttpMethod.GET, FILES_API_PATTERN)
                                     .hasAnyAuthority("SCOPE_files.read", ROLE_USERS_AUTHORITY, ROLE_ADMINS_AUTHORITY);
-                            auth.requestMatchers(HttpMethod.DELETE, FILES_API_PATTERN)
-                                    .hasAnyAuthority("SCOPE_files.delete", ROLE_ADMINS_AUTHORITY);
                         } else {
                             auth.requestMatchers(HttpMethod.POST, FILES_API_PATTERN)
                                     .hasAuthority("SCOPE_files.write");
                             auth.requestMatchers(HttpMethod.GET, FILES_API_PATTERN)
                                     .hasAuthority("SCOPE_files.read");
-                            auth.requestMatchers(HttpMethod.DELETE, FILES_API_PATTERN)
-                                    .hasAuthority("SCOPE_files.delete");
                         }
+
+                        auth.requestMatchers(HttpMethod.DELETE, FILES_API_PATTERN)
+                                .hasRole(ROLE_ADMINS);
 
                         auth.requestMatchers("/api/v1/admin/**")
                                 .hasRole(ROLE_ADMINS)

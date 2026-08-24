@@ -62,6 +62,8 @@ class DynamoDbFileRepositoryAdapterTest {
 
             PutItemRequest request = putRequestCaptor.getValue();
             assertThat(request.tableName()).isEqualTo(TABLE_NAME);
+            assertThat(request.conditionExpression())
+                    .isEqualTo("attribute_not_exists(PK) AND attribute_not_exists(SK)");
 
             Map<String, AttributeValue> item = request.item();
             assertThat(item.get("PK").s()).isEqualTo("FILE#" + file.getId());
@@ -103,6 +105,37 @@ class DynamoDbFileRepositoryAdapterTest {
         }
 
         @Test
+        @DisplayName("should update an existing file when marking it for deletion")
+        void shouldUpdateExistingFileWhenMarkingItForDeletion() {
+            SecureFile deletingFile = createUploadedFile().markAsDeleting();
+            given(dynamoDbClient.putItem(any(PutItemRequest.class)))
+                    .willReturn(PutItemResponse.builder().build());
+
+            SecureFile result = adapter.save(deletingFile);
+
+            assertThat(result).isEqualTo(deletingFile);
+            then(dynamoDbClient).should().putItem(putRequestCaptor.capture());
+            PutItemRequest request = putRequestCaptor.getValue();
+            assertThat(request.conditionExpression())
+                    .isEqualTo("attribute_exists(PK) AND attribute_exists(SK)");
+            assertThat(request.item().get("status").s()).isEqualTo("DELETING");
+        }
+
+        @Test
+        @DisplayName("should fail a deletion transition when metadata no longer exists")
+        void shouldFailDeletionTransitionWhenMetadataNoLongerExists() {
+            SecureFile deletingFile = createUploadedFile().markAsDeleting();
+            ConditionalCheckFailedException failure = ConditionalCheckFailedException.builder()
+                    .message("metadata no longer exists")
+                    .build();
+            given(dynamoDbClient.putItem(any(PutItemRequest.class))).willThrow(failure);
+
+            assertThatThrownBy(() -> adapter.save(deletingFile)).isSameAs(failure);
+
+            then(dynamoDbClient).should(never()).getItem(any(GetItemRequest.class));
+        }
+
+        @Test
         @DisplayName("should propagate DynamoDB exceptions")
         void shouldPropagateDynamoDbExceptions() {
             SecureFile file = createPendingFile();
@@ -113,6 +146,34 @@ class DynamoDbFileRepositoryAdapterTest {
             assertThatThrownBy(() -> adapter.save(file))
                     .isInstanceOf(DynamoDbException.class)
                     .hasMessageContaining("Provisioned throughput exceeded");
+        }
+
+        @Test
+        void shouldReturnTheCommittedUploadAfterAnUnknownPutOutcome() {
+            SecureFile file = createUploadedFile();
+            given(dynamoDbClient.putItem(any(PutItemRequest.class)))
+                    .willThrow(ConditionalCheckFailedException.builder().message("already committed").build());
+            mockGetReturning(file);
+
+            SecureFile result = adapter.save(file);
+
+            assertThat(result.getId()).isEqualTo(file.getId());
+            assertThat(result.getChecksum()).isEqualTo(file.getChecksum());
+        }
+
+        @Test
+        void shouldNotHideAConflictingCommittedUpload() {
+            SecureFile file = createUploadedFile();
+            SecureFile conflicting = file.toBuilder()
+                    .correlationId(CorrelationId.generate())
+                    .build();
+            ConditionalCheckFailedException failure = ConditionalCheckFailedException.builder()
+                    .message("conflict")
+                    .build();
+            given(dynamoDbClient.putItem(any(PutItemRequest.class))).willThrow(failure);
+            mockGetReturning(conflicting);
+
+            assertThatThrownBy(() -> adapter.save(file)).isSameAs(failure);
         }
     }
     @Nested
@@ -154,6 +215,84 @@ class DynamoDbFileRepositoryAdapterTest {
             assertThat(outboxPut.item().get("aggregateId").s()).isEqualTo(file.getId().toString());
             assertThat(outboxPut.item().get("status").s()).isEqualTo("PENDING");
             assertThat(outboxPut.item().get("payload").s()).contains("\"fileId\":\"" + file.getId() + "\"");
+        }
+
+        @Test
+        void shouldReturnTheCommittedUploadAfterAnUnknownTransactionOutcome() {
+            SecureFile file = createUploadedFile();
+            FileUploadedEvent event = FileUploadedEvent.from(file);
+            DynamoDbFileRepositoryAdapter outboxAdapter =
+                    new DynamoDbFileRepositoryAdapter(dynamoDbClient, objectMapper(), TABLE_NAME, "test-outbox");
+            given(dynamoDbClient.transactWriteItems(any(TransactWriteItemsRequest.class)))
+                    .willThrow(TransactionCanceledException.builder().message("already committed").build());
+            mockGetReturningWithOutbox(file, event);
+
+            SecureFile result = outboxAdapter.saveWithOutbox(file, event);
+
+            assertThat(result.getId()).isEqualTo(file.getId());
+            assertThat(result.getChecksum()).isEqualTo(file.getChecksum());
+        }
+
+        @Test
+        void shouldNotReportDurabilityWhenTheOutboxEventIsMissing() {
+            SecureFile file = createUploadedFile();
+            FileUploadedEvent event = FileUploadedEvent.from(file);
+            DynamoDbFileRepositoryAdapter outboxAdapter =
+                    new DynamoDbFileRepositoryAdapter(dynamoDbClient, objectMapper(), TABLE_NAME, "test-outbox");
+            TransactionCanceledException cancellation = TransactionCanceledException.builder()
+                    .message("metadata exists without outbox")
+                    .build();
+            given(dynamoDbClient.transactWriteItems(any(TransactWriteItemsRequest.class)))
+                    .willThrow(cancellation);
+            given(dynamoDbClient.getItem(any(GetItemRequest.class))).willAnswer(invocation -> {
+                GetItemRequest request = invocation.getArgument(0);
+                return GetItemResponse.builder()
+                        .item(TABLE_NAME.equals(request.tableName()) ? metadataItem(file) : Map.of())
+                        .build();
+            });
+
+            assertThatThrownBy(() -> outboxAdapter.saveWithOutbox(file, event))
+                    .isSameAs(cancellation);
+        }
+
+        @Test
+        void shouldNotHideAConflictingUploadWithTheSameFileId() {
+            SecureFile file = createUploadedFile();
+            SecureFile conflicting = file.toBuilder()
+                    .checksum(Checksum.sha256("b".repeat(64)))
+                    .build();
+            FileUploadedEvent event = FileUploadedEvent.from(file);
+            DynamoDbFileRepositoryAdapter outboxAdapter =
+                    new DynamoDbFileRepositoryAdapter(dynamoDbClient, objectMapper(), TABLE_NAME, "test-outbox");
+            TransactionCanceledException cancellation = TransactionCanceledException.builder()
+                    .message("conflict")
+                    .build();
+            given(dynamoDbClient.transactWriteItems(any(TransactWriteItemsRequest.class)))
+                    .willThrow(cancellation);
+            mockGetReturningWithOutbox(conflicting, event);
+
+            assertThatThrownBy(() -> outboxAdapter.saveWithOutbox(file, event))
+                    .isSameAs(cancellation);
+        }
+
+        @Test
+        void shouldNotRecoverAnUploadWithADifferentCorrelationId() {
+            SecureFile file = createUploadedFile();
+            SecureFile conflicting = file.toBuilder()
+                    .correlationId(CorrelationId.generate())
+                    .build();
+            FileUploadedEvent event = FileUploadedEvent.from(file);
+            DynamoDbFileRepositoryAdapter outboxAdapter =
+                    new DynamoDbFileRepositoryAdapter(dynamoDbClient, objectMapper(), TABLE_NAME, "test-outbox");
+            TransactionCanceledException cancellation = TransactionCanceledException.builder()
+                    .message("conflict")
+                    .build();
+            given(dynamoDbClient.transactWriteItems(any(TransactWriteItemsRequest.class)))
+                    .willThrow(cancellation);
+            mockGetReturningWithOutbox(conflicting, event);
+
+            assertThatThrownBy(() -> outboxAdapter.saveWithOutbox(file, event))
+                    .isSameAs(cancellation);
         }
     }
     @Nested
@@ -241,6 +380,32 @@ class DynamoDbFileRepositoryAdapterTest {
             assertThat(found.getEncryptionMetadata().kmsKeyId()).isEqualTo("alias/test-kms-key");
             assertThat(found.getEncryptionMetadata().encrypted()).isTrue();
         }
+
+        @Test
+        void shouldReadTheLegacyFileNameAttribute() {
+            SecureFile file = createPendingFile();
+            Map<String, AttributeValue> item = metadataItem(file);
+            item.put("fileName", item.remove("originalFilename"));
+            given(dynamoDbClient.getItem(any(GetItemRequest.class)))
+                    .willReturn(GetItemResponse.builder().item(item).build());
+
+            SecureFile result = adapter.findById(file.getId()).orElseThrow();
+
+            assertThat(result.getFileName()).isEqualTo(file.getFileName());
+        }
+
+        @Test
+        void shouldRejectMetadataWithoutAFileName() {
+            SecureFile file = createPendingFile();
+            Map<String, AttributeValue> item = metadataItem(file);
+            item.remove("originalFilename");
+            given(dynamoDbClient.getItem(any(GetItemRequest.class)))
+                    .willReturn(GetItemResponse.builder().item(item).build());
+
+            assertThatThrownBy(() -> adapter.findById(file.getId()))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("Missing DynamoDB attribute: originalFilename");
+        }
     }
     @Nested
     @DisplayName("delete")
@@ -326,6 +491,28 @@ class DynamoDbFileRepositoryAdapterTest {
     }
 
     private void mockGetReturning(SecureFile file) {
+        given(dynamoDbClient.getItem(any(GetItemRequest.class)))
+                .willReturn(GetItemResponse.builder().item(metadataItem(file)).build());
+    }
+
+    private void mockGetReturningWithOutbox(SecureFile file, FileUploadedEvent event) {
+        given(dynamoDbClient.getItem(any(GetItemRequest.class))).willAnswer(invocation -> {
+            GetItemRequest request = invocation.getArgument(0);
+            if (TABLE_NAME.equals(request.tableName())) {
+                return GetItemResponse.builder().item(metadataItem(file)).build();
+            }
+            return GetItemResponse.builder().item(Map.of(
+                    "PK", s("OUTBOX#FileUpload#" + file.getId()),
+                    "SK", s("EVENT#" + event.eventId()),
+                    "entityType", s("OUTBOX_EVENT"),
+                    "eventId", s(event.eventId().toString()),
+                    "aggregateId", s(file.getId().toString()),
+                    "eventType", s(event.getEventType())
+            )).build();
+        });
+    }
+
+    private static Map<String, AttributeValue> metadataItem(SecureFile file) {
         Map<String, AttributeValue> item = new HashMap<>();
 
         item.put("PK", s("FILE#" + file.getId()));
@@ -358,8 +545,7 @@ class DynamoDbFileRepositoryAdapterTest {
             item.put("isEncrypted", AttributeValue.builder().bool(file.getEncryptionMetadata().encrypted()).build());
         }
 
-        given(dynamoDbClient.getItem(any(GetItemRequest.class)))
-                .willReturn(GetItemResponse.builder().item(item).build());
+        return item;
     }
 
     private static AttributeValue s(String value) {
