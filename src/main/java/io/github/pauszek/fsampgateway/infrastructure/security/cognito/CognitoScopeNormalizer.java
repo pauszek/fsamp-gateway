@@ -38,8 +38,8 @@ public final class CognitoScopeNormalizer {
 
         return scopes
                 .map(String::trim)
-                .filter(scope -> !scope.isBlank())
                 .map(this::normalize)
+                .filter(scope -> !scope.isBlank())
                 .collect(Collectors.toUnmodifiableSet());
     }
 

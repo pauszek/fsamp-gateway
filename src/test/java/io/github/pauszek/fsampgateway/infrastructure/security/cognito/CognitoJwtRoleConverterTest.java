@@ -87,6 +87,19 @@ class CognitoJwtRoleConverterTest {
     }
 
     @Test
+    @DisplayName("should ignore the resource server identifier without a scope name")
+    void shouldIgnoreResourceServerIdentifierWithoutScopeName() {
+        Jwt jwt = createJwt(Map.of(
+                "scope", RESOURCE_SERVER + "/",
+                "sub", "service-123"
+        ));
+
+        Collection<GrantedAuthority> authorities = converter.convert(jwt);
+
+        assertThat(authorities).isEmpty();
+    }
+
+    @Test
     @DisplayName("should not normalize scopes from another resource server")
     void shouldNotNormalizeAnotherResourceServerScopes() {
         Jwt jwt = createJwt(Map.of(
