@@ -38,9 +38,4 @@ public class InMemoryFileRepositoryAdapter implements FileRepositoryPort {
         log.debug("Deleting file: fileId={}", fileId);
         storage.remove(fileId);
     }
-
-    @Override
-    public boolean exists(FileId fileId) {
-        return storage.containsKey(fileId);
-    }
 }

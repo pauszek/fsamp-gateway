@@ -20,10 +20,6 @@ public final class ValidationResult {
         return new ValidationResult(false, detectedType, message);
     }
 
-    public boolean isValid() {
-        return valid;
-    }
-
     public boolean isInvalid() {
         return !valid;
     }

@@ -27,7 +27,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,info
   endpoint:
     health:
       show-details: when_authorized
@@ -48,10 +48,6 @@ management:
         http.server.requests: true
       slo:
         http.server.requests: 100ms,200ms,500ms,1s,2s
-  prometheus:
-    metrics:
-      export:
-        enabled: true
   cloudwatch:
     metrics:
       export:
@@ -65,8 +61,7 @@ logging:
     io.github.pauszek: DEBUG
     software.amazon.awssdk: WARN
   pattern:
-    # Keep the AU-3 audit trail in every log line: the business correlation id
-    # (X-Correlation-ID, propagated through SNS/SQS) plus the Micrometer trace.
+    # AU-3: business correlation id plus the Micrometer trace on every line.
     correlation: "[%X{correlationId:-}] [%X{traceId:-}-%X{spanId:-}] "
 
 resilience4j:
@@ -108,11 +103,8 @@ resilience4j:
         max-attempts: 3
         wait-duration: 1s
         exponential-backoff-multiplier: 2
-        # FedRAMP SI-4: retrying on every Throwable masks programming
-        # errors (NullPointerException, IllegalArgumentException, etc.)
-        # behind transient-looking failures. Restrict retries to AWS SDK
-        # service exceptions/domain wrappers and IO errors and fail fast on
-        # validation/configuration errors.
+        # SI-4: retry only transient AWS/IO failures so programming errors
+        # surface instead of hiding behind retries.
         retry-exceptions:
           - io.github.pauszek.fsampgateway.domain.exception.StorageException
           - software.amazon.awssdk.services.s3.model.S3Exception

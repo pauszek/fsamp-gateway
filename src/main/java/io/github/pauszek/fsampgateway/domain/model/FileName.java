@@ -37,22 +37,6 @@ public record FileName(String value) {
         return new FileName(value);
     }
 
-    public String getExtension() {
-        int lastDot = value.lastIndexOf('.');
-        if (lastDot > 0 && lastDot < value.length() - 1) {
-            return value.substring(lastDot + 1).toLowerCase();
-        }
-        return "";
-    }
-
-    public String getBaseName() {
-        int lastDot = value.lastIndexOf('.');
-        if (lastDot > 0) {
-            return value.substring(0, lastDot);
-        }
-        return value;
-    }
-
     public String safeForLogs() {
         return safeForLogs(value);
     }

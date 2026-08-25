@@ -28,23 +28,6 @@ class ValueObjectsTest {
         }
 
         @Test
-        @DisplayName("should detect image types")
-        void shouldDetectImageTypes() {
-            assertThat(MimeType.of("image/png").isImage()).isTrue();
-            assertThat(MimeType.of("image/jpeg").isImage()).isTrue();
-            assertThat(MimeType.of("image/gif").isImage()).isTrue();
-            assertThat(MimeType.of("application/pdf").isImage()).isFalse();
-        }
-
-        @Test
-        @DisplayName("should detect document types")
-        void shouldDetectDocumentTypes() {
-            assertThat(MimeType.of("application/pdf").isDocument()).isTrue();
-            assertThat(MimeType.of("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet").isDocument()).isTrue();
-            assertThat(MimeType.of("text/plain").isDocument()).isFalse();
-        }
-
-        @Test
         @DisplayName("should throw for null MIME type")
         void shouldThrowForNull() {
             assertThatThrownBy(() -> MimeType.of(null))
@@ -70,33 +53,6 @@ class ValueObjectsTest {
     @Nested
     @DisplayName("FileName Value Object")
     class FileNameTests {
-
-        @Test
-        @DisplayName("should return empty extension for file without extension")
-        void shouldReturnEmptyExtensionForFileWithoutExtension() {
-            FileName fileName = FileName.of("README");
-
-            assertThat(fileName.getExtension()).isEmpty();
-            assertThat(fileName.getBaseName()).isEqualTo("README");
-        }
-
-        @Test
-        @DisplayName("should handle file starting with dot")
-        void shouldHandleFileStartingWithDot() {
-            FileName fileName = FileName.of(".gitignore");
-
-            assertThat(fileName.getExtension()).isEmpty();
-            assertThat(fileName.getBaseName()).isEqualTo(".gitignore");
-        }
-
-        @Test
-        @DisplayName("should handle multiple dots in filename")
-        void shouldHandleMultipleDots() {
-            FileName fileName = FileName.of("archive.tar.gz");
-
-            assertThat(fileName.getExtension()).isEqualTo("gz");
-            assertThat(fileName.getBaseName()).isEqualTo("archive.tar");
-        }
 
         @Test
         @DisplayName("should throw for null filename")
@@ -439,21 +395,6 @@ class ValueObjectsTest {
             assertThat(updated.updatedAt()).isAfterOrEqualTo(original.createdAt());
         }
 
-        @Test
-        @DisplayName("should create system audit info")
-        void shouldCreateSystemAuditInfo() {
-            AuditInfo info = AuditInfo.system();
-
-            assertThat(info.createdBy()).isEqualTo("SYSTEM");
-        }
-
-        @Test
-        @DisplayName("should create anonymous audit info")
-        void shouldCreateAnonymousAuditInfo() {
-            AuditInfo info = AuditInfo.anonymous();
-
-            assertThat(info.createdBy()).isEqualTo("ANONYMOUS");
-        }
     }
 
     @Nested
@@ -527,50 +468,6 @@ class ValueObjectsTest {
             assertThat(FileStatus.COMPLETED.getDescription()).isNotBlank();
             assertThat(FileStatus.FAILED.getDescription()).isNotBlank();
         }
-
-        @Test
-        @DisplayName("should check terminal states")
-        void shouldCheckTerminalStates() {
-            assertThat(FileStatus.COMPLETED.isTerminal()).isTrue();
-            assertThat(FileStatus.FAILED.isTerminal()).isTrue();
-            assertThat(FileStatus.PENDING.isTerminal()).isFalse();
-            assertThat(FileStatus.PROCESSING.isTerminal()).isFalse();
-        }
-
-        @Test
-        @DisplayName("should have correct codes")
-        void shouldHaveCorrectCodes() {
-            assertThat(FileStatus.PENDING.getCode()).isEqualTo("pending");
-            assertThat(FileStatus.UPLOADED.getCode()).isEqualTo("uploaded");
-            assertThat(FileStatus.SCANNING.getCode()).isEqualTo("scanning");
-            assertThat(FileStatus.PROCESSING.getCode()).isEqualTo("processing");
-            assertThat(FileStatus.COMPLETED.getCode()).isEqualTo("completed");
-            assertThat(FileStatus.FAILED.getCode()).isEqualTo("failed");
-        }
-
-        @Test
-        @DisplayName("should check canRetry")
-        void shouldCheckCanRetry() {
-            assertThat(FileStatus.FAILED.canRetry()).isTrue();
-            assertThat(FileStatus.COMPLETED.canRetry()).isFalse();
-            assertThat(FileStatus.PENDING.canRetry()).isFalse();
-        }
-
-        @Test
-        @DisplayName("should get status from code")
-        void shouldGetStatusFromCode() {
-            assertThat(FileStatus.fromCode("pending")).isEqualTo(FileStatus.PENDING);
-            assertThat(FileStatus.fromCode("UPLOADED")).isEqualTo(FileStatus.UPLOADED);
-            assertThat(FileStatus.fromCode("Processing")).isEqualTo(FileStatus.PROCESSING);
-        }
-
-        @Test
-        @DisplayName("should throw for unknown code")
-        void shouldThrowForUnknownCode() {
-            assertThatThrownBy(() -> FileStatus.fromCode("unknown"))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("Unknown status code");
-        }
     }
 
     @Nested
@@ -631,12 +528,6 @@ class ValueObjectsTest {
                     Checksum.sha256("a".repeat(64))
             );
             assertThat(file.getStatus()).isEqualTo(FileStatus.UPLOADED);
-
-            file = file.markAsProcessing();
-            assertThat(file.getStatus()).isEqualTo(FileStatus.PROCESSING);
-
-            file = file.markAsCompleted();
-            assertThat(file.getStatus()).isEqualTo(FileStatus.COMPLETED);
         }
 
         @Test
@@ -662,51 +553,6 @@ class ValueObjectsTest {
 
             assertThatThrownBy(() -> uploadedFile.markAsUploaded(location, encryption, checksum))
                     .isInstanceOf(IllegalStateException.class);
-        }
-
-        @Test
-        @DisplayName("should throw when marking processing from wrong state")
-        void shouldThrowWhenMarkingProcessingFromWrongState() {
-            SecureFile file = SecureFile.createPending(
-                    FileName.of("test.pdf"),
-                    MimeType.of("application/pdf"),
-                    FileSize.of(1024),
-                    CorrelationId.generate(),
-                    "user-123"
-            );
-
-            assertThatThrownBy(file::markAsProcessing)
-                    .isInstanceOf(IllegalStateException.class);
-        }
-
-        @Test
-        @DisplayName("should throw when marking completed from wrong state")
-        void shouldThrowWhenMarkingCompletedFromWrongState() {
-            SecureFile file = SecureFile.createPending(
-                    FileName.of("test.pdf"),
-                    MimeType.of("application/pdf"),
-                    FileSize.of(1024),
-                    CorrelationId.generate(),
-                    "user-123"
-            );
-
-            assertThatThrownBy(file::markAsCompleted)
-                    .isInstanceOf(IllegalStateException.class);
-        }
-
-        @Test
-        @DisplayName("should allow marking as failed from any state")
-        void shouldAllowMarkingAsFailedFromAnyState() {
-            SecureFile file = SecureFile.createPending(
-                    FileName.of("test.pdf"),
-                    MimeType.of("application/pdf"),
-                    FileSize.of(1024),
-                    CorrelationId.generate(),
-                    "user-123"
-            );
-
-            SecureFile failed = file.markAsFailed();
-            assertThat(failed.getStatus()).isEqualTo(FileStatus.FAILED);
         }
     }
 
@@ -764,20 +610,6 @@ class ValueObjectsTest {
     @Nested
     @DisplayName("FileSize Extended Tests")
     class FileSizeExtendedTests {
-
-        @Test
-        @DisplayName("should convert to kilobytes")
-        void shouldConvertToKilobytes() {
-            FileSize size = FileSize.of(2048);
-            assertThat(size.toKilobytes()).isEqualTo(2.0);
-        }
-
-        @Test
-        @DisplayName("should convert to megabytes")
-        void shouldConvertToMegabytes() {
-            FileSize size = FileSize.of(10 * 1024 * 1024);
-            assertThat(size.toMegabytes()).isEqualTo(10.0);
-        }
 
         @Test
         @DisplayName("should throw for zero size")
@@ -897,30 +729,6 @@ class ValueObjectsTest {
                     TEST_EXPIRES_AT
             );
             assertThat(user.isAdmin()).isFalse();
-        }
-
-        @Test
-        @DisplayName("should check isTokenExpired")
-        void shouldCheckIsTokenExpired() {
-            UserPrincipal expiredUser = new UserPrincipal(
-                    "user-1", "user@test.com", "User",
-                    Set.of(),
-                    Set.of(),
-                    null,
-                    Instant.parse("2020-01-15T10:00:00Z"),
-                    Instant.parse("2020-01-15T11:00:00Z")
-            );
-            assertThat(expiredUser.isTokenExpired()).isTrue();
-
-            UserPrincipal validUser = new UserPrincipal(
-                    "user-2", "user2@test.com", "User2",
-                    Set.of(),
-                    Set.of(),
-                    null,
-                    Instant.parse("2999-01-15T10:00:00Z"),
-                    Instant.parse("2999-01-15T11:00:00Z")
-            );
-            assertThat(validUser.isTokenExpired()).isFalse();
         }
 
         @Test

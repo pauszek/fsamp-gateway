@@ -44,40 +44,6 @@ public class FileUploadDomainService implements UploadFileUseCase {
     private final boolean directPublishAfterOutbox;
     private final String storageRegion;
 
-    public FileUploadDomainService(
-            ContentValidatorPort contentValidator,
-            FileStoragePort fileStorage,
-            EventPublisherPort eventPublisher,
-            FileRepositoryPort fileRepository
-    ) {
-        this(contentValidator, fileStorage, eventPublisher, fileRepository,
-                MimeType.ALLOWED_TYPES, FileSize.MAX_SIZE, false, null);
-    }
-
-    public FileUploadDomainService(
-            ContentValidatorPort contentValidator,
-            FileStoragePort fileStorage,
-            EventPublisherPort eventPublisher,
-            FileRepositoryPort fileRepository,
-            boolean directPublishAfterOutbox
-    ) {
-        this(contentValidator, fileStorage, eventPublisher, fileRepository,
-                MimeType.ALLOWED_TYPES, FileSize.MAX_SIZE, directPublishAfterOutbox, null);
-    }
-
-    public FileUploadDomainService(
-            ContentValidatorPort contentValidator,
-            FileStoragePort fileStorage,
-            EventPublisherPort eventPublisher,
-            FileRepositoryPort fileRepository,
-            Set<String> allowedContentTypes,
-            long maxFileSizeBytes,
-            boolean directPublishAfterOutbox
-    ) {
-        this(contentValidator, fileStorage, eventPublisher, fileRepository,
-                allowedContentTypes, maxFileSizeBytes, directPublishAfterOutbox, null);
-    }
-
     @SuppressWarnings("java:S107")
     public FileUploadDomainService(
             ContentValidatorPort contentValidator,

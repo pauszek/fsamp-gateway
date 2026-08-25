@@ -209,31 +209,9 @@ public class S3StorageAdapter implements FileStoragePort {
         }
     }
 
-    @Override
-    @CircuitBreaker(name = CIRCUIT_BREAKER_NAME)
-    public boolean exists(StorageLocation location) {
-        try {
-            HeadObjectRequest request = HeadObjectRequest.builder()
-                    .bucket(location.bucketName())
-                    .key(location.objectKey())
-                    .build();
-
-            s3Client.headObject(request);
-            return true;
-
-        } catch (NoSuchKeyException e) {
-            return false;
-        } catch (S3Exception e) {
-            log.error("Error checking file existence: {}, error={}", location, e.getMessage(), e);
-            throw new StorageException("Failed to check file existence", e);
-        }
-    }
-
     private String generateObjectKey(FileId fileId) {
-        // Always derive the key from UTC so the partition is identical
-        // regardless of the JVM default timezone. Mismatched zones would
-        // otherwise cause the gateway and the processor to disagree about
-        // which prefix the object lives under.
+        // UTC keeps the prefix identical across JVM timezones, so the gateway
+        // and the processor always agree on where the object lives.
         LocalDate now = LocalDate.now(ZoneOffset.UTC);
         return String.format("uploads/%d/%02d/%02d/%s",
                 now.getYear(),

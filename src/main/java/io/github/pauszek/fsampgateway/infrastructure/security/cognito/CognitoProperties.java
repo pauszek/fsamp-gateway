@@ -57,11 +57,4 @@ public record CognitoProperties(
         );
     }
 
-    public String getTokenEndpoint() {
-        return getUserPoolDomain() + "/oauth2/token";
-    }
-
-    public String getAuthorizationEndpoint() {
-        return getUserPoolDomain() + "/oauth2/authorize";
-    }
 }

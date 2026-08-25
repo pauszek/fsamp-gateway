@@ -428,49 +428,6 @@ class DynamoDbFileRepositoryAdapterTest {
             assertThat(request.key().get("SK").s()).isEqualTo("METADATA");
         }
     }
-    @Nested
-    @DisplayName("exists")
-    class Exists {
-
-        @Test
-        @DisplayName("should return true when the item exists")
-        void shouldReturnTrueWhenItemExists() {
-            given(dynamoDbClient.getItem(any(GetItemRequest.class)))
-                    .willReturn(GetItemResponse.builder()
-                            .item(Map.of("PK", s("FILE#present")))
-                            .build());
-
-            boolean result = adapter.exists(FileId.generate());
-
-            assertThat(result).isTrue();
-        }
-
-        @Test
-        @DisplayName("should return false when the item is absent")
-        void shouldReturnFalseWhenItemIsAbsent() {
-            given(dynamoDbClient.getItem(any(GetItemRequest.class)))
-                    .willReturn(GetItemResponse.builder().item(Map.of()).build());
-
-            boolean result = adapter.exists(FileId.generate());
-
-            assertThat(result).isFalse();
-        }
-
-        @Test
-        @DisplayName("should project only the partition key")
-        void shouldUseAKeyProjection() {
-            FileId fileId = FileId.generate();
-            given(dynamoDbClient.getItem(any(GetItemRequest.class)))
-                    .willReturn(GetItemResponse.builder().item(Map.of()).build());
-
-            adapter.exists(fileId);
-
-            then(dynamoDbClient).should().getItem(getItemRequestCaptor.capture());
-            assertThat(getItemRequestCaptor.getValue().projectionExpression()).isEqualTo("PK");
-            assertThat(getItemRequestCaptor.getValue().key())
-                    .containsEntry("SK", AttributeValue.fromS("METADATA"));
-        }
-    }
     private SecureFile createPendingFile() {
         return SecureFile.createPending(
                 FileName.of("test-document.pdf"),
